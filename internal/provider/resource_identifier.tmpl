@@ -1,0 +1,54 @@
+package {{ .Resource.Name }}
+
+import (
+{{ range .Imports }}
+"{{ . }}"
+{{ end }}
+)
+
+// Identifier is the identifier for a {{ .Resource.Name }}.
+type Identifier struct {
+{{- range .Resource.Identifier }}
+  // {{ toPascalCase .Name }} is {{ .Description }}
+  {{ toPascalCase .Name }} {{ identifierPartGoType . }}
+{{ end }}
+}
+
+
+type HCLIdentifier struct {
+{{ range .Resource.Identifier }}
+  {{ toPascalCase .Name }} {{ identifierPartHCLGoType . }} {{ backtick }}hcl:"{{ .Name }}" cty:"{{ .Name }}"{{ backtick }}
+{{ end }}
+}
+
+func (id *HCLIdentifier) CtyType() cty.Type {
+	return cty.Object(map[string]cty.Type{
+	{{ range .Resource.Identifier -}}
+	  "{{ .Name }}": {{ identifierPartCtyType . }},
+	{{ end }}
+	})
+}
+
+func (id *HCLIdentifier) ToCtyValue() (cty.Value, error) {
+	return gocty.ToCtyValue(id, id.CtyType())
+}
+
+func (id *HCLIdentifier) ToIdentifier() *Identifier {
+  out := &Identifier{}
+{{ range $id := .Resource.Identifier }}
+  {{ if eq .Type "identifier_oneof" }}
+    switch t := id.{{ toPascalCase .Name }}.(type) {
+    {{ range .Choices -}}
+    case *{{ . }}.HCLIdentifier:
+      out.{{ toPascalCase $id.Name }} = t.ToIdentifier()
+    {{- end }}
+    }
+  {{ else if eq .Type "resource" }}
+    out.{{ toPascalCase .Name }} = id.{{ toPascalCase .Name }}.ToIdentifier()
+  {{ else }}
+    out.{{ toPascalCase .Name }} = id.{{ toPascalCase .Name }}
+  {{ end }}
+{{ end }}
+
+  return out
+}

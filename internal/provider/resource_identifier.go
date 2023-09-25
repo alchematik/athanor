@@ -1,0 +1,61 @@
+package generator
+
+import (
+	"bytes"
+	_ "embed"
+	"go/format"
+	"path/filepath"
+	"text/template"
+)
+
+//go:embed resource_identifier.tmpl
+var resourceIdentifier string
+
+func (g Generator) GenerateResourceIdentifier(resource Resource) ([]byte, error) {
+	tmpl, err := template.New("resource_identifier").
+		Funcs(template.FuncMap{
+			"backtick":                backtick,
+			"toPascalCase":            toPascalCase,
+			"identifierPartGoType":    identifierPartGoType,
+			"identifierPartHCLGoType": identifierPartHCLGoType,
+			"identifierPartCtyType":   identifierPartCtyType,
+		}).
+		Parse(resourceIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	imports := []string{
+		"github.com/zclconf/go-cty/cty",
+		"github.com/zclconf/go-cty/cty/gocty",
+	}
+	for _, id := range resource.Identifier {
+		if id.Type == "resource" {
+			imports = append(imports, filepath.Join(g.ModName, g.ResourceDir, id.Resource))
+		}
+		if id.Type == "identifier_oneof" {
+			imports = append(imports, "github.com/alchematik/athanor/identifier")
+			for _, choice := range id.Choices {
+				imports = append(imports, filepath.Join(g.ModName, g.ResourceDir, choice))
+			}
+		}
+
+	}
+
+	tmplData := map[string]any{
+		"Resource": resource,
+		"Imports":  imports,
+	}
+
+	var buffer bytes.Buffer
+	if err := tmpl.Execute(&buffer, tmplData); err != nil {
+		return nil, err
+	}
+
+	src, err := format.Source(buffer.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return src, nil
+}
