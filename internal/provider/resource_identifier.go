@@ -28,13 +28,15 @@ func (g Generator) GenerateResourceIdentifier(resource Resource) ([]byte, error)
 	imports := []string{
 		"github.com/zclconf/go-cty/cty",
 		"github.com/zclconf/go-cty/cty/gocty",
+		"github.com/hashicorp/hcl/v2",
+		"github.com/hashicorp/hcl/v2/gohcl",
+		"github.com/alchematik/athanor/identifier",
 	}
 	for _, id := range resource.Identifier {
 		if id.Type == "resource" {
 			imports = append(imports, filepath.Join(g.ModName, g.ResourceDir, id.Resource))
 		}
 		if id.Type == "identifier_oneof" {
-			imports = append(imports, "github.com/alchematik/athanor/identifier")
 			for _, choice := range id.Choices {
 				imports = append(imports, filepath.Join(g.ModName, g.ResourceDir, choice))
 			}

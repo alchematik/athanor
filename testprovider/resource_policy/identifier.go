@@ -5,10 +5,67 @@ import (
 
 	"github.com/zclconf/go-cty/cty/gocty"
 
+	"github.com/hashicorp/hcl/v2"
+
+	"github.com/hashicorp/hcl/v2/gohcl"
+
 	"github.com/alchematik/athanor/identifier"
 
 	"github.com/alchematik/athanor/testprovider/bucket"
 )
+
+func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
+	schema := &hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "name"},
+			{Name: "resource"},
+		},
+	}
+	content, diag := block.Body.Content(schema)
+	if diag.HasErrors() {
+		return nil, diag
+	}
+
+	var hclID HCLIdentifier
+
+	if attr, ok := content.Attributes["name"]; ok {
+
+		var name string
+		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &name); diag.HasErrors() {
+			return nil, diag
+		}
+		hclID.Name = name
+
+	}
+
+	if attr, ok := content.Attributes["resource"]; ok {
+
+		variable := attr.Expr.Variables()[0]
+		part := variable.SimpleSplit().Rel[1].(hcl.TraverseAttr)
+		var resource identifier.HCLIdentifier
+		switch part.Name {
+
+		case "bucket":
+			resource = &bucket.HCLIdentifier{}
+
+		}
+
+		if diag := gohcl.DecodeExpression(attr.Expr, ctx, resource); diag.HasErrors() {
+			return nil, diag
+		}
+		hclID.Resource = resource
+
+	}
+
+	val, err := hclID.ToCtyValue()
+	if err != nil {
+		return nil, err
+	}
+
+	identifier.AddIdentifierValueToEvalCtx(ctx, block, val)
+
+	return hclID.ToIdentifier(), nil
+}
 
 // Identifier is the identifier for a resource_policy.
 type Identifier struct {

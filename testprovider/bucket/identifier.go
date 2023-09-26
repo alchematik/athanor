@@ -4,7 +4,68 @@ import (
 	"github.com/zclconf/go-cty/cty"
 
 	"github.com/zclconf/go-cty/cty/gocty"
+
+	"github.com/hashicorp/hcl/v2"
+
+	"github.com/hashicorp/hcl/v2/gohcl"
+
+	"github.com/alchematik/athanor/identifier"
 )
+
+func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
+	schema := &hcl.BodySchema{
+		Attributes: []hcl.AttributeSchema{
+			{Name: "account"},
+			{Name: "region"},
+			{Name: "name"},
+		},
+	}
+	content, diag := block.Body.Content(schema)
+	if diag.HasErrors() {
+		return nil, diag
+	}
+
+	var hclID HCLIdentifier
+
+	if attr, ok := content.Attributes["account"]; ok {
+
+		var account string
+		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &account); diag.HasErrors() {
+			return nil, diag
+		}
+		hclID.Account = account
+
+	}
+
+	if attr, ok := content.Attributes["region"]; ok {
+
+		var region string
+		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &region); diag.HasErrors() {
+			return nil, diag
+		}
+		hclID.Region = region
+
+	}
+
+	if attr, ok := content.Attributes["name"]; ok {
+
+		var name string
+		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &name); diag.HasErrors() {
+			return nil, diag
+		}
+		hclID.Name = name
+
+	}
+
+	val, err := hclID.ToCtyValue()
+	if err != nil {
+		return nil, err
+	}
+
+	identifier.AddIdentifierValueToEvalCtx(ctx, block, val)
+
+	return hclID.ToIdentifier(), nil
+}
 
 // Identifier is the identifier for a bucket.
 type Identifier struct {

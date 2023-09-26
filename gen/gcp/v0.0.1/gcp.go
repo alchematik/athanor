@@ -3,11 +3,10 @@ package gcp
 import (
 	"fmt"
 
+	"github.com/alchematik/athanor/testprovider/bucket"
+	"github.com/alchematik/athanor/testprovider/bucket_object"
+	"github.com/alchematik/athanor/testprovider/resource_policy"
 	"github.com/hashicorp/hcl/v2"
-
-	"github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket"
-	"github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket_object"
-	"github.com/alchematik/athanor/gen/gcp/v0.0.1/resource_policy"
 )
 
 func ParseIdentifierBlock(evalCtx *hcl.EvalContext, block *hcl.Block) (any, error) {

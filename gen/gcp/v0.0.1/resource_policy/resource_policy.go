@@ -1,7 +1,7 @@
 package resource_policy
 
 import (
-	athanorcty "github.com/alchematik/athanor/cty"
+	"github.com/alchematik/athanor/identifier"
 
 	"github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket"
 
@@ -17,8 +17,8 @@ type Identifier struct {
 }
 
 type HCLIdentifier struct {
-	Name     string              `hcl:"name" cty:"name"`
-	Resource athanorcty.CtyTyper `hcl:"resource" cty:"resource"`
+	Name     string                   `hcl:"name" cty:"name"`
+	Resource identifier.HCLIdentifier `hcl:"resource" cty:"resource"`
 }
 
 func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
@@ -48,7 +48,7 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 		part := variable.SimpleSplit().Rel[1].(hcl.TraverseAttr)
 		resourceName := part.Name
 
-		var hclResource athanorcty.CtyTyper
+		var hclResource identifier.HCLIdentifier
 		switch resourceName {
 		case "bucket":
 			hclResource = &bucket.HCLIdentifier{}

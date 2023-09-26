@@ -6,6 +6,58 @@ import (
 {{ end }}
 )
 
+func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
+  schema := &hcl.BodySchema{
+    Attributes: []hcl.AttributeSchema{
+    {{ range .Resource.Identifier -}}
+      {Name: "{{ .Name }}"},
+    {{ end }}
+    },
+  }
+  content, diag := block.Body.Content(schema)
+  if diag.HasErrors() {
+    return nil, diag
+  }
+
+  var hclID HCLIdentifier
+  {{ range $id := .Resource.Identifier }}
+    if attr, ok := content.Attributes["{{ .Name }}"]; ok {
+    {{ if eq .Type "identifier_oneof" }}
+      variable := attr.Expr.Variables()[0]
+		  part := variable.SimpleSplit().Rel[1].(hcl.TraverseAttr)
+		  var {{ .Name }} identifier.HCLIdentifier
+		  switch part.Name {
+		  {{ range .Choices }}
+		    case "{{ . }}":
+		      {{ $id.Name }} = &{{ . }}.HCLIdentifier{}
+		    {{ end }}
+		  }
+
+      if diag := gohcl.DecodeExpression(attr.Expr, ctx, {{ .Name }}); diag.HasErrors() {
+        return nil, diag
+      }
+      hclID.{{ toPascalCase .Name }} = {{ .Name }}
+
+    {{ else }}
+      var {{ .Name }} {{ identifierPartHCLGoType . }}
+      if diag := gohcl.DecodeExpression(attr.Expr, ctx, &{{ .Name }}); diag.HasErrors() {
+        return nil, diag
+      }
+      hclID.{{ toPascalCase .Name }} = {{ .Name }}
+    {{ end }}
+    }
+  {{ end }}
+
+	val, err := hclID.ToCtyValue()
+	if err != nil {
+		return nil, err
+	}
+
+  identifier.AddIdentifierValueToEvalCtx(ctx, block, val)
+
+	return hclID.ToIdentifier(), nil
+}
+
 // Identifier is the identifier for a {{ .Resource.Name }}.
 type Identifier struct {
 {{- range .Resource.Identifier }}
