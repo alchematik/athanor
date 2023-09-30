@@ -122,21 +122,7 @@ func main() {
 							}
 
 							evalCtx := &hcl.EvalContext{
-								Variables: map[string]cty.Value{
-									"id": cty.ObjectVal(map[string]cty.Value{
-										"gcp": cty.ObjectVal(map[string]cty.Value{
-											"bucket": cty.ObjectVal(map[string]cty.Value{
-												"": cty.StringVal(""),
-											}),
-											"bucket_object": cty.ObjectVal(map[string]cty.Value{
-												"": cty.StringVal(""),
-											}),
-											"resource_policy": cty.ObjectVal(map[string]cty.Value{
-												"": cty.StringVal(""),
-											}),
-										}),
-									}),
-								},
+								Variables: map[string]cty.Value{},
 							}
 
 							var ids []any

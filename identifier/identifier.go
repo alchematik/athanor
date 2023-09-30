@@ -15,11 +15,32 @@ func AddIdentifierValueToEvalCtx(ctx *hcl.EvalContext, block *hcl.Block, value c
 	resource := block.Labels[1]
 	name := block.Labels[2]
 
-	m := ctx.Variables[blockType].AsValueMap()
-	providerMap := m[provider].AsValueMap()
-	resourceMap := providerMap[resource].AsValueMap()
+	typeMapVar, ok := ctx.Variables[blockType]
+	if !ok {
+		typeMapVar = cty.ObjectVal(map[string]cty.Value{
+			"": cty.StringVal(""),
+		})
+	}
+	typeMap := typeMapVar.AsValueMap()
+
+	providerMapVar, ok := typeMap[provider]
+	if !ok {
+		providerMapVar = cty.ObjectVal(map[string]cty.Value{
+			"": cty.StringVal(""),
+		})
+	}
+	providerMap := providerMapVar.AsValueMap()
+
+	resourceMapVar, ok := providerMap[resource]
+	if !ok {
+		resourceMapVar = cty.ObjectVal(map[string]cty.Value{
+			"": cty.StringVal(""),
+		})
+	}
+	resourceMap := resourceMapVar.AsValueMap()
+
 	resourceMap[name] = value
 	providerMap[resource] = cty.ObjectVal(resourceMap)
-	m[provider] = cty.ObjectVal(providerMap)
-	ctx.Variables[blockType] = cty.ObjectVal(m)
+	typeMap[provider] = cty.ObjectVal(providerMap)
+	ctx.Variables[blockType] = cty.ObjectVal(typeMap)
 }
