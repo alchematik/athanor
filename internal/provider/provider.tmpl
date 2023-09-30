@@ -1,0 +1,18 @@
+package {{ .Schema.Provider.Name }}
+
+import (
+{{ range .Imports }}
+"{{ . }}"
+{{ end }}
+)
+
+func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
+  switch block.Labels[1] {
+  {{ range .Schema.Resources }}
+  case "{{ .Name }}":
+    return {{ .Name }}.ParseIdentifierBlock(ctx, block)
+  {{ end }}
+  default:
+    return nil, fmt.Errorf("unknown block type: %s", block.Labels[1])
+  }
+} 

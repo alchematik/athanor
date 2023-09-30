@@ -8,9 +8,9 @@ import (
 	"os"
 	"path/filepath"
 
-	gcp "github.com/alchematik/athanor/gen/gcp/v0.0.1"
 	"github.com/alchematik/athanor/internal/parser"
 	"github.com/alchematik/athanor/internal/provider"
+	gcp "github.com/alchematik/athanor/testprovider"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -223,6 +223,19 @@ func main() {
 								if _, err := f.Write(data); err != nil {
 									return err
 								}
+							}
+
+							providerData, err := g.GenerateProvider(schema)
+							if err != nil {
+								return err
+							}
+							providerPath := filepath.Join(outPath, "provider.go")
+							f, err := os.Create(providerPath)
+							if err != nil {
+								return err
+							}
+							if _, err := f.Write(providerData); err != nil {
+								return err
 							}
 
 							return nil
