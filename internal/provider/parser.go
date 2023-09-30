@@ -50,5 +50,20 @@ type Resource struct {
 	Modifiers  []string         `hcl:"modifiers"`
 	Identifier []IdentifierPart `hcl:"identifier,block"`
 	Config     []ConfigPart     `hcl:"config,block"`
-	Parent     *IdentifierPart  `hcl:"parent,block"`
+}
+
+func (r Resource) Dependencies() []string {
+	var deps []string
+	for _, id := range r.Identifier {
+		switch id.Type {
+		case "resource":
+			deps = append(deps, id.Name)
+		case "identifier_oneof":
+			for _, c := range id.Choices {
+				deps = append(deps, c)
+			}
+		}
+	}
+
+	return deps
 }

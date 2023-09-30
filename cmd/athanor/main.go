@@ -13,6 +13,7 @@ import (
 	gcp "github.com/alchematik/athanor/testprovider"
 
 	"github.com/hashicorp/hcl/v2"
+	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
 	// "github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/urfave/cli/v2"
@@ -99,11 +100,12 @@ func main() {
 								blocks = append(blocks, content.Blocks...)
 							}
 
-							resourceNames := []string{"gcp.bucket", "gcp.bucket_object", "gcp.resource_policy"}
 							idBlocks := map[string]map[string]*hcl.Block{}
-							for _, r := range resourceNames {
-								idBlocks[r] = map[string]*hcl.Block{}
+							type Provider struct {
+								Alias   string `hcl:"name"`
+								Version string `hcl:"version"`
 							}
+							providers := map[string]map[string]Provider{}
 
 							for _, b := range blocks {
 								switch b.Type {
@@ -112,12 +114,30 @@ func main() {
 									resource := b.Labels[1]
 									name := b.Labels[2]
 									resourceKey := provider + "." + resource
-									_, ok := idBlocks[resourceKey][name]
+									resourceMap, ok := idBlocks[resourceKey]
+									if !ok {
+										resourceMap = map[string]*hcl.Block{}
+										idBlocks[resourceKey] = resourceMap
+									}
+
+									_, ok = resourceMap[name]
 									if ok {
 										return fmt.Errorf("dupe: %v.%v", resourceKey, name)
 									}
 
 									idBlocks[resourceKey][name] = b
+								case "provider":
+									providerName := b.Labels[0]
+									var p Provider
+									if diag := gohcl.DecodeBody(b.Body, nil, &p); diag.HasErrors() {
+										return diag
+									}
+									m, ok := providers[providerName]
+									if !ok {
+										m = map[string]Provider{}
+										providers[providerName] = m
+									}
+									m[p.Alias] = p
 								}
 							}
 
@@ -126,8 +146,8 @@ func main() {
 							}
 
 							var ids []any
-							for _, r := range resourceNames {
-								blocks := idBlocks[r]
+							for _, r := range gcp.ResourceNames() {
+								blocks := idBlocks["gcp."+r]
 								for _, b := range blocks {
 									id, err := gcp.ParseIdentifierBlock(evalCtx, b)
 									if err != nil {
@@ -137,6 +157,8 @@ func main() {
 									ids = append(ids, id)
 								}
 							}
+
+							fmt.Printf("providers: %v\n", providers)
 
 							for _, id := range ids {
 								fmt.Printf("ID >>> %+v, %T\n", id, id)
