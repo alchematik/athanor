@@ -15,7 +15,7 @@ import (
 func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
-			{Name: "project"},
+			{Name: "account"},
 			{Name: "region"},
 			{Name: "name"},
 		},
@@ -27,13 +27,13 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 
 	var hclID HCLIdentifier
 
-	if attr, ok := content.Attributes["project"]; ok {
+	if attr, ok := content.Attributes["account"]; ok {
 
-		var project string
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &project); diag.HasErrors() {
+		var account string
+		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &account); diag.HasErrors() {
 			return nil, diag
 		}
-		hclID.Project = project
+		hclID.Account = account
 
 	}
 
@@ -69,8 +69,8 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 
 // Identifier is the identifier for a bucket.
 type Identifier struct {
-	// Project is the project that the bucket belongs to.
-	Project string
+	// Account is the account that the bucket belongs to.
+	Account string
 
 	// Region is the region that the bucket belongs in.
 	Region string
@@ -80,7 +80,7 @@ type Identifier struct {
 }
 
 type HCLIdentifier struct {
-	Project string `hcl:"project" cty:"project"`
+	Account string `hcl:"account" cty:"account"`
 
 	Region string `hcl:"region" cty:"region"`
 
@@ -89,7 +89,7 @@ type HCLIdentifier struct {
 
 func (id *HCLIdentifier) CtyType() cty.Type {
 	return cty.Object(map[string]cty.Type{
-		"project": cty.String,
+		"account": cty.String,
 		"region":  cty.String,
 		"name":    cty.String,
 	})
@@ -102,7 +102,7 @@ func (id *HCLIdentifier) ToCtyValue() (cty.Value, error) {
 func (id *HCLIdentifier) ToIdentifier() *Identifier {
 	out := &Identifier{}
 
-	out.Project = id.Project
+	out.Account = id.Account
 
 	out.Region = id.Region
 

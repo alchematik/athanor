@@ -5,9 +5,9 @@ provider {
 
 resource "bucket" {
   modifiers = ["create", "delete"]
-  identifier "account" {
+  identifier "project" {
     type        = "string"
-    description = "the account that the bucket belongs to."
+    description = "the project that the bucket belongs to."
   }
   identifier "region" {
     type        = "string"

@@ -3,8 +3,13 @@ provider "gcp" {
   version = "v0.0.1"
 }
 
+provider "aws" {
+  name    = "aws"
+  version = "v0.0.1"
+}
+
 id "gcp" "bucket" "test-bucket" {
-  account  = "something"
+  project  = "something"
   region   = "us-va"
   name     = "test-bucket"
 }
@@ -35,4 +40,10 @@ id "gcp" "resource_policy" "bucket-policy" {
 op "create" {
   version = "v0.0.1"
   id      = id.resource_policy.bucket-policy
+}
+
+id "aws" "bucket" "test-bucket" {
+  account = "test-account"
+  region  = "us-east-1"
+  name    = "aws-test-bucket"
 }
