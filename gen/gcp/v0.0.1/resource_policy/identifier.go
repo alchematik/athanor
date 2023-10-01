@@ -11,7 +11,7 @@ import (
 
 	"github.com/alchematik/athanor/identifier"
 
-	"github.com/alchematik/athanor/testprovider/bucket"
+	"github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket"
 )
 
 func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {

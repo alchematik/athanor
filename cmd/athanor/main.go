@@ -7,10 +7,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"plugin"
 
 	"github.com/alchematik/athanor/internal/parser"
 	"github.com/alchematik/athanor/internal/provider"
-	gcp "github.com/alchematik/athanor/testprovider"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -44,6 +44,11 @@ func main() {
 				Subcommands: []*cli.Command{
 					{
 						Name: "show",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name: "providers",
+							},
+						},
 						Action: func(ctx *cli.Context) error {
 							dir := ctx.Args().First()
 							if dir == "" {
@@ -81,6 +86,11 @@ func main() {
 
 							if len(files) == 0 {
 								return errors.New("no files found")
+							}
+
+							providersPath := ctx.String("providers")
+							if providersPath == "" {
+								return errors.New("must provide path to providers")
 							}
 
 							resourcesSchema := &hcl.BodySchema{Blocks: blockTypes}
@@ -141,20 +151,51 @@ func main() {
 								}
 							}
 
+							// Load plugins based on provider.
+
 							evalCtx := &hcl.EvalContext{
 								Variables: map[string]cty.Value{},
 							}
 
 							var ids []any
-							for _, r := range gcp.ResourceNames() {
-								blocks := idBlocks["gcp."+r]
-								for _, b := range blocks {
-									id, err := gcp.ParseIdentifierBlock(evalCtx, b)
+							for providerType, p := range providers {
+								for alias, provider := range p {
+									fp := filepath.Join(providersPath, providerType, provider.Version, "provider.so")
+									plug, err := plugin.Open(fp)
+									if err != nil {
+										return err
+									}
+									rnFuncSym, err := plug.Lookup("ResourceNames")
+									if err != nil {
+										return err
+									}
+									rnFunc, ok := rnFuncSym.(func() []string)
+									if !ok {
+										return fmt.Errorf("wrong type for ResourceNames symbol")
+									}
+
+									parseFuncSym, err := plug.Lookup("ParseIdentifierBlock")
 									if err != nil {
 										return err
 									}
 
-									ids = append(ids, id)
+									parseFunc, ok := parseFuncSym.(func(*hcl.EvalContext, *hcl.Block) (any, error))
+									if !ok {
+										return fmt.Errorf("wrong type for ParseIdentifierBlock symbol")
+									}
+
+									resourceNames := rnFunc()
+									for _, rn := range resourceNames {
+										blocks := idBlocks[alias+"."+rn]
+										for _, b := range blocks {
+											id, err := parseFunc(evalCtx, b)
+											if err != nil {
+												return err
+											}
+
+											ids = append(ids, id)
+										}
+									}
 								}
 							}
 
@@ -202,7 +243,7 @@ func main() {
 								return err
 							}
 
-							outPath := ctx.String("out")
+							outPath := filepath.Join(ctx.String("out"), schema.Provider.Name, schema.Provider.Version)
 							if err := os.MkdirAll(outPath, 0777); err != nil {
 								return err
 							}
