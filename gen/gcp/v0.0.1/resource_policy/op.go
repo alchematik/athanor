@@ -38,6 +38,15 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Op, error) {
 
 	op.Type = block.Type
 
+	if configAttr, ok := content.Attributes["config"]; ok {
+		var hclConfig HCLConfig
+		if diag := gohcl.DecodeExpression(configAttr.Expr, ctx, &hclConfig); diag.HasErrors() {
+			return nil, diag
+		}
+
+		op.HCLConfig = hclConfig
+	}
+
 	return op.ToOp(), nil
 }
 
@@ -45,6 +54,7 @@ type Op struct {
 	Type       string
 	Identifier *Identifier
 	Version    string
+	Config     Config
 }
 
 type Config struct {
@@ -54,7 +64,7 @@ type HCLOp struct {
 	Type          string         `hcl:"type" cty:"type"`
 	HCLIdentifier *HCLIdentifier `hcl:"id" cty:"id"`
 	Version       string         `hcl:"version" cty:"version"`
-	HCLConfig     *HCLConfig     `hcl:"config" cty:"config"`
+	HCLConfig     HCLConfig      `hcl:"config" cty:"config"`
 }
 
 func (op *HCLOp) ToOp() *Op {
@@ -62,8 +72,15 @@ func (op *HCLOp) ToOp() *Op {
 		Type:       op.Type,
 		Identifier: op.HCLIdentifier.ToIdentifier(),
 		Version:    op.Version,
+		Config:     op.HCLConfig.ToConfig(),
 	}
 }
 
 type HCLConfig struct {
+}
+
+func (c HCLConfig) ToConfig() Config {
+	out := Config{}
+
+	return out
 }

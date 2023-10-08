@@ -92,3 +92,25 @@ func identifierPartToIdentifier(part IdentifierPart) (string, error) {
 		return "", fmt.Errorf("unknown type: %q", part.Type)
 	}
 }
+
+func configPartGoType(part ConfigPart) (string, error) {
+	switch part.Type {
+	case "string":
+		return "string", nil
+	case "identifier_oneof":
+		return "any", nil
+	default:
+		return "", fmt.Errorf("unknown type: %q", part.Type)
+	}
+}
+
+func configPartHCLGoType(part ConfigPart) (string, error) {
+	switch part.Type {
+	case "string":
+		return "string", nil
+	case "identifier_oneof":
+		return "cty.Value", nil
+	default:
+		return "", fmt.Errorf("unknown type: %q", part.Type)
+	}
+}

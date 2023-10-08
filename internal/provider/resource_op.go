@@ -11,8 +11,12 @@ import (
 var resourceOp string
 
 func (g Generator) GenerateResourceOp(resource Resource) ([]byte, error) {
-	tmpl, err := template.New("resource_create").
-		Funcs(template.FuncMap{}).Parse(resourceOp)
+	tmpl, err := template.New("resource_op").
+		Funcs(template.FuncMap{
+			"toPascalCase":        toPascalCase,
+			"configPartGoType":    configPartGoType,
+			"configPartHCLGoType": configPartHCLGoType,
+		}).Parse(resourceOp)
 	if err != nil {
 		return nil, err
 	}

@@ -33,7 +33,8 @@ resource "bucket_object" {
 		description = "the name of the bucket_object."
 	}
 	config "contents" {
-		type        = "file"
+		/* type        = "file" */
+		type = "string"
 		immutable   = true
 	  description = "the path to the file to upload."
 	}
