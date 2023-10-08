@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"plugin"
+	"sort"
 
 	"github.com/alchematik/athanor/internal/parser"
 	"github.com/alchematik/athanor/internal/provider"
@@ -18,6 +19,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/urfave/cli/v2"
 	"github.com/zclconf/go-cty/cty"
+	"golang.org/x/mod/semver"
 )
 
 var blockTypes = []hcl.BlockHeaderSchema{
@@ -244,12 +246,33 @@ func main() {
 
 							fmt.Printf("providers: %v\n", providers)
 
-							for _, id := range ids {
-								fmt.Printf("ID >>> %+v, %T\n", id, id)
+							migrations := map[string][]operation.Operation{}
+							for _, op := range ops {
+								id := op.ForIdentifier().String()
+								migrations[id] = append(migrations[id], op)
 							}
 
-							for _, op := range ops {
-								fmt.Printf("OP >> %+v\n", op.ForIdentifier().String())
+							resourceStates := map[string]*operation.Resource{}
+							for id, resourceOps := range migrations {
+								sort.Slice(resourceOps, func(i, j int) bool {
+									return semver.Compare(resourceOps[i].ForVersion(), resourceOps[j].ForVersion()) < 0
+								})
+
+								for _, op := range resourceOps {
+									r, ok := resourceStates[id]
+									if !ok {
+										r = &operation.Resource{
+											Identifier: op.ForIdentifier(),
+										}
+										resourceStates[id] = r
+									}
+									op.Apply(r)
+								}
+
+							}
+
+							for _, rs := range resourceStates {
+								fmt.Printf("resource state: %+v\n", rs)
 							}
 
 							return nil

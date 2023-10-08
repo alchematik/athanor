@@ -63,6 +63,15 @@ func (o *Op) ForIdentifier() operation.Identifier {
 	return o.Identifier
 }
 
+func (o *Op) ForVersion() string {
+	return o.Version
+}
+
+func (o *Op) Apply(r *operation.Resource) {
+	r.State = operation.ResourceStateExists
+	r.Config = o.Config
+}
+
 type Config struct {
 	Contents string
 }
