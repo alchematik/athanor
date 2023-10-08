@@ -41,10 +41,6 @@ func toPascalCase(str string) string {
 	return strings.Join(transformed, "")
 }
 
-func backtick() string {
-	return "`"
-}
-
 func identifierPartGoType(part IdentifierPart) (string, error) {
 	switch part.Type {
 	case "string":

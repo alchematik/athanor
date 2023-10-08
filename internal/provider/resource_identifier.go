@@ -15,7 +15,6 @@ var resourceIdentifier string
 func (g Generator) GenerateResourceIdentifier(resource Resource) ([]byte, error) {
 	tmpl, err := template.New("resource_identifier").
 		Funcs(template.FuncMap{
-			"backtick":                backtick,
 			"toPascalCase":            toPascalCase,
 			"identifierPartGoType":    identifierPartGoType,
 			"identifierPartHCLGoType": identifierPartHCLGoType,

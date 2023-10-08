@@ -66,7 +66,7 @@ type HCLIdentifier struct {
   Metadata HCLIdentifierMetadata `cty:"metadata"`
 {{ end }}
 {{ range .Resource.Identifier }}
-  {{ toPascalCase .Name }} {{ identifierPartHCLGoType . }} {{ backtick }}hcl:"{{ .Name }}" cty:"{{ .Name }}"{{ backtick }}
+  {{ toPascalCase .Name }} {{ identifierPartHCLGoType . }} `hcl:"{{ .Name }}" cty:"{{ .Name }}"`
 {{ end }}
 }
 
