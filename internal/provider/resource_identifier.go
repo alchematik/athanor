@@ -12,7 +12,7 @@ import (
 //go:embed resource_identifier.tmpl
 var resourceIdentifier string
 
-func (g Generator) GenerateResourceIdentifier(resource Resource) ([]byte, error) {
+func (g Generator) GenerateResourceIdentifier(provider Provider, resource Resource) ([]byte, error) {
 	tmpl, err := template.New("resource_identifier").
 		Funcs(template.FuncMap{
 			"toPascalCase":            toPascalCase,
@@ -26,6 +26,8 @@ func (g Generator) GenerateResourceIdentifier(resource Resource) ([]byte, error)
 	}
 
 	imports := []string{
+		"fmt",
+		"strings",
 		"github.com/zclconf/go-cty/cty",
 		"github.com/zclconf/go-cty/cty/gocty",
 		"github.com/hashicorp/hcl/v2",
@@ -49,6 +51,7 @@ func (g Generator) GenerateResourceIdentifier(resource Resource) ([]byte, error)
 	}
 
 	tmplData := map[string]any{
+		"Provider": provider,
 		"Resource": resource,
 		"Imports":  imports,
 		"Metadata": metadata,

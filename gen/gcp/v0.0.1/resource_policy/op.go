@@ -1,12 +1,14 @@
 package resource_policy
 
 import (
+	"github.com/alchematik/athanor/operation"
+
 	"github.com/hashicorp/hcl/v2/gohcl"
 
 	"github.com/hashicorp/hcl/v2"
 )
 
-func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Op, error) {
+func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (operation.Operation, error) {
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "id"},
@@ -57,6 +59,10 @@ type Op struct {
 	Config     Config
 }
 
+func (o *Op) ForIdentifier() operation.Identifier {
+	return o.Identifier
+}
+
 type Config struct {
 }
 
@@ -67,7 +73,7 @@ type HCLOp struct {
 	HCLConfig     HCLConfig      `hcl:"config" cty:"config"`
 }
 
-func (op *HCLOp) ToOp() *Op {
+func (op *HCLOp) ToOp() operation.Operation {
 	return &Op{
 		Type:       op.Type,
 		Identifier: op.HCLIdentifier.ToIdentifier(),

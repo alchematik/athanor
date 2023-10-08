@@ -1,6 +1,10 @@
 package bucket_object
 
 import (
+	"fmt"
+
+	"strings"
+
 	"github.com/zclconf/go-cty/cty"
 
 	"github.com/zclconf/go-cty/cty/gocty"
@@ -65,6 +69,16 @@ type Identifier struct {
 
 	// Name is the name of the bucket_object.
 	Name string
+}
+
+func (id *Identifier) String() string {
+	var parts []string
+
+	parts = append(parts, fmt.Sprintf("%s", id.Bucket))
+
+	parts = append(parts, "bucket_object", fmt.Sprintf("%s", id.Name))
+
+	return strings.Join(parts, "/")
 }
 
 type HCLIdentifier struct {

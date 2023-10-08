@@ -17,7 +17,7 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
   }
 } 
 
-func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
+func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (operation.Operation, error) {
   switch block.Labels[1] {
   {{ range .Schema.Resources }}
   case "{{ .Name }}":

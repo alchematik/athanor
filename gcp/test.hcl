@@ -9,7 +9,7 @@ provider "aws" {
 }
 
 id "gcp" "bucket" "test-bucket" {
-  project  = "something"
+  project  = "test-project"
   region   = "us-va"
   name     = "test-bucket"
 }

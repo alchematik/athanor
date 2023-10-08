@@ -60,6 +60,23 @@ type Identifier struct {
 {{ end }}
 }
 
+func (id *Identifier) String() string {
+  var parts []string
+{{ if eq (len .Resource.Dependencies) 0 }}
+  parts = append(parts, "{{ .Provider.Name }}", "{{ .Provider.Version }}")
+{{ end }}
+  
+{{ range .Resource.Identifier }}
+  {{ if .IsNamed }}
+    parts = append(parts, "{{ $.Resource.Name }}", fmt.Sprintf("%s", id.{{ toPascalCase .Name }}))
+  {{ else }}
+    parts = append(parts, fmt.Sprintf("%s", id.{{ toPascalCase .Name }}))
+  {{ end }}
+{{ end }}
+
+  return strings.Join(parts, "/")
+}
+
 
 type HCLIdentifier struct {
 {{ if gt (len .Metadata) 0 }}

@@ -42,16 +42,16 @@ resource "bucket_object" {
 
 resource "resource_policy" {
   modifiers = ["create", "delete"]
-  identifier "name" {
-    type        = "string"
-    is_named    = true
-    description = "the name of the resource policy."
-  }
   identifier "resource" {
     type    = "identifier_oneof"
     choices = [
       "bucket"
     ]
     description = "the resource that the policy belongs to."
+  }
+  identifier "name" {
+    type        = "string"
+    is_named    = true
+    description = "the name of the resource policy."
   }
 }

@@ -23,6 +23,7 @@ func (g Generator) GenerateProvider(s Schema) ([]byte, error) {
 	imports := []string{
 		"fmt",
 		"github.com/hashicorp/hcl/v2",
+		"github.com/alchematik/athanor/operation",
 	}
 	dag := graph.New(graph.StringHash, graph.Directed(), graph.Acyclic(), graph.PreventCycles())
 	if err := dag.AddVertex("root"); err != nil {

@@ -5,6 +5,8 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 
+	"github.com/alchematik/athanor/operation"
+
 	"github.com/alchematik/athanor/gen/aws/v0.0.1/bucket"
 )
 
@@ -19,7 +21,7 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
 	}
 }
 
-func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
+func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (operation.Operation, error) {
 	switch block.Labels[1] {
 
 	case "bucket":

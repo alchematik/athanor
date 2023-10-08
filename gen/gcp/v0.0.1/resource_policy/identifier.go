@@ -1,6 +1,10 @@
 package resource_policy
 
 import (
+	"fmt"
+
+	"strings"
+
 	"github.com/zclconf/go-cty/cty"
 
 	"github.com/zclconf/go-cty/cty/gocty"
@@ -17,8 +21,8 @@ import (
 func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
-			{Name: "name"},
 			{Name: "resource"},
+			{Name: "name"},
 		},
 	}
 	content, diag := block.Body.Content(schema)
@@ -27,16 +31,6 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 	}
 
 	var hclID HCLIdentifier
-
-	if attr, ok := content.Attributes["name"]; ok {
-
-		var name string
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &name); diag.HasErrors() {
-			return nil, diag
-		}
-		hclID.Name = name
-
-	}
 
 	if attr, ok := content.Attributes["resource"]; ok {
 
@@ -48,6 +42,16 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 			return nil, diag
 		}
 		hclID.Resource = val
+
+	}
+
+	if attr, ok := content.Attributes["name"]; ok {
+
+		var name string
+		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &name); diag.HasErrors() {
+			return nil, diag
+		}
+		hclID.Name = name
 
 	}
 
@@ -63,19 +67,29 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 
 // Identifier is the identifier for a resource_policy.
 type Identifier struct {
-	// Name is the name of the resource policy.
-	Name string
-
 	// Resource is the resource that the policy belongs to.
 	Resource any
+
+	// Name is the name of the resource policy.
+	Name string
+}
+
+func (id *Identifier) String() string {
+	var parts []string
+
+	parts = append(parts, fmt.Sprintf("%s", id.Resource))
+
+	parts = append(parts, "resource_policy", fmt.Sprintf("%s", id.Name))
+
+	return strings.Join(parts, "/")
 }
 
 type HCLIdentifier struct {
 	Metadata HCLIdentifierMetadata `cty:"metadata"`
 
-	Name string `hcl:"name" cty:"name"`
-
 	Resource cty.Value `hcl:"resource" cty:"resource"`
+
+	Name string `hcl:"name" cty:"name"`
 }
 
 func (id *HCLIdentifier) CtyType() cty.Type {
@@ -83,8 +97,8 @@ func (id *HCLIdentifier) CtyType() cty.Type {
 
 		"metadata": id.Metadata.CtyType(),
 
-		"name":     cty.String,
 		"resource": cty.DynamicPseudoType,
+		"name":     cty.String,
 	})
 }
 
@@ -95,8 +109,6 @@ func (id *HCLIdentifier) ToCtyValue() (cty.Value, error) {
 func (id *HCLIdentifier) ToIdentifier() *Identifier {
 	out := &Identifier{}
 
-	out.Name = id.Name
-
 	switch id.Metadata.ResourceType {
 	case "bucket":
 		var val bucket.HCLIdentifier
@@ -105,6 +117,8 @@ func (id *HCLIdentifier) ToIdentifier() *Identifier {
 		}
 		out.Resource = val.ToIdentifier()
 	}
+
+	out.Name = id.Name
 
 	return out
 }

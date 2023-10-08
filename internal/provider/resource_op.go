@@ -22,6 +22,7 @@ func (g Generator) GenerateResourceOp(resource Resource) ([]byte, error) {
 	}
 
 	imports := []string{
+		"github.com/alchematik/athanor/operation",
 		"github.com/hashicorp/hcl/v2/gohcl",
 		"github.com/hashicorp/hcl/v2",
 	}

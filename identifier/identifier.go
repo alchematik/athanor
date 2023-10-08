@@ -5,10 +5,6 @@ import (
 	"github.com/zclconf/go-cty/cty"
 )
 
-type HCLIdentifier interface {
-	CtyType() cty.Type
-}
-
 func AddIdentifierValueToEvalCtx(ctx *hcl.EvalContext, block *hcl.Block, value cty.Value) {
 	blockType := block.Type
 	provider := block.Labels[0]

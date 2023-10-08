@@ -11,11 +11,11 @@ import (
 
 	"github.com/alchematik/athanor/internal/parser"
 	"github.com/alchematik/athanor/internal/provider"
+	"github.com/alchematik/athanor/operation"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
-	// "github.com/hashicorp/hcl/v2/hclsimple"
 	"github.com/urfave/cli/v2"
 	"github.com/zclconf/go-cty/cty"
 )
@@ -212,7 +212,7 @@ func main() {
 								}
 							}
 
-							var ops []any
+							var ops []operation.Operation
 							for providerType, p := range providers {
 								for alias, provider := range p {
 									fp := filepath.Join(providersPath, providerType, provider.Version, "provider.so")
@@ -226,7 +226,7 @@ func main() {
 										return err
 									}
 
-									parseFunc, ok := parseFuncSym.(func(*hcl.EvalContext, *hcl.Block) (any, error))
+									parseFunc, ok := parseFuncSym.(func(*hcl.EvalContext, *hcl.Block) (operation.Operation, error))
 									if !ok {
 										return fmt.Errorf("wrong type for ParseOpBlock symbol")
 									}
@@ -249,7 +249,7 @@ func main() {
 							}
 
 							for _, op := range ops {
-								fmt.Printf("OP >> %+v\n", op)
+								fmt.Printf("OP >> %+v\n", op.ForIdentifier().String())
 							}
 
 							return nil
@@ -300,7 +300,7 @@ func main() {
 								ResourceDir: outPath,
 							}
 							for _, r := range schema.Resources {
-								data, err := g.GenerateResourceIdentifier(r)
+								data, err := g.GenerateResourceIdentifier(schema.Provider, r)
 								if err != nil {
 									return err
 								}
