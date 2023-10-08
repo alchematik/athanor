@@ -30,8 +30,16 @@ var blockTypes = []hcl.BlockHeaderSchema{
 		LabelNames: []string{"provider", "resource", "name"},
 	},
 	{
-		Type:       "op",
-		LabelNames: []string{"name"},
+		Type:       "create",
+		LabelNames: []string{"provider", "resource"},
+	},
+	{
+		Type:       "update",
+		LabelNames: []string{"provider", "resource"},
+	},
+	{
+		Type:       "delete",
+		LabelNames: []string{"provider", "resource"},
 	},
 }
 
@@ -117,6 +125,8 @@ func main() {
 							}
 							providers := map[string]map[string]Provider{}
 
+							opBlocks := map[string][]*hcl.Block{}
+
 							for _, b := range blocks {
 								switch b.Type {
 								case "id":
@@ -148,6 +158,9 @@ func main() {
 										providers[providerName] = m
 									}
 									m[p.Alias] = p
+								case "create":
+									provider := b.Labels[0]
+									opBlocks[provider] = append(opBlocks[provider], b)
 								}
 							}
 
@@ -199,10 +212,44 @@ func main() {
 								}
 							}
 
+							var ops []any
+							for providerType, p := range providers {
+								for alias, provider := range p {
+									fp := filepath.Join(providersPath, providerType, provider.Version, "provider.so")
+									plug, err := plugin.Open(fp)
+									if err != nil {
+										return err
+									}
+
+									parseFuncSym, err := plug.Lookup("ParseOpBlock")
+									if err != nil {
+										return err
+									}
+
+									parseFunc, ok := parseFuncSym.(func(*hcl.EvalContext, *hcl.Block) (any, error))
+									if !ok {
+										return fmt.Errorf("wrong type for ParseOpBlock symbol")
+									}
+
+									for _, b := range opBlocks[alias] {
+										op, err := parseFunc(evalCtx, b)
+										if err != nil {
+											return err
+										}
+
+										ops = append(ops, op)
+									}
+								}
+							}
+
 							fmt.Printf("providers: %v\n", providers)
 
 							for _, id := range ids {
 								fmt.Printf("ID >>> %+v, %T\n", id, id)
+							}
+
+							for _, op := range ops {
+								fmt.Printf("OP >> %+v\n", op)
 							}
 
 							return nil
@@ -265,6 +312,21 @@ func main() {
 
 								identifierPath := filepath.Join(resourcePath, "identifier.go")
 								f, err := os.Create(identifierPath)
+								if err != nil {
+									return err
+								}
+
+								if _, err := f.Write(data); err != nil {
+									return err
+								}
+
+								data, err = g.GenerateResourceOp(r)
+								if err != nil {
+									return err
+								}
+
+								opPath := filepath.Join(resourcePath, "op.go")
+								f, err = os.Create(opPath)
 								if err != nil {
 									return err
 								}

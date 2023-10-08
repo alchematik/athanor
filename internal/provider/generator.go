@@ -63,7 +63,7 @@ func identifierPartHCLGoType(part IdentifierPart) (string, error) {
 	case "string":
 		return "string", nil
 	case "identifier_oneof":
-		return "identifier.HCLIdentifier", nil
+		return "cty.Value", nil
 	case "resource":
 		return fmt.Sprintf("*%s.HCLIdentifier", part.Resource), nil
 	default:
@@ -76,7 +76,7 @@ func identifierPartCtyType(part IdentifierPart) (string, error) {
 	case "string":
 		return "cty.String", nil
 	case "identifier_oneof":
-		return fmt.Sprintf("id.%s.CtyType()", toPascalCase(part.Name)), nil
+		return "cty.DynamicPseudoType", nil
 	case "resource":
 		return fmt.Sprintf("id.%s.CtyType()", toPascalCase(part.Name)), nil
 	default:

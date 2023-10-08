@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"go/format"
 	"path/filepath"
 	"text/template"
@@ -32,6 +33,7 @@ func (g Generator) GenerateResourceIdentifier(resource Resource) ([]byte, error)
 		"github.com/hashicorp/hcl/v2/gohcl",
 		"github.com/alchematik/athanor/identifier",
 	}
+	var metadata []IdentifierPart
 	for _, id := range resource.Identifier {
 		if id.Type == "resource" {
 			imports = append(imports, filepath.Join(g.ModName, g.ResourceDir, id.Resource))
@@ -40,13 +42,17 @@ func (g Generator) GenerateResourceIdentifier(resource Resource) ([]byte, error)
 			for _, choice := range id.Choices {
 				imports = append(imports, filepath.Join(g.ModName, g.ResourceDir, choice))
 			}
+			metadata = append(metadata, IdentifierPart{
+				Name: fmt.Sprintf("%s_type", id.Name),
+				Type: "string",
+			})
 		}
-
 	}
 
 	tmplData := map[string]any{
 		"Resource": resource,
 		"Imports":  imports,
+		"Metadata": metadata,
 	}
 
 	var buffer bytes.Buffer

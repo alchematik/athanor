@@ -25,18 +25,12 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
     {{ if eq .Type "identifier_oneof" }}
       variable := attr.Expr.Variables()[0]
 		  part := variable.SimpleSplit().Rel[1].(hcl.TraverseAttr)
-		  var {{ .Name }} identifier.HCLIdentifier
-		  switch part.Name {
-		  {{ range .Choices }}
-		    case "{{ . }}":
-		      {{ $id.Name }} = &{{ . }}.HCLIdentifier{}
-		    {{ end }}
-		  }
-
-      if diag := gohcl.DecodeExpression(attr.Expr, ctx, {{ .Name }}); diag.HasErrors() {
+		  hclID.Metadata.{{ toPascalCase $id.Name }}Type = part.Name
+		  var val cty.Value
+      if diag := gohcl.DecodeExpression(attr.Expr, ctx, &val); diag.HasErrors() {
         return nil, diag
       }
-      hclID.{{ toPascalCase .Name }} = {{ .Name }}
+      hclID.{{ toPascalCase .Name }} = val
 
     {{ else }}
       var {{ .Name }} {{ identifierPartHCLGoType . }}
@@ -68,6 +62,9 @@ type Identifier struct {
 
 
 type HCLIdentifier struct {
+{{ if gt (len .Metadata) 0 }}
+  Metadata HCLIdentifierMetadata `cty:"metadata"`
+{{ end }}
 {{ range .Resource.Identifier }}
   {{ toPascalCase .Name }} {{ identifierPartHCLGoType . }} {{ backtick }}hcl:"{{ .Name }}" cty:"{{ .Name }}"{{ backtick }}
 {{ end }}
@@ -75,6 +72,9 @@ type HCLIdentifier struct {
 
 func (id *HCLIdentifier) CtyType() cty.Type {
 	return cty.Object(map[string]cty.Type{
+  {{ if gt (len .Metadata) 0 }}
+	  "metadata": id.Metadata.CtyType(),
+	{{ end }}
 	{{ range .Resource.Identifier -}}
 	  "{{ .Name }}": {{ identifierPartCtyType . }},
 	{{ end }}
@@ -89,10 +89,14 @@ func (id *HCLIdentifier) ToIdentifier() *Identifier {
   out := &Identifier{}
 {{ range $id := .Resource.Identifier }}
   {{ if eq .Type "identifier_oneof" }}
-    switch t := id.{{ toPascalCase .Name }}.(type) {
+    switch id.Metadata.{{ toPascalCase .Name }}Type {
     {{ range .Choices -}}
-    case *{{ . }}.HCLIdentifier:
-      out.{{ toPascalCase $id.Name }} = t.ToIdentifier()
+    case "{{ . }}":
+      var val {{ . }}.HCLIdentifier 
+		  if err := gocty.FromCtyValue(id.{{ toPascalCase $id.Name }}, &val); err != nil {
+			  panic(err)
+		  }
+      out.{{ toPascalCase $id.Name }} = val.ToIdentifier()
     {{- end }}
     }
   {{ else if eq .Type "resource" }}
@@ -103,4 +107,18 @@ func (id *HCLIdentifier) ToIdentifier() *Identifier {
 {{ end }}
 
   return out
+}
+
+type HCLIdentifierMetadata struct {
+{{ range .Metadata }}
+  {{ toPascalCase .Name }} {{ identifierPartHCLGoType . }} `cty:"{{ .Name }}"`
+{{ end }}
+}
+
+func (m HCLIdentifierMetadata) CtyType() cty.Type {
+	return cty.Object(map[string]cty.Type{
+	{{ range .Metadata -}}
+	  "{{ .Name }}": {{ identifierPartCtyType . }},
+	{{ end }}
+	})
 }

@@ -17,6 +17,17 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
   }
 } 
 
+func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
+  switch block.Labels[1] {
+  {{ range .Schema.Resources }}
+  case "{{ .Name }}":
+    return {{ .Name }}.ParseOpBlock(ctx, block)
+  {{ end }}
+  default:
+    return nil, fmt.Errorf("unknown block type: %s", block.Labels[1])
+  }
+}
+
 func ResourceNames() []string {
   return []string{
   {{ range .ResourceNames }}

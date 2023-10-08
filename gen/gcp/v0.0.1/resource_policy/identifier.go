@@ -42,18 +42,12 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 
 		variable := attr.Expr.Variables()[0]
 		part := variable.SimpleSplit().Rel[1].(hcl.TraverseAttr)
-		var resource identifier.HCLIdentifier
-		switch part.Name {
-
-		case "bucket":
-			resource = &bucket.HCLIdentifier{}
-
-		}
-
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, resource); diag.HasErrors() {
+		hclID.Metadata.ResourceType = part.Name
+		var val cty.Value
+		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &val); diag.HasErrors() {
 			return nil, diag
 		}
-		hclID.Resource = resource
+		hclID.Resource = val
 
 	}
 
@@ -77,15 +71,20 @@ type Identifier struct {
 }
 
 type HCLIdentifier struct {
+	Metadata HCLIdentifierMetadata `cty:"metadata"`
+
 	Name string `hcl:"name" cty:"name"`
 
-	Resource identifier.HCLIdentifier `hcl:"resource" cty:"resource"`
+	Resource cty.Value `hcl:"resource" cty:"resource"`
 }
 
 func (id *HCLIdentifier) CtyType() cty.Type {
 	return cty.Object(map[string]cty.Type{
+
+		"metadata": id.Metadata.CtyType(),
+
 		"name":     cty.String,
-		"resource": id.Resource.CtyType(),
+		"resource": cty.DynamicPseudoType,
 	})
 }
 
@@ -98,10 +97,24 @@ func (id *HCLIdentifier) ToIdentifier() *Identifier {
 
 	out.Name = id.Name
 
-	switch t := id.Resource.(type) {
-	case *bucket.HCLIdentifier:
-		out.Resource = t.ToIdentifier()
+	switch id.Metadata.ResourceType {
+	case "bucket":
+		var val bucket.HCLIdentifier
+		if err := gocty.FromCtyValue(id.Resource, &val); err != nil {
+			panic(err)
+		}
+		out.Resource = val.ToIdentifier()
 	}
 
 	return out
+}
+
+type HCLIdentifierMetadata struct {
+	ResourceType string `cty:"resource_type"`
+}
+
+func (m HCLIdentifierMetadata) CtyType() cty.Type {
+	return cty.Object(map[string]cty.Type{
+		"resource_type": cty.String,
+	})
 }

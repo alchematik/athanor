@@ -29,6 +29,23 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
 	}
 }
 
+func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
+	switch block.Labels[1] {
+
+	case "bucket":
+		return bucket.ParseOpBlock(ctx, block)
+
+	case "bucket_object":
+		return bucket_object.ParseOpBlock(ctx, block)
+
+	case "resource_policy":
+		return resource_policy.ParseOpBlock(ctx, block)
+
+	default:
+		return nil, fmt.Errorf("unknown block type: %s", block.Labels[1])
+	}
+}
+
 func ResourceNames() []string {
 	return []string{
 

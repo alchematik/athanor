@@ -89,6 +89,7 @@ type HCLIdentifier struct {
 
 func (id *HCLIdentifier) CtyType() cty.Type {
 	return cty.Object(map[string]cty.Type{
+
 		"project": cty.String,
 		"region":  cty.String,
 		"name":    cty.String,
@@ -109,4 +110,11 @@ func (id *HCLIdentifier) ToIdentifier() *Identifier {
 	out.Name = id.Name
 
 	return out
+}
+
+type HCLIdentifierMetadata struct {
+}
+
+func (m HCLIdentifierMetadata) CtyType() cty.Type {
+	return cty.Object(map[string]cty.Type{})
 }
