@@ -27,7 +27,7 @@ id "gcp" "bucket_object" "test-object" {
 create "gcp" "bucket_object" {
   version = "v0.0.1"
   id      = id.gcp.bucket_object.test-object
-  config  = {
+  config {
     contents = "bla"
   }
 }

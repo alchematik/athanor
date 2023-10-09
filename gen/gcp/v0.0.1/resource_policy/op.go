@@ -12,8 +12,12 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (operation.Operation, 
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "id"},
-			{Name: "config"},
 			{Name: "version"},
+		},
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type: "config",
+			},
 		},
 	}
 	content, diag := block.Body.Content(schema)
@@ -39,15 +43,6 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (operation.Operation, 
 	op.Version = version
 
 	op.Type = block.Type
-
-	if configAttr, ok := content.Attributes["config"]; ok {
-		var hclConfig HCLConfig
-		if diag := gohcl.DecodeExpression(configAttr.Expr, ctx, &hclConfig); diag.HasErrors() {
-			return nil, diag
-		}
-
-		op.HCLConfig = hclConfig
-	}
 
 	return op.ToOp(), nil
 }

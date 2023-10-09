@@ -12,8 +12,12 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (operation.Operation, 
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "id"},
-			{Name: "config"},
 			{Name: "version"},
+		},
+		Blocks: []hcl.BlockHeaderSchema{
+			{
+				Type: "config",
+			},
 		},
 	}
 	content, diag := block.Body.Content(schema)
@@ -40,13 +44,31 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (operation.Operation, 
 
 	op.Type = block.Type
 
-	if configAttr, ok := content.Attributes["config"]; ok {
-		var hclConfig HCLConfig
-		if diag := gohcl.DecodeExpression(configAttr.Expr, ctx, &hclConfig); diag.HasErrors() {
-			return nil, diag
-		}
+	for _, b := range content.Blocks {
+		if b.Type == "config" {
+			var hclConfig HCLConfig
+			configSchema := &hcl.BodySchema{
+				Attributes: []hcl.AttributeSchema{
 
-		op.HCLConfig = hclConfig
+					{Name: "contents"},
+				},
+			}
+			configContent, diag := b.Body.Content(configSchema)
+			if diag.HasErrors() {
+				return nil, diag
+			}
+
+			if attr, ok := configContent.Attributes["contents"]; ok {
+				var contents string
+				if diag := gohcl.DecodeExpression(attr.Expr, ctx, &contents); diag.HasErrors() {
+					return nil, diag
+				}
+
+				hclConfig.Contents = contents
+			}
+
+			op.HCLConfig = hclConfig
+		}
 	}
 
 	return op.ToOp(), nil
