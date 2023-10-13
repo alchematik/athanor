@@ -12,7 +12,7 @@ import (
 
 	"github.com/alchematik/athanor/internal/parser"
 	"github.com/alchematik/athanor/internal/provider"
-	"github.com/alchematik/athanor/operation"
+	"github.com/alchematik/athanor/provider"
 
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -173,37 +173,31 @@ func main() {
 							}
 
 							var ids []any
-							for providerType, p := range providers {
-								for alias, provider := range p {
-									fp := filepath.Join(providersPath, providerType, provider.Version, "provider.so")
+							for providerType, providerMap := range providers {
+								for alias, providerData := range providerMap {
+									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider.so")
 									plug, err := plugin.Open(fp)
 									if err != nil {
 										return err
 									}
-									rnFuncSym, err := plug.Lookup("ResourceNames")
-									if err != nil {
-										return err
-									}
-									rnFunc, ok := rnFuncSym.(func() []string)
-									if !ok {
-										return fmt.Errorf("wrong type for ResourceNames symbol")
-									}
 
-									parseFuncSym, err := plug.Lookup("ParseIdentifierBlock")
+									newProviderFuncSym, err := plug.Lookup("NewProvider")
 									if err != nil {
 										return err
 									}
 
-									parseFunc, ok := parseFuncSym.(func(*hcl.EvalContext, *hcl.Block) (any, error))
+									newProviderFunc, ok := newProviderFuncSym.(func() *provider.Provider)
 									if !ok {
-										return fmt.Errorf("wrong type for ParseIdentifierBlock symbol")
+										return fmt.Errorf("wrong type for NewProvider symbol")
 									}
 
-									resourceNames := rnFunc()
+									p := newProviderFunc()
+
+									resourceNames := p.ResourceNames()
 									for _, rn := range resourceNames {
 										blocks := idBlocks[alias+"."+rn]
 										for _, b := range blocks {
-											id, err := parseFunc(evalCtx, b)
+											id, err := p.ParseIdentifierBlock(evalCtx, b)
 											if err != nil {
 												return err
 											}
@@ -214,27 +208,29 @@ func main() {
 								}
 							}
 
-							var ops []operation.Operation
+							var ops []provider.Operation
 							for providerType, p := range providers {
-								for alias, provider := range p {
-									fp := filepath.Join(providersPath, providerType, provider.Version, "provider.so")
+								for alias, providerData := range p {
+									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider.so")
 									plug, err := plugin.Open(fp)
 									if err != nil {
 										return err
 									}
 
-									parseFuncSym, err := plug.Lookup("ParseOpBlock")
+									newProviderFuncSym, err := plug.Lookup("NewProvider")
 									if err != nil {
 										return err
 									}
 
-									parseFunc, ok := parseFuncSym.(func(*hcl.EvalContext, *hcl.Block) (operation.Operation, error))
+									newProviderFunc, ok := newProviderFuncSym.(func() *provider.Provider)
 									if !ok {
-										return fmt.Errorf("wrong type for ParseOpBlock symbol")
+										return fmt.Errorf("wrong type for NewProvider symbol")
 									}
 
+									p := newProviderFunc()
+
 									for _, b := range opBlocks[alias] {
-										op, err := parseFunc(evalCtx, b)
+										op, err := p.ParseOpBlock(evalCtx, b)
 										if err != nil {
 											return err
 										}
@@ -246,19 +242,19 @@ func main() {
 
 							fmt.Printf("providers: %v\n", providers)
 
-							resourceOperations := map[string][]operation.Operation{}
+							resourceOperations := map[string][]provider.Operation{}
 							for _, op := range ops {
 								id := op.ForIdentifier().String()
 								resourceOperations[id] = append(resourceOperations[id], op)
 							}
 
-							resources := map[string]*operation.Resource{}
+							resources := map[string]*provider.Resource{}
 							for id, operations := range resourceOperations {
 								sort.Slice(operations, func(i, j int) bool {
 									return semver.Compare(operations[i].ForVersion(), operations[j].ForVersion()) < 0
 								})
 
-								resource := &operation.Resource{}
+								resource := &provider.Resource{}
 								for _, op := range operations {
 									op.Apply(resource)
 								}

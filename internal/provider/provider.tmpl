@@ -12,19 +12,6 @@ type ClientRegistry struct {
 {{ end }}
 }
 
-func (r *ClientRegistry) RegisterClient(client any) error {
-  switch c := client.(type) {
-{{ range .Schema.Resources }}
-  case {{ .Name }}.Client:
-    r.{{ toPascalCase .Name }}Client = c
-{{ end }}
-  default:
-    return fmt.Errorf("unrecognized client type: %T", client)
-  }
-
-  return nil
-}
-
 func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Identifier) (*provider.Resource, error) {
   switch id := identifier.(type) {
 {{ range .Schema.Resources }}
@@ -36,7 +23,10 @@ func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Id
   }
 }
 
-func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
+type Parser struct {
+}
+
+func (p *Parser) ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
   switch block.Labels[1] {
   {{ range .Schema.Resources }}
   case "{{ .Name }}":
@@ -45,9 +35,9 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
   default:
     return nil, fmt.Errorf("unknown block type: %s", block.Labels[1])
   }
-} 
+}
 
-func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
+func (p *Parser) ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
   switch block.Labels[1] {
   {{ range .Schema.Resources }}
   case "{{ .Name }}":
@@ -58,7 +48,7 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, e
   }
 }
 
-func ResourceNames() []string {
+func (p *Parser) ResourceNames() []string {
   return []string{
   {{ range .ResourceNames }}
   "{{ .}}",

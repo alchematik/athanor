@@ -18,13 +18,13 @@ type Provider struct {
 }
 
 type ClientRegistry interface {
-	RegisterClient(any) error
-	GetResource(context.Context, Identifier) (Resource, error)
+	GetResource(context.Context, Identifier) (*Resource, error)
 }
 
 type Parser interface {
 	ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error)
 	ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (Operation, error)
+	ResourceNames() []string
 }
 
 func New(r ClientRegistry, p Parser) *Provider {
@@ -42,7 +42,11 @@ func (p *Provider) ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (Operati
 	return p.parser.ParseOpBlock(ctx, block)
 }
 
-func (p *Provider) GetResource(ctx context.Context, id Identifier) (Resource, error) {
+func (p *Provider) ResourceNames() []string {
+	return p.parser.ResourceNames()
+}
+
+func (p *Provider) GetResource(ctx context.Context, id Identifier) (*Resource, error) {
 	return p.clients.GetResource(ctx, id)
 }
 

@@ -24,25 +24,6 @@ type ClientRegistry struct {
 	ResourcePolicyClient resource_policy.Client
 }
 
-func (r *ClientRegistry) RegisterClient(client any) error {
-	switch c := client.(type) {
-
-	case bucket.Client:
-		r.BucketClient = c
-
-	case bucket_object.Client:
-		r.BucketObjectClient = c
-
-	case resource_policy.Client:
-		r.ResourcePolicyClient = c
-
-	default:
-		return fmt.Errorf("unrecognized client type: %T", client)
-	}
-
-	return nil
-}
-
 func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Identifier) (*provider.Resource, error) {
 	switch id := identifier.(type) {
 
@@ -60,7 +41,10 @@ func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Id
 	}
 }
 
-func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
+type Parser struct {
+}
+
+func (p *Parser) ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
 	switch block.Labels[1] {
 
 	case "bucket":
@@ -77,7 +61,7 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
 	}
 }
 
-func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
+func (p *Parser) ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
 	switch block.Labels[1] {
 
 	case "bucket":
@@ -94,13 +78,13 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, e
 	}
 }
 
-func ResourceNames() []string {
+func (p *Parser) ResourceNames() []string {
 	return []string{
 
 		"bucket",
 
-		"bucket_object",
-
 		"resource_policy",
+
+		"bucket_object",
 	}
 }
