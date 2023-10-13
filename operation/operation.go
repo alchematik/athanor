@@ -3,7 +3,8 @@ package operation
 type ResourceState string
 
 const (
-	ResourceStateExists = "exists"
+	ResourceStateExists    = "exists"
+	ResourceStateNotExists = "not_exists"
 )
 
 type Operation interface {

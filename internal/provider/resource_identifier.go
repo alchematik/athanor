@@ -32,7 +32,7 @@ func (g Generator) GenerateResourceIdentifier(provider Provider, resource Resour
 		"github.com/zclconf/go-cty/cty/gocty",
 		"github.com/hashicorp/hcl/v2",
 		"github.com/hashicorp/hcl/v2/gohcl",
-		"github.com/alchematik/athanor/identifier",
+		"github.com/alchematik/athanor/provider",
 	}
 	var metadata []IdentifierPart
 	for _, id := range resource.Identifier {

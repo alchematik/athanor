@@ -1,14 +1,14 @@
 package bucket_object
 
 import (
-	"github.com/alchematik/athanor/operation"
+	"github.com/alchematik/athanor/provider"
 
 	"github.com/hashicorp/hcl/v2/gohcl"
 
 	"github.com/hashicorp/hcl/v2"
 )
 
-func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (operation.Operation, error) {
+func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
 	schema := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "id"},
@@ -81,7 +81,7 @@ type Op struct {
 	Config     Config
 }
 
-func (o *Op) ForIdentifier() operation.Identifier {
+func (o *Op) ForIdentifier() provider.Identifier {
 	return o.Identifier
 }
 
@@ -89,8 +89,9 @@ func (o *Op) ForVersion() string {
 	return o.Version
 }
 
-func (o *Op) Apply(r *operation.Resource) {
-	r.State = operation.ResourceStateExists
+func (o *Op) Apply(r *provider.Resource) {
+	r.State = provider.ResourceStateExists
+	r.Identifier = o.Identifier
 	r.Config = o.Config
 }
 
@@ -105,7 +106,7 @@ type HCLOp struct {
 	HCLConfig     HCLConfig      `hcl:"config" cty:"config"`
 }
 
-func (op *HCLOp) ToOp() operation.Operation {
+func (op *HCLOp) ToOp() provider.Operation {
 	return &Op{
 		Type:       op.Type,
 		Identifier: op.HCLIdentifier.ToIdentifier(),

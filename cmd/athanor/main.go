@@ -246,32 +246,27 @@ func main() {
 
 							fmt.Printf("providers: %v\n", providers)
 
-							migrations := map[string][]operation.Operation{}
+							resourceOperations := map[string][]operation.Operation{}
 							for _, op := range ops {
 								id := op.ForIdentifier().String()
-								migrations[id] = append(migrations[id], op)
+								resourceOperations[id] = append(resourceOperations[id], op)
 							}
 
-							resourceStates := map[string]*operation.Resource{}
-							for id, resourceOps := range migrations {
-								sort.Slice(resourceOps, func(i, j int) bool {
-									return semver.Compare(resourceOps[i].ForVersion(), resourceOps[j].ForVersion()) < 0
+							resources := map[string]*operation.Resource{}
+							for id, operations := range resourceOperations {
+								sort.Slice(operations, func(i, j int) bool {
+									return semver.Compare(operations[i].ForVersion(), operations[j].ForVersion()) < 0
 								})
 
-								for _, op := range resourceOps {
-									r, ok := resourceStates[id]
-									if !ok {
-										r = &operation.Resource{
-											Identifier: op.ForIdentifier(),
-										}
-										resourceStates[id] = r
-									}
-									op.Apply(r)
+								resource := &operation.Resource{}
+								for _, op := range operations {
+									op.Apply(resource)
 								}
+								resources[id] = resource
 
 							}
 
-							for _, rs := range resourceStates {
+							for _, rs := range resources {
 								fmt.Printf("resource state: %+v\n", rs)
 							}
 
@@ -350,6 +345,21 @@ func main() {
 
 								opPath := filepath.Join(resourcePath, "op.go")
 								f, err = os.Create(opPath)
+								if err != nil {
+									return err
+								}
+
+								if _, err := f.Write(data); err != nil {
+									return err
+								}
+
+								data, err = g.GenerateClient(r)
+								if err != nil {
+									return err
+								}
+
+								clientPath := filepath.Join(resourcePath, "client.go")
+								f, err = os.Create(clientPath)
 								if err != nil {
 									return err
 								}

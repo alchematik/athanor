@@ -47,7 +47,7 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 		return nil, err
 	}
 
-  identifier.AddIdentifierValueToEvalCtx(ctx, block, val)
+  provider.AddIdentifierValueToEvalCtx(ctx, block, val)
 
 	return hclID.ToIdentifier(), nil
 }

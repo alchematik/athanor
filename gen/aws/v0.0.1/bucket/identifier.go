@@ -13,7 +13,7 @@ import (
 
 	"github.com/hashicorp/hcl/v2/gohcl"
 
-	"github.com/alchematik/athanor/identifier"
+	"github.com/alchematik/athanor/provider"
 )
 
 func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
@@ -66,7 +66,7 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 		return nil, err
 	}
 
-	identifier.AddIdentifierValueToEvalCtx(ctx, block, val)
+	provider.AddIdentifierValueToEvalCtx(ctx, block, val)
 
 	return hclID.ToIdentifier(), nil
 }

@@ -7,31 +7,29 @@ import (
 	"text/template"
 )
 
-//go:embed resource_op.tmpl
-var resourceOp string
+//go:embed client.tmpl
+var clientTmpl string
 
-func (g Generator) GenerateResourceOp(resource Resource) ([]byte, error) {
-	tmpl, err := template.New("resource_op").
+func (g Generator) GenerateClient(resource Resource) ([]byte, error) {
+	tmpl, err := template.New("client").
 		Funcs(template.FuncMap{
-			"toPascalCase":        toPascalCase,
-			"configPartGoType":    configPartGoType,
-			"configPartHCLGoType": configPartHCLGoType,
-		}).Parse(resourceOp)
+			"toPascalCase": toPascalCase,
+		}).
+		Parse(clientTmpl)
 	if err != nil {
 		return nil, err
 	}
 
 	imports := []string{
+		"context",
+		"errors",
 		"github.com/alchematik/athanor/provider",
-		"github.com/hashicorp/hcl/v2/gohcl",
-		"github.com/hashicorp/hcl/v2",
 	}
 
 	tmplData := map[string]any{
-		"Resource": resource,
 		"Imports":  imports,
+		"Resource": resource,
 	}
-
 	var buffer bytes.Buffer
 	if err := tmpl.Execute(&buffer, tmplData); err != nil {
 		return nil, err

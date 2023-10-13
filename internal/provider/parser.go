@@ -67,3 +67,13 @@ func (r Resource) Dependencies() []string {
 
 	return deps
 }
+
+func (r Resource) HasCreate() bool {
+	for _, m := range r.Modifiers {
+		if m == "create" {
+			return true
+		}
+	}
+
+	return false
+}

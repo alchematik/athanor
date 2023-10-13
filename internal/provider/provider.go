@@ -14,7 +14,9 @@ var providerTmpl string
 
 func (g Generator) GenerateProvider(s Schema) ([]byte, error) {
 	tmpl, err := template.New("provider").
-		Funcs(template.FuncMap{}).
+		Funcs(template.FuncMap{
+			"toPascalCase": toPascalCase,
+		}).
 		Parse(providerTmpl)
 	if err != nil {
 		return nil, err
@@ -22,8 +24,9 @@ func (g Generator) GenerateProvider(s Schema) ([]byte, error) {
 
 	imports := []string{
 		"fmt",
+		"context",
 		"github.com/hashicorp/hcl/v2",
-		"github.com/alchematik/athanor/operation",
+		"github.com/alchematik/athanor/provider",
 	}
 	dag := graph.New(graph.StringHash, graph.Directed(), graph.Acyclic(), graph.PreventCycles())
 	if err := dag.AddVertex("root"); err != nil {
