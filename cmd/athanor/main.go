@@ -181,17 +181,20 @@ func main() {
 										return err
 									}
 
-									newProviderFuncSym, err := plug.Lookup("NewProvider")
+									parserFuncSym, err := plug.Lookup("Parser")
 									if err != nil {
 										return err
 									}
 
-									newProviderFunc, ok := newProviderFuncSym.(func() *provider.Provider)
+									parserFunc, ok := parserFuncSym.(func() any)
 									if !ok {
-										return fmt.Errorf("wrong type for NewProvider symbol")
+										return fmt.Errorf("wrong type for Parser symbol")
 									}
 
-									p := newProviderFunc()
+									p, ok := parserFunc().(provider.Parser)
+									if !ok {
+										return fmt.Errorf("not a valid parser for %s provider", alias)
+									}
 
 									resourceNames := p.ResourceNames()
 									for _, rn := range resourceNames {
@@ -217,17 +220,20 @@ func main() {
 										return err
 									}
 
-									newProviderFuncSym, err := plug.Lookup("NewProvider")
+									parserFuncSym, err := plug.Lookup("Parser")
 									if err != nil {
 										return err
 									}
 
-									newProviderFunc, ok := newProviderFuncSym.(func() *provider.Provider)
+									parserFunc, ok := parserFuncSym.(func() any)
 									if !ok {
-										return fmt.Errorf("wrong type for NewProvider symbol")
+										return fmt.Errorf("wrong type for Parser symbol")
 									}
 
-									p := newProviderFunc()
+									p, ok := parserFunc().(provider.Parser)
+									if !ok {
+										return fmt.Errorf("not a valid parser for %s provider", alias)
+									}
 
 									for _, b := range opBlocks[alias] {
 										op, err := p.ParseOpBlock(evalCtx, b)

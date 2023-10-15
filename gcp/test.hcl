@@ -21,7 +21,7 @@ create "gcp" "bucket" {
 
 id "gcp" "bucket_object" "test-object" {
   bucket   = id.gcp.bucket.test-bucket
-  name     = "test/v0.0.1"
+  name     = "test"
 }
 
 create "gcp" "bucket_object" {

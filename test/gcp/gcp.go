@@ -7,19 +7,19 @@ import (
 	bucket "github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket"
 	bucketobject "github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket_object"
 	resourcepolicy "github.com/alchematik/athanor/gen/gcp/v0.0.1/resource_policy"
-
-	"github.com/alchematik/athanor/provider"
 )
 
-func NewProvider() *provider.Provider {
+func Registry() any {
 	r := gen.ClientRegistry{
 		BucketClient:         &bucketClient{},
 		BucketObjectClient:   &bucketClient{},
 		ResourcePolicyClient: &iamClient{},
 	}
+	return &r
+}
 
-	p := gen.Parser{}
-	return provider.New(&r, &p)
+func Parser() any {
+	return &gen.Parser{}
 }
 
 type bucketClient struct {

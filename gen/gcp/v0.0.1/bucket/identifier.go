@@ -13,24 +13,34 @@ import (
 
 	"github.com/hashicorp/hcl/v2/gohcl"
 
+	"github.com/alchematik/athanor/gen/gcp/v0.0.1/schema"
 	"github.com/alchematik/athanor/provider"
 )
 
 func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{Name: "project"},
-			{Name: "region"},
-			{Name: "name"},
-		},
+	var hclAttrs []hcl.AttributeSchema
+	for _, f := range schema.Schema["bucket"] {
+		hclAttrs = append(hclAttrs, hcl.AttributeSchema{Name: f.Name})
 	}
-	content, diag := block.Body.Content(schema)
+	content, diag := block.Body.Content(&hcl.BodySchema{Attributes: hclAttrs})
 	if diag.HasErrors() {
 		return nil, diag
 	}
 
-	var hclID HCLIdentifier
+	var fvs []provider.FieldValue
+	for _, f := range schema.Schema["bucket"] {
+		if attr, ok := content.Attributes[f.Name]; ok {
+			fv, err := provider.DecodeField(ctx, attr.Expr, f, schema.Schema)
+			if err != nil {
+				return nil, err
+			}
+			fvs = append(fvs, fv)
+		}
+	}
 
+	fmt.Printf("bucket fvs: %+v\n", fvs)
+
+	var hclID HCLIdentifier
 	if attr, ok := content.Attributes["project"]; ok {
 
 		var project string

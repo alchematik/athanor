@@ -16,19 +16,31 @@ import (
 	"github.com/alchematik/athanor/provider"
 
 	"github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket"
+	"github.com/alchematik/athanor/gen/gcp/v0.0.1/schema"
 )
 
 func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, error) {
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{Name: "resource"},
-			{Name: "name"},
-		},
+	var hclAttrs []hcl.AttributeSchema
+	for _, f := range schema.Schema["resource_policy"] {
+		hclAttrs = append(hclAttrs, hcl.AttributeSchema{Name: f.Name})
 	}
-	content, diag := block.Body.Content(schema)
+	content, diag := block.Body.Content(&hcl.BodySchema{Attributes: hclAttrs})
 	if diag.HasErrors() {
 		return nil, diag
 	}
+
+	var fvs []provider.FieldValue
+	for _, f := range schema.Schema["resource_policy"] {
+		if attr, ok := content.Attributes[f.Name]; ok {
+			fv, err := provider.DecodeField(ctx, attr.Expr, f, schema.Schema)
+			if err != nil {
+				return nil, err
+			}
+			fvs = append(fvs, fv)
+		}
+	}
+
+	fmt.Printf("resource_policy fvs: %+v\n", fvs)
 
 	var hclID HCLIdentifier
 

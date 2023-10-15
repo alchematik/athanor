@@ -3,18 +3,18 @@ package main
 import (
 	"context"
 
-	"github.com/alchematik/athanor/provider"
-
 	gen "github.com/alchematik/athanor/gen/aws/v0.0.1"
 	bucket "github.com/alchematik/athanor/gen/aws/v0.0.1/bucket"
 )
 
-func NewProvider() *provider.Provider {
-	r := gen.ClientRegistry{
+func Registry() any {
+	return &gen.ClientRegistry{
 		BucketClient: &s3Client{},
 	}
-	p := gen.Parser{}
-	return provider.New(&r, &p)
+}
+
+func Parser() any {
+	return &gen.Parser{}
 }
 
 type s3Client struct {
