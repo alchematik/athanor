@@ -81,24 +81,12 @@ func (p *ProviderPlugin) Client(b *plugin.MuxBroker, c *rpc.Client) (any, error)
 	return &ProviderRPCClient{client: c}, nil
 }
 
-/*
-
-- expect NewProvider() (ClientRegistry, error) function to be defined.
-
-*/
-
 type ResourceState string
 
 const (
 	ResourceStateExists    = "exists"
 	ResourceStateNotExists = "not_exists"
 )
-
-type Operation interface {
-	ForIdentifier() Identifier
-	ForVersion() string
-	Apply(*Resource)
-}
 
 type Identifier interface {
 	String() string
