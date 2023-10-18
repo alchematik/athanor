@@ -14,6 +14,7 @@ import (
 	"github.com/alchematik/athanor/internal/provider"
 	"github.com/alchematik/athanor/provider"
 
+	"github.com/dominikbraun/graph"
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
@@ -205,21 +206,38 @@ func main() {
 										return fmt.Errorf("not a client: %T", raw)
 									}
 
-									resourceNames, err := providerClient.ResourceNames()
+									schema, err := providerClient.Schema()
 									if err != nil {
 										return err
 									}
 
-									fmt.Printf("RESOURCE NAMES >> %v, %v\n", alias, resourceNames)
+									dag := graph.New(graph.StringHash, graph.Directed(), graph.Acyclic(), graph.PreventCycles())
+									if err := dag.AddVertex("root"); err != nil {
+										return err
+									}
 
-									identifierSchema, err := providerClient.IdentifierSchema()
+									for name, r := range schema.Resources {
+										if err := dag.AddVertex(name); err != nil {
+											return err
+										}
+										for _, dep := range r.DependsOn {
+											dag.AddEdge(dep, name)
+										}
+										if len(r.DependsOn) == 0 {
+											dag.AddEdge("root", name)
+										}
+									}
+
+									resourceNames, err := graph.TopologicalSort(dag)
 									if err != nil {
 										return err
 									}
+
+									resourceNames = resourceNames[1:]
 
 									for _, rn := range resourceNames {
 										blocks := idBlocks[alias+"."+rn]
-										s := identifierSchema[rn]
+										s := schema.Resources[rn].IdentifierFields
 										var hclAttrs []hcl.AttributeSchema
 										for _, f := range s {
 											hclAttrs = append(hclAttrs, hcl.AttributeSchema{Name: f.Name})
@@ -234,7 +252,7 @@ func main() {
 											var fvs []provider.FieldValue
 											for _, f := range s {
 												if attr, ok := content.Attributes[f.Name]; ok {
-													fv, err := provider.DecodeField(evalCtx, attr.Expr, f, identifierSchema)
+													fv, err := provider.DecodeField(evalCtx, attr.Expr, f, schema)
 													if err != nil {
 														return err
 													}
@@ -259,8 +277,6 @@ func main() {
 							for providerType, p := range providers {
 								for alias, providerData := range p {
 									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider")
-									fmt.Printf(">> %v, %v\n", fp, alias)
-
 									var handshakeConfig = plugin.HandshakeConfig{
 										ProtocolVersion:  1,
 										MagicCookieKey:   "BASIC_PLUGIN",
@@ -305,20 +321,20 @@ func main() {
 											return diag
 										}
 
-										identifierSchema, err := providerClient.IdentifierSchema()
+										schema, err := providerClient.Schema()
 										if err != nil {
 											return err
 										}
 
 										idAttr := content.Attributes["id"]
 										t := b.Labels[1]
-										ivf, err := provider.DecodeField(evalCtx, idAttr.Expr, provider.Field{Name: "id", Type: t}, identifierSchema)
+										ivf, err := provider.DecodeField(evalCtx, idAttr.Expr, provider.Field{Name: "id", Type: t}, schema)
 										if err != nil {
 											return err
 										}
 
 										versionAttr := content.Attributes["version"]
-										vfv, err := provider.DecodeField(evalCtx, versionAttr.Expr, provider.Field{Name: "version", Type: "string"}, identifierSchema)
+										vfv, err := provider.DecodeField(evalCtx, versionAttr.Expr, provider.Field{Name: "version", Type: "string"}, schema)
 										if err != nil {
 											return err
 										}
@@ -326,13 +342,8 @@ func main() {
 										fmt.Printf("version: %s, id: %+v\n", vfv.Value, ivf.Value)
 										for _, b := range content.Blocks {
 											if b.Type == "config" {
-												configSchema, err := providerClient.ConfigSchema()
-												if err != nil {
-													return err
-												}
-
 												var attrs []hcl.AttributeSchema
-												for _, f := range configSchema[t] {
+												for _, f := range schema.Resources[t].ConfigFields {
 													attrs = append(attrs, hcl.AttributeSchema{Name: f.Name})
 												}
 
@@ -342,9 +353,9 @@ func main() {
 												}
 
 												var fvs []provider.FieldValue
-												for _, f := range configSchema[t] {
+												for _, f := range schema.Resources[t].ConfigFields {
 													if attr, ok := configContent.Attributes[f.Name]; ok {
-														fv, err := provider.DecodeField(evalCtx, attr.Expr, f, identifierSchema)
+														fv, err := provider.DecodeField(evalCtx, attr.Expr, f, schema)
 														if err != nil {
 															return err
 														}
@@ -478,6 +489,21 @@ func main() {
 
 								clientPath := filepath.Join(resourcePath, "client.go")
 								f, err = os.Create(clientPath)
+								if err != nil {
+									return err
+								}
+
+								if _, err := f.Write(data); err != nil {
+									return err
+								}
+
+								resourceFilePath := filepath.Join(resourcePath, "resource.go")
+								f, err = os.Create(resourceFilePath)
+								if err != nil {
+									return err
+								}
+
+								data, err = g.GenerateResource(r)
 								if err != nil {
 									return err
 								}

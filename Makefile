@@ -9,7 +9,7 @@ generate/gcp:
 build: build/aws build/gcp
 
 build/aws:
-	go build -buildmode=plugin -o .providers/aws/v0.0.1/provider.so ./test/aws/
+	go build -o .providers/aws/v0.0.1/provider ./test/aws/
 
 build/gcp:
 	go build -o .providers/gcp/v0.0.1/provider ./test/gcp/

@@ -2,50 +2,7 @@ package bucket
 
 import (
 	"github.com/alchematik/athanor/provider"
-
-	"github.com/hashicorp/hcl/v2/gohcl"
-
-	"github.com/hashicorp/hcl/v2"
 )
-
-func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
-	schema := &hcl.BodySchema{
-		Attributes: []hcl.AttributeSchema{
-			{Name: "id"},
-			{Name: "version"},
-		},
-		Blocks: []hcl.BlockHeaderSchema{
-			{
-				Type: "config",
-			},
-		},
-	}
-	content, diag := block.Body.Content(schema)
-	if diag.HasErrors() {
-		return nil, diag
-	}
-
-	var op HCLOp
-	idAttr := content.Attributes["id"]
-	var id HCLIdentifier
-	if diag := gohcl.DecodeExpression(idAttr.Expr, ctx, &id); diag.HasErrors() {
-		return nil, diag
-	}
-
-	op.HCLIdentifier = &id
-
-	versionAttr := content.Attributes["version"]
-	var version string
-	if diag := gohcl.DecodeExpression(versionAttr.Expr, ctx, &version); diag.HasErrors() {
-		return nil, diag
-	}
-
-	op.Version = version
-
-	op.Type = block.Type
-
-	return op.ToOp(), nil
-}
 
 type Op struct {
 	Type       string
@@ -69,29 +26,4 @@ func (o *Op) Apply(r *provider.Resource) {
 }
 
 type Config struct {
-}
-
-type HCLOp struct {
-	Type          string         `hcl:"type" cty:"type"`
-	HCLIdentifier *HCLIdentifier `hcl:"id" cty:"id"`
-	Version       string         `hcl:"version" cty:"version"`
-	HCLConfig     HCLConfig      `hcl:"config" cty:"config"`
-}
-
-func (op *HCLOp) ToOp() provider.Operation {
-	return &Op{
-		Type:       op.Type,
-		Identifier: op.HCLIdentifier.ToIdentifier(),
-		Version:    op.Version,
-		Config:     op.HCLConfig.ToConfig(),
-	}
-}
-
-type HCLConfig struct {
-}
-
-func (c HCLConfig) ToConfig() Config {
-	out := Config{}
-
-	return out
 }

@@ -3,10 +3,10 @@ provider "gcp" {
   version = "v0.0.1"
 }
 
-/* provider "aws" { */
-/*   name    = "aws" */
-/*   version = "v0.0.1" */
-/* } */
+provider "aws" {
+  name    = "aws"
+  version = "v0.0.1"
+}
 
 id "gcp" "bucket" "test-bucket" {
   project  = "test-project"
@@ -42,13 +42,13 @@ create "gcp" "resource_policy" {
   id      = id.gcp.resource_policy.bucket-policy
 }
 
-/* id "aws" "bucket" "test-bucket" { */
-/*   account = "test-account" */
-/*   region  = "us-east-1" */
-/*   name    = "aws-test-bucket" */
-/* } */
-/**/
-/* create "aws" "bucket" { */
-/*   version = "v0.0.1" */
-/*   id      = id.aws.bucket.test-bucket */
-/* } */
+id "aws" "bucket" "test-bucket" {
+  account = "test-account"
+  region  = "us-east-1"
+  name    = "aws-test-bucket"
+}
+
+create "aws" "bucket" {
+  version = "v0.0.1"
+  id      = id.aws.bucket.test-bucket
+}

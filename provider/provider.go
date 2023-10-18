@@ -21,39 +21,15 @@ type ClientRegistry interface {
 	GetResource(context.Context, Identifier) (*Resource, error)
 }
 
-type SchemaProvider interface {
-	ResourceNames() []string
-	IdentifierSchema() map[string][]Field
-	ConfigSchema() map[string][]Field
-}
-
 type ProviderRPCClient struct {
 	client *rpc.Client
 }
 
-func (p *ProviderRPCClient) ResourceNames() ([]string, error) {
-	var res []string
-	err := p.client.Call("Plugin.ResourceNames", new(interface{}), &res)
+func (p *ProviderRPCClient) Schema() (Schema, error) {
+	var res Schema
+	err := p.client.Call("Plugin.Schema", new(interface{}), &res)
 	if err != nil {
-		return nil, err
-	}
-
-	return res, nil
-}
-
-func (p *ProviderRPCClient) IdentifierSchema() (map[string][]Field, error) {
-	var res map[string][]Field
-	if err := p.client.Call("Plugin.IdentifierSchema", new(interface{}), &res); err != nil {
-		return nil, err
-	}
-
-	return res, nil
-}
-
-func (p *ProviderRPCClient) ConfigSchema() (map[string][]Field, error) {
-	var res map[string][]Field
-	if err := p.client.Call("Plugin.ConfigSchema", new(interface{}), &res); err != nil {
-		return nil, err
+		return Schema{}, err
 	}
 
 	return res, nil
@@ -70,21 +46,11 @@ func (p *ProviderRPCClient) GetResource(id Identifier) (*Resource, error) {
 
 type ProviderRPCServer struct {
 	ClientRegistry ClientRegistry
-	SchemaProvider SchemaProvider
+	ProviderSchema Schema
 }
 
-func (s *ProviderRPCServer) ResourceNames(args any, resp *[]string) error {
-	*resp = s.SchemaProvider.ResourceNames()
-	return nil
-}
-
-func (s *ProviderRPCServer) IdentifierSchema(args any, resp *map[string][]Field) error {
-	*resp = s.SchemaProvider.IdentifierSchema()
-	return nil
-}
-
-func (s *ProviderRPCServer) ConfigSchema(args any, resp *map[string][]Field) error {
-	*resp = s.SchemaProvider.ConfigSchema()
+func (s *ProviderRPCServer) Schema(args any, resp *Schema) error {
+	*resp = s.ProviderSchema
 	return nil
 }
 
@@ -101,13 +67,13 @@ func (s *ProviderRPCServer) GetResource(id Identifier, resp *Resource) error {
 
 type ProviderPlugin struct {
 	ClientRegistry ClientRegistry
-	SchemaProvider SchemaProvider
+	Schema         Schema
 }
 
 func (p *ProviderPlugin) Server(*plugin.MuxBroker) (any, error) {
 	return &ProviderRPCServer{
 		ClientRegistry: p.ClientRegistry,
-		SchemaProvider: p.SchemaProvider,
+		ProviderSchema: p.Schema,
 	}, nil
 }
 
@@ -181,9 +147,8 @@ func AddIdentifierValueToEvalCtx(ctx *hcl.EvalContext, block *hcl.Block, value c
 }
 
 type Field struct {
-	Name  string
-	Type  string
-	Oneof []string
+	Name string
+	Type string
 }
 
 type FieldValue struct {
@@ -193,7 +158,15 @@ type FieldValue struct {
 	Metadata map[string]string
 }
 
-type Schema map[string][]Field
+type Schema struct {
+	Resources map[string]ResourceSchema
+}
+
+type ResourceSchema struct {
+	IdentifierFields []Field
+	ConfigFields     []Field
+	DependsOn        []string
+}
 
 func DecodeField(ctx *hcl.EvalContext, expr hcl.Expression, f Field, s Schema) (FieldValue, error) {
 	fv := FieldValue{
@@ -208,21 +181,11 @@ func DecodeField(ctx *hcl.EvalContext, expr hcl.Expression, f Field, s Schema) (
 			return FieldValue{}, diag
 		}
 		fv.Value = val
-	case "oneof":
+	case "identifier":
 		variable := expr.Variables()[0]
 		subtype := variable.SimpleSplit().Rel[1].(hcl.TraverseAttr).Name
-		sub := s[subtype]
+		sub := s.Resources[subtype].IdentifierFields
 		fv.Metadata["oneof_type"] = subtype
-		var match bool
-		for _, o := range f.Oneof {
-			if subtype == o {
-				match = true
-			}
-		}
-		if !match {
-			return FieldValue{}, fmt.Errorf("not oneof type: %v", subtype)
-		}
-
 		val, diag := expr.Value(ctx)
 		if diag.HasErrors() {
 			return FieldValue{}, diag
@@ -261,7 +224,7 @@ func DecodeField(ctx *hcl.EvalContext, expr hcl.Expression, f Field, s Schema) (
 		}
 
 		m := val.AsValueMap()
-		vals, err := parseValues(m, s[f.Type], s)
+		vals, err := parseValues(m, s.Resources[f.Type].IdentifierFields, s)
 		if err != nil {
 			return FieldValue{}, err
 		}
@@ -323,7 +286,7 @@ func fieldValuesToMap(fields []FieldValue) map[string]any {
 	return m
 }
 
-func parseValues(m map[string]cty.Value, fields []Field, schema map[string][]Field) ([]FieldValue, error) {
+func parseValues(m map[string]cty.Value, fields []Field, schema Schema) ([]FieldValue, error) {
 	var vals []FieldValue
 	for _, f := range fields {
 		switch f.Type {
@@ -333,14 +296,14 @@ func parseValues(m map[string]cty.Value, fields []Field, schema map[string][]Fie
 				Name:  f.Name,
 				Value: m[f.Name].AsString(),
 			})
-		case "oneof":
+		case "identifier":
 			metadataValue := m[fmt.Sprintf("%s_metadata", f.Name)].AsValueMap()
 			metadata := map[string]string{}
 			for k, v := range metadataValue {
 				metadata[k] = v.AsString()
 			}
 			oneofType := metadata["oneof_type"]
-			subVals, err := parseValues(m[f.Name].AsValueMap(), schema[oneofType], schema)
+			subVals, err := parseValues(m[f.Name].AsValueMap(), schema.Resources[oneofType].IdentifierFields, schema)
 			if err != nil {
 				return nil, err
 			}
@@ -351,7 +314,7 @@ func parseValues(m map[string]cty.Value, fields []Field, schema map[string][]Fie
 				Metadata: metadata,
 			})
 		default:
-			subvals, err := parseValues(m[f.Name].AsValueMap(), schema[f.Name], schema)
+			subvals, err := parseValues(m[f.Name].AsValueMap(), schema.Resources[f.Name].IdentifierFields, schema)
 			if err != nil {
 				return nil, err
 			}

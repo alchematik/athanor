@@ -13,9 +13,8 @@ var resourceOp string
 func (g Generator) GenerateResourceOp(resource Resource) ([]byte, error) {
 	tmpl, err := template.New("resource_op").
 		Funcs(template.FuncMap{
-			"toPascalCase":        toPascalCase,
-			"configPartGoType":    configPartGoType,
-			"configPartHCLGoType": configPartHCLGoType,
+			"toPascalCase":     toPascalCase,
+			"configPartGoType": configPartGoType,
 		}).Parse(resourceOp)
 	if err != nil {
 		return nil, err
@@ -23,8 +22,6 @@ func (g Generator) GenerateResourceOp(resource Resource) ([]byte, error) {
 
 	imports := []string{
 		"github.com/alchematik/athanor/provider",
-		"github.com/hashicorp/hcl/v2/gohcl",
-		"github.com/hashicorp/hcl/v2",
 	}
 
 	tmplData := map[string]any{

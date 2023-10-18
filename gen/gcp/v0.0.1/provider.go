@@ -5,8 +5,6 @@ import (
 
 	"context"
 
-	"github.com/hashicorp/hcl/v2"
-
 	"github.com/alchematik/athanor/provider"
 
 	"github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket"
@@ -41,50 +39,15 @@ func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Id
 	}
 }
 
-type Parser struct {
-}
+func Schema() provider.Schema {
+	return provider.Schema{
+		Resources: map[string]provider.ResourceSchema{
 
-func (p *Parser) ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
-	switch block.Labels[1] {
+			"bucket": bucket.ResourceSchema(),
 
-	case "bucket":
-		return bucket.ParseIdentifierBlock(ctx, block)
+			"bucket_object": bucket_object.ResourceSchema(),
 
-	case "bucket_object":
-		return bucket_object.ParseIdentifierBlock(ctx, block)
-
-	case "resource_policy":
-		return resource_policy.ParseIdentifierBlock(ctx, block)
-
-	default:
-		return nil, fmt.Errorf("unknown block type: %s", block.Labels[1])
-	}
-}
-
-func (p *Parser) ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
-	switch block.Labels[1] {
-
-	case "bucket":
-		return bucket.ParseOpBlock(ctx, block)
-
-	case "bucket_object":
-		return bucket_object.ParseOpBlock(ctx, block)
-
-	case "resource_policy":
-		return resource_policy.ParseOpBlock(ctx, block)
-
-	default:
-		return nil, fmt.Errorf("unknown block type: %s", block.Labels[1])
-	}
-}
-
-func (p *Parser) ResourceNames() []string {
-	return []string{
-
-		"bucket",
-
-		"resource_policy",
-
-		"bucket_object",
+			"resource_policy": resource_policy.ResourceSchema(),
+		},
 	}
 }

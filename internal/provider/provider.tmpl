@@ -23,35 +23,13 @@ func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Id
   }
 }
 
-type Parser struct {
-}
-
-func (p *Parser) ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (any, error) {
-  switch block.Labels[1] {
+func Schema() provider.Schema {
+  return provider.Schema{
+    Resources: map[string]provider.ResourceSchema{
   {{ range .Schema.Resources }}
-  case "{{ .Name }}":
-    return {{ .Name }}.ParseIdentifierBlock(ctx, block)
+    "{{ .Name }}": {{ .Name }}.ResourceSchema(),
   {{ end }}
-  default:
-    return nil, fmt.Errorf("unknown block type: %s", block.Labels[1])
+    },
   }
 }
 
-func (p *Parser) ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
-  switch block.Labels[1] {
-  {{ range .Schema.Resources }}
-  case "{{ .Name }}":
-    return {{ .Name }}.ParseOpBlock(ctx, block)
-  {{ end }}
-  default:
-    return nil, fmt.Errorf("unknown block type: %s", block.Labels[1])
-  }
-}
-
-func (p *Parser) ResourceNames() []string {
-  return []string{
-  {{ range .ResourceNames }}
-  "{{ .}}",
-  {{ end }}
-  }
-}

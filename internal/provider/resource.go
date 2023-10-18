@@ -3,6 +3,7 @@ package generator
 import (
 	"bytes"
 	_ "embed"
+	"fmt"
 	"go/format"
 	"text/template"
 )
@@ -10,15 +11,23 @@ import (
 //go:embed resource.tmpl
 var resourceTmpl string
 
-func (g Generator) GenerateResource(provider string, r Resource) ([]byte, error) {
+func (g Generator) GenerateResource(r Resource) ([]byte, error) {
 	tmpl, err := template.New("resource").
-		Funcs(template.FuncMap{}).
+		Funcs(template.FuncMap{
+			"convertIdentifierType": convertIdentifierType,
+		}).
 		Parse(resourceTmpl)
 	if err != nil {
 		return nil, err
 	}
 
-	tmplData := map[string]any{}
+	imports := []string{
+		"github.com/alchematik/athanor/provider",
+	}
+	tmplData := map[string]any{
+		"Imports":  imports,
+		"Resource": r,
+	}
 
 	var buffer bytes.Buffer
 	if err := tmpl.Execute(&buffer, tmplData); err != nil {
@@ -31,4 +40,18 @@ func (g Generator) GenerateResource(provider string, r Resource) ([]byte, error)
 	}
 
 	return src, nil
+}
+
+func convertIdentifierType(part IdentifierPart) (string, error) {
+	switch part.Type {
+	case "string":
+		return "string", nil
+	case "identifier_oneof":
+		return "identifier", nil
+	case "resource":
+		return part.Resource, nil
+	default:
+		return "", fmt.Errorf("unknown type: %s", part.Type)
+	}
+
 }

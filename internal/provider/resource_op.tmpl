@@ -6,77 +6,6 @@ import (
 {{ end }}
 )
 
-func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
-  schema := &hcl.BodySchema{
-    Attributes: []hcl.AttributeSchema{
-      {Name: "id"},
-      {Name: "version"},
-    },
-		Blocks: []hcl.BlockHeaderSchema{
-			{
-				Type: "config",
-			},
-		},
-  }
-  content, diag := block.Body.Content(schema)
-  if diag.HasErrors() {
-    return nil, diag
-  }
-
-  var op HCLOp
-  idAttr := content.Attributes["id"]
-  var id HCLIdentifier
-  if diag := gohcl.DecodeExpression(idAttr.Expr, ctx, &id); diag.HasErrors() {
-    return nil, diag
-  }
-
-  op.HCLIdentifier = &id
-
-  versionAttr := content.Attributes["version"]
-  var version string
-  if diag := gohcl.DecodeExpression(versionAttr.Expr, ctx, &version); diag.HasErrors() {
-    return nil, diag
-  }
-
-  op.Version = version
-
-  op.Type = block.Type
-
-  {{ if gt (len .Resource.Config) 0 }}
-	  for _, b := range content.Blocks {
-		  if b.Type == "config" {
-			  var hclConfig HCLConfig
-			  configSchema := &hcl.BodySchema{
-				  Attributes: []hcl.AttributeSchema{
-				  {{ range .Resource.Config }}
-				    {Name:"{{ .Name }}"},
-				  {{ end }}
-				  },
-			  }
-			  configContent, diag := b.Body.Content(configSchema)
-			  if diag.HasErrors() {
-				  return nil, diag
-			  }
-
-			  {{ range $id := .Resource.Config }}
-			    if attr, ok := configContent.Attributes["{{ .Name }}"]; ok {
-				    var {{ .Name }} {{ configPartHCLGoType . }}
-				    if diag := gohcl.DecodeExpression(attr.Expr, ctx, &{{ .Name }}); diag.HasErrors() {
-					    return nil, diag
-				    }
-
-				    hclConfig.{{ toPascalCase .Name }} = {{ .Name }}
-			    }
-			  {{ end }}
-
-			  op.HCLConfig = hclConfig
-		  }
-	  }
-	{{ end }}
-
-  return op.ToOp(), nil
-}
-
 type Op struct {
   Type string
   Identifier *Identifier
@@ -102,36 +31,5 @@ type Config struct {
 {{ range .Resource.Config }}
   {{ toPascalCase .Name }} {{ configPartGoType . }}
 {{ end }}
-}
-
-type HCLOp struct {
-  Type string `hcl:"type" cty:"type"`
-  HCLIdentifier *HCLIdentifier `hcl:"id" cty:"id"`
-  Version string `hcl:"version" cty:"version"`
-  HCLConfig HCLConfig `hcl:"config" cty:"config"`
-}
-
-func (op *HCLOp) ToOp() provider.Operation {
-  return &Op{
-    Type: op.Type,
-    Identifier: op.HCLIdentifier.ToIdentifier(),
-    Version: op.Version,
-    Config: op.HCLConfig.ToConfig(),
-  }
-}
-
-type HCLConfig struct {
-{{ range .Resource.Config }}
-  {{ toPascalCase .Name }} {{ configPartHCLGoType . }} `hcl:"{{ .Name }}" cty:"{{ .Name }}"`
-{{ end }}
-
-}
-
-func (c HCLConfig) ToConfig() Config {
-  out := Config{} 
-{{ range $config := .Resource.Config }}
-  out.{{ toPascalCase .Name }} = c.{{ toPascalCase .Name }}
-{{ end }}
-  return out
 }
 

@@ -54,62 +54,12 @@ func identifierPartGoType(part IdentifierPart) (string, error) {
 	}
 }
 
-func identifierPartHCLGoType(part IdentifierPart) (string, error) {
-	switch part.Type {
-	case "string":
-		return "string", nil
-	case "identifier_oneof":
-		return "cty.Value", nil
-	case "resource":
-		return fmt.Sprintf("*%s.HCLIdentifier", part.Resource), nil
-	default:
-		return "", fmt.Errorf("unknown type: %q", part.Type)
-	}
-}
-
-func identifierPartCtyType(part IdentifierPart) (string, error) {
-	switch part.Type {
-	case "string":
-		return "cty.String", nil
-	case "identifier_oneof":
-		return "cty.DynamicPseudoType", nil
-	case "resource":
-		return fmt.Sprintf("id.%s.CtyType()", toPascalCase(part.Name)), nil
-	default:
-		return "", fmt.Errorf("unknown type: %q", part.Type)
-	}
-}
-
-func identifierPartToIdentifier(part IdentifierPart) (string, error) {
-	switch part.Type {
-	case "string":
-		return fmt.Sprintf("id.%s", toPascalCase(part.Name)), nil
-	case "identifier_oneof":
-		return fmt.Sprintf("id.%s.CtyType()", toPascalCase(part.Name)), nil
-	case "resource":
-		return fmt.Sprintf("id.%s.ToIdentifier()", toPascalCase(part.Name)), nil
-	default:
-		return "", fmt.Errorf("unknown type: %q", part.Type)
-	}
-}
-
 func configPartGoType(part ConfigPart) (string, error) {
 	switch part.Type {
 	case "string":
 		return "string", nil
 	case "identifier_oneof":
 		return "any", nil
-	default:
-		return "", fmt.Errorf("unknown type: %q", part.Type)
-	}
-}
-
-func configPartHCLGoType(part ConfigPart) (string, error) {
-	switch part.Type {
-	case "string":
-		return "string", nil
-	case "identifier_oneof":
-		return "cty.Value", nil
 	default:
 		return "", fmt.Errorf("unknown type: %q", part.Type)
 	}

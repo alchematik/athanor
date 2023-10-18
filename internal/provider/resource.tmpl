@@ -1,1 +1,33 @@
-package {{ .Name }}
+package {{ .Resource.Name }}
+
+import (
+{{ range .Imports }}
+"{{ . }}"
+{{ end }}
+)
+
+func ResourceSchema() provider.ResourceSchema {
+  return provider.ResourceSchema{
+    IdentifierFields: []provider.Field{
+    {{ range .Resource.Identifier }}
+      {
+        Name: "{{ .Name }}",
+        Type: "{{ convertIdentifierType . }}",
+      },
+    {{ end }}
+    },
+    ConfigFields: []provider.Field{
+    {{ range .Resource.Config }}
+      {
+        Name: "{{ .Name }}",
+        Type: "{{ .Type }}",
+      },
+    {{ end }}
+    },
+    DependsOn: []string{
+    {{ range .Resource.Dependencies }}
+      "{{ . }}",
+    {{ end }}
+    },
+  }
+}
