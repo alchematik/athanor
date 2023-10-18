@@ -1,15 +1,18 @@
 package bucket
 
 import (
+	"fmt"
 	"github.com/alchematik/athanor/provider"
 
 	"github.com/hashicorp/hcl/v2/gohcl"
 
 	"github.com/hashicorp/hcl/v2"
+
+	"github.com/alchematik/athanor/gen/gcp/v0.0.1/schema"
 )
 
 func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, error) {
-	schema := &hcl.BodySchema{
+	s := &hcl.BodySchema{
 		Attributes: []hcl.AttributeSchema{
 			{Name: "id"},
 			{Name: "version"},
@@ -20,19 +23,19 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, e
 			},
 		},
 	}
-	content, diag := block.Body.Content(schema)
+	content, diag := block.Body.Content(s)
 	if diag.HasErrors() {
 		return nil, diag
 	}
 
 	var op HCLOp
 	idAttr := content.Attributes["id"]
-	var id HCLIdentifier
-	if diag := gohcl.DecodeExpression(idAttr.Expr, ctx, &id); diag.HasErrors() {
-		return nil, diag
+	ivf, err := provider.DecodeField(ctx, idAttr.Expr, provider.Field{Name: "id", Type: "bucket"}, schema.Schema)
+	if err != nil {
+		return nil, err
 	}
 
-	op.HCLIdentifier = &id
+	fmt.Printf("bucket op id: %+v\n", ivf)
 
 	versionAttr := content.Attributes["version"]
 	var version string
@@ -44,7 +47,7 @@ func ParseOpBlock(ctx *hcl.EvalContext, block *hcl.Block) (provider.Operation, e
 
 	op.Type = block.Type
 
-	return op.ToOp(), nil
+	return nil, nil
 }
 
 type Op struct {

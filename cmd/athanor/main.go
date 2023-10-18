@@ -6,14 +6,15 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"plugin"
 	"sort"
 
 	"github.com/alchematik/athanor/internal/parser"
 	"github.com/alchematik/athanor/internal/provider"
 	"github.com/alchematik/athanor/provider"
 
+	plugin "github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/hcl/v2"
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/hashicorp/hcl/v2/hclparse"
@@ -172,77 +173,192 @@ func main() {
 								Variables: map[string]cty.Value{},
 							}
 
-							var ids []any
+							// var ids []any
 							for providerType, providerMap := range providers {
 								for alias, providerData := range providerMap {
-									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider.so")
-									plug, err := plugin.Open(fp)
+									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider")
+									var handshakeConfig = plugin.HandshakeConfig{
+										ProtocolVersion:  1,
+										MagicCookieKey:   "BASIC_PLUGIN",
+										MagicCookieValue: "hello",
+									}
+									client := plugin.NewClient(&plugin.ClientConfig{
+										HandshakeConfig: handshakeConfig,
+										Plugins: map[string]plugin.Plugin{
+											"provider": &provider.ProviderPlugin{},
+										},
+										Cmd: exec.Command(fp),
+									})
+
+									rpcClient, err := client.Client()
 									if err != nil {
 										return err
 									}
 
-									parserFuncSym, err := plug.Lookup("Parser")
+									raw, err := rpcClient.Dispense("provider")
 									if err != nil {
 										return err
 									}
 
-									parserFunc, ok := parserFuncSym.(func() any)
+									providerClient, ok := raw.(*provider.ProviderRPCClient)
 									if !ok {
-										return fmt.Errorf("wrong type for Parser symbol")
+										return fmt.Errorf("not a client: %T", raw)
 									}
 
-									p, ok := parserFunc().(provider.Parser)
-									if !ok {
-										return fmt.Errorf("not a valid parser for %s provider", alias)
+									resourceNames, err := providerClient.ResourceNames()
+									if err != nil {
+										return err
 									}
 
-									resourceNames := p.ResourceNames()
+									fmt.Printf("RESOURCE NAMES >> %v, %v\n", alias, resourceNames)
+
+									identifierSchema, err := providerClient.IdentifierSchema()
+									if err != nil {
+										return err
+									}
+
 									for _, rn := range resourceNames {
 										blocks := idBlocks[alias+"."+rn]
+										s := identifierSchema[rn]
+										var hclAttrs []hcl.AttributeSchema
+										for _, f := range s {
+											hclAttrs = append(hclAttrs, hcl.AttributeSchema{Name: f.Name})
+										}
+										fmt.Printf("SCHEMA: %+v\n", s)
 										for _, b := range blocks {
-											id, err := p.ParseIdentifierBlock(evalCtx, b)
+											content, diag := b.Body.Content(&hcl.BodySchema{Attributes: hclAttrs})
+											if diag.HasErrors() {
+												return diag
+											}
+
+											var fvs []provider.FieldValue
+											for _, f := range s {
+												if attr, ok := content.Attributes[f.Name]; ok {
+													fv, err := provider.DecodeField(evalCtx, attr.Expr, f, identifierSchema)
+													if err != nil {
+														return err
+													}
+													fvs = append(fvs, fv)
+												}
+											}
+
+											val, err := provider.FieldValuesToCtyValue(fvs)
 											if err != nil {
 												return err
 											}
 
-											ids = append(ids, id)
+											provider.AddIdentifierValueToEvalCtx(evalCtx, b, val)
 										}
 									}
+
+									client.Kill()
 								}
 							}
 
 							var ops []provider.Operation
 							for providerType, p := range providers {
 								for alias, providerData := range p {
-									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider.so")
-									plug, err := plugin.Open(fp)
+									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider")
+									fmt.Printf(">> %v, %v\n", fp, alias)
+
+									var handshakeConfig = plugin.HandshakeConfig{
+										ProtocolVersion:  1,
+										MagicCookieKey:   "BASIC_PLUGIN",
+										MagicCookieValue: "hello",
+									}
+									client := plugin.NewClient(&plugin.ClientConfig{
+										HandshakeConfig: handshakeConfig,
+										Plugins: map[string]plugin.Plugin{
+											"provider": &provider.ProviderPlugin{},
+										},
+										Cmd: exec.Command(fp),
+									})
+
+									rpcClient, err := client.Client()
 									if err != nil {
 										return err
 									}
 
-									parserFuncSym, err := plug.Lookup("Parser")
+									raw, err := rpcClient.Dispense("provider")
 									if err != nil {
 										return err
 									}
 
-									parserFunc, ok := parserFuncSym.(func() any)
+									providerClient, ok := raw.(*provider.ProviderRPCClient)
 									if !ok {
-										return fmt.Errorf("wrong type for Parser symbol")
+										return fmt.Errorf("not a client: %T", raw)
 									}
-
-									p, ok := parserFunc().(provider.Parser)
-									if !ok {
-										return fmt.Errorf("not a valid parser for %s provider", alias)
-									}
-
 									for _, b := range opBlocks[alias] {
-										op, err := p.ParseOpBlock(evalCtx, b)
+										bs := &hcl.BodySchema{
+											Attributes: []hcl.AttributeSchema{
+												{Name: "id"},
+												{Name: "version"},
+											},
+											Blocks: []hcl.BlockHeaderSchema{
+												{
+													Type: "config",
+												},
+											},
+										}
+										content, diag := b.Body.Content(bs)
+										if diag.HasErrors() {
+											return diag
+										}
+
+										identifierSchema, err := providerClient.IdentifierSchema()
 										if err != nil {
 											return err
 										}
 
-										ops = append(ops, op)
+										idAttr := content.Attributes["id"]
+										t := b.Labels[1]
+										ivf, err := provider.DecodeField(evalCtx, idAttr.Expr, provider.Field{Name: "id", Type: t}, identifierSchema)
+										if err != nil {
+											return err
+										}
+
+										versionAttr := content.Attributes["version"]
+										vfv, err := provider.DecodeField(evalCtx, versionAttr.Expr, provider.Field{Name: "version", Type: "string"}, identifierSchema)
+										if err != nil {
+											return err
+										}
+
+										fmt.Printf("version: %s, id: %+v\n", vfv.Value, ivf.Value)
+										for _, b := range content.Blocks {
+											if b.Type == "config" {
+												configSchema, err := providerClient.ConfigSchema()
+												if err != nil {
+													return err
+												}
+
+												var attrs []hcl.AttributeSchema
+												for _, f := range configSchema[t] {
+													attrs = append(attrs, hcl.AttributeSchema{Name: f.Name})
+												}
+
+												configContent, diag := b.Body.Content(&hcl.BodySchema{Attributes: attrs})
+												if diag.HasErrors() {
+													return diag
+												}
+
+												var fvs []provider.FieldValue
+												for _, f := range configSchema[t] {
+													if attr, ok := configContent.Attributes[f.Name]; ok {
+														fv, err := provider.DecodeField(evalCtx, attr.Expr, f, identifierSchema)
+														if err != nil {
+															return err
+														}
+														fvs = append(fvs, fv)
+													}
+												}
+
+												fmt.Printf("config: %+v\n", fvs)
+											}
+										}
+
+										// ops = append(ops, op)
 									}
+									client.Kill()
 								}
 							}
 

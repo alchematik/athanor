@@ -12,7 +12,7 @@ build/aws:
 	go build -buildmode=plugin -o .providers/aws/v0.0.1/provider.so ./test/aws/
 
 build/gcp:
-	go build -buildmode=plugin -o .providers/gcp/v0.0.1/provider.so ./test/gcp/
+	go build -o .providers/gcp/v0.0.1/provider ./test/gcp/
 
 blueprint/show:
 	go run ./cmd/athanor/main.go blueprint show -providers ./.providers ./gcp

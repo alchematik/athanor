@@ -11,8 +11,6 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 
-	"github.com/hashicorp/hcl/v2/gohcl"
-
 	"github.com/alchematik/athanor/provider"
 
 	"github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket"
@@ -42,35 +40,18 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 
 	fmt.Printf("bucket_object fvs: %+v\n", fvs)
 
-	var hclID HCLIdentifier
-
-	if attr, ok := content.Attributes["bucket"]; ok {
-		var bucket *bucket.HCLIdentifier
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &bucket); diag.HasErrors() {
-			return nil, diag
-		}
-		hclID.Bucket = bucket
-
-	}
-
-	if attr, ok := content.Attributes["name"]; ok {
-
-		var name string
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &name); diag.HasErrors() {
-			return nil, diag
-		}
-		hclID.Name = name
-
-	}
-
-	val, err := hclID.ToCtyValue()
+	// val, err := hclID.ToCtyValue()
+	// if err != nil {
+	// 	return nil, err
+	// }
+	val, err := provider.FieldValuesToCtyValue(fvs)
 	if err != nil {
 		return nil, err
 	}
 
 	provider.AddIdentifierValueToEvalCtx(ctx, block, val)
 
-	return hclID.ToIdentifier(), nil
+	return nil, nil
 }
 
 // Identifier is the identifier for a bucket_object.

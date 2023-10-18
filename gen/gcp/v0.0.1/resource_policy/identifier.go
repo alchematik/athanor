@@ -11,8 +11,6 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 
-	"github.com/hashicorp/hcl/v2/gohcl"
-
 	"github.com/alchematik/athanor/provider"
 
 	"github.com/alchematik/athanor/gen/gcp/v0.0.1/bucket"
@@ -42,39 +40,14 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 
 	fmt.Printf("resource_policy fvs: %+v\n", fvs)
 
-	var hclID HCLIdentifier
-
-	if attr, ok := content.Attributes["resource"]; ok {
-
-		variable := attr.Expr.Variables()[0]
-		part := variable.SimpleSplit().Rel[1].(hcl.TraverseAttr)
-		hclID.Metadata.ResourceType = part.Name
-		var val cty.Value
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &val); diag.HasErrors() {
-			return nil, diag
-		}
-		hclID.Resource = val
-
-	}
-
-	if attr, ok := content.Attributes["name"]; ok {
-
-		var name string
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &name); diag.HasErrors() {
-			return nil, diag
-		}
-		hclID.Name = name
-
-	}
-
-	val, err := hclID.ToCtyValue()
+	val, err := provider.FieldValuesToCtyValue(fvs)
 	if err != nil {
 		return nil, err
 	}
 
 	provider.AddIdentifierValueToEvalCtx(ctx, block, val)
 
-	return hclID.ToIdentifier(), nil
+	return nil, nil
 }
 
 // Identifier is the identifier for a resource_policy.

@@ -11,8 +11,6 @@ import (
 
 	"github.com/hashicorp/hcl/v2"
 
-	"github.com/hashicorp/hcl/v2/gohcl"
-
 	"github.com/alchematik/athanor/gen/gcp/v0.0.1/schema"
 	"github.com/alchematik/athanor/provider"
 )
@@ -40,45 +38,19 @@ func ParseIdentifierBlock(ctx *hcl.EvalContext, block *hcl.Block) (*Identifier, 
 
 	fmt.Printf("bucket fvs: %+v\n", fvs)
 
-	var hclID HCLIdentifier
-	if attr, ok := content.Attributes["project"]; ok {
+	// val, err := hclID.ToCtyValue()
+	// if err != nil {
+	// 	return nil, err
+	// }
 
-		var project string
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &project); diag.HasErrors() {
-			return nil, diag
-		}
-		hclID.Project = project
-
-	}
-
-	if attr, ok := content.Attributes["region"]; ok {
-
-		var region string
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &region); diag.HasErrors() {
-			return nil, diag
-		}
-		hclID.Region = region
-
-	}
-
-	if attr, ok := content.Attributes["name"]; ok {
-
-		var name string
-		if diag := gohcl.DecodeExpression(attr.Expr, ctx, &name); diag.HasErrors() {
-			return nil, diag
-		}
-		hclID.Name = name
-
-	}
-
-	val, err := hclID.ToCtyValue()
+	val, err := provider.FieldValuesToCtyValue(fvs)
 	if err != nil {
 		return nil, err
 	}
 
 	provider.AddIdentifierValueToEvalCtx(ctx, block, val)
 
-	return hclID.ToIdentifier(), nil
+	return nil, nil
 }
 
 // Identifier is the identifier for a bucket.

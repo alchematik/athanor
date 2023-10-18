@@ -41,3 +41,14 @@ var Schema = map[string][]provider.Field{
 		},
 	},
 }
+
+var ConfigSchema = map[string][]provider.Field{
+	"bucket": {},
+	"bucket_object": {
+		{
+			Name: "contents",
+			Type: "string",
+		},
+	},
+	"resource_policy": {},
+}
