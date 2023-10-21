@@ -19,9 +19,10 @@ type ResourcePolicy struct {
 	Config     *Config
 }
 
-func GetResource(ctx context.Context, client Client, id *Identifier) (*provider.Resource, error) {
-	r := &provider.Resource{Identifier: id}
-	out, err := client.GetResourcePolicy(ctx, id)
+func GetResource(ctx context.Context, client Client, identifier []provider.FieldValue) (*provider.Resource, error) {
+	r := &provider.Resource{}
+	id := FieldValuesToIdentifier(identifier)
+	_, err := client.GetResourcePolicy(ctx, id)
 	if err != nil {
 		if errors.Is(err, provider.NotFoundError) {
 			r.State = provider.ResourceStateNotExists
@@ -31,6 +32,6 @@ func GetResource(ctx context.Context, client Client, id *Identifier) (*provider.
 		return nil, err
 	}
 
-	r.Config = out.Config
+	// r.Config = out.Config
 	return r, nil
 }

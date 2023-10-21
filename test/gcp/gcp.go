@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"os"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 
 	"github.com/alchematik/athanor/provider"
@@ -32,9 +34,15 @@ func main() {
 		MagicCookieValue: "hello",
 	}
 
+	logger := hclog.New(&hclog.LoggerOptions{
+		Output: os.Stderr,
+		Level:  hclog.Debug,
+	})
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: handshakeConfig,
 		Plugins:         pluginMap,
+		// Logger:          hclog.NewNullLogger(),
+		Logger: logger,
 	})
 }
 
@@ -42,14 +50,19 @@ type bucketClient struct {
 }
 
 func (c *bucketClient) GetBucket(ctx context.Context, id *bucket.Identifier) (*bucket.Bucket, error) {
+	logger := hclog.New(&hclog.LoggerOptions{})
+	logger.Info("Getting bucket!!!", "id", id)
 	return nil, nil
 }
 
 func (c *bucketClient) CreateBucket(ctx context.Context, id *bucket.Identifier, config *bucket.Config) error {
+
 	return nil
 }
 
 func (c *bucketClient) GetBucketObject(ctx context.Context, id *bucketobject.Identifier) (*bucketobject.BucketObject, error) {
+	logger := hclog.New(&hclog.LoggerOptions{})
+	logger.Info("Getting bucket object!!!", "id", id)
 	return nil, nil
 }
 

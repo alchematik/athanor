@@ -26,11 +26,14 @@ func (g Generator) GenerateResourceIdentifier(provider Provider, resource Resour
 	imports := []string{
 		"fmt",
 		"strings",
+		"github.com/alchematik/athanor/provider",
 	}
 	var metadata []IdentifierPart
 	for _, id := range resource.Identifier {
-		if id.Type == "resource" {
-			imports = append(imports, filepath.Join(g.ModName, g.ResourceDir, id.Resource))
+		if id.Type == "identifier_oneof" {
+			for _, choice := range id.Choices {
+				imports = append(imports, filepath.Join(g.ModName, g.ResourceDir, choice))
+			}
 		}
 	}
 

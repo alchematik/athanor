@@ -31,3 +31,28 @@ func (id *Identifier) String() string {
   return strings.Join(parts, "/")
 }
 
+func FieldValuesToIdentifier(fieldValues []provider.FieldValue) *Identifier {
+  var id Identifier
+
+  for _, fv := range fieldValues {
+    switch fv.Name {
+  {{ range $id := .Resource.Identifier }}
+    case "{{ $id.Name }}":
+      {{ if eq $id.Type "string" }}
+        id.{{ toPascalCase $id.Name }} = fv.Value.(string)
+      {{ end }}
+
+      {{ if eq $id.Type "identifier_oneof" }}
+        switch fv.Metadata["identifier_type"]{
+        {{ range $id.Choices }}
+        case "{{ . }}":
+          id.{{ toPascalCase $id.Name }} = {{ . }}.FieldValuesToIdentifier(fv.Value.([]provider.FieldValue)) 
+        {{ end }}
+        }
+      {{ end }}
+  {{ end }}
+    }
+  }
+
+  return &id
+}

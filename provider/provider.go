@@ -2,12 +2,16 @@ package provider
 
 import (
 	"context"
+	"encoding/gob"
 	"errors"
 	"fmt"
 	"net/rpc"
+	"strings"
 
+	"github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/hcl/v2"
+
 	"github.com/hashicorp/hcl/v2/gohcl"
 	"github.com/zclconf/go-cty/cty"
 	"github.com/zclconf/go-cty/cty/gocty"
@@ -17,8 +21,12 @@ var (
 	NotFoundError = errors.New("not found")
 )
 
+func init() {
+	gob.Register([]FieldValue{})
+}
+
 type ClientRegistry interface {
-	GetResource(context.Context, Identifier) (*Resource, error)
+	GetResource(context.Context, string, []FieldValue) (*Resource, error)
 }
 
 type ProviderRPCClient struct {
@@ -35,9 +43,15 @@ func (p *ProviderRPCClient) Schema() (Schema, error) {
 	return res, nil
 }
 
-func (p *ProviderRPCClient) GetResource(id Identifier) (*Resource, error) {
+type GetResurceInput struct {
+	IdentifierFields []FieldValue
+	ResourceType     string
+}
+
+func (p *ProviderRPCClient) GetResource(input GetResurceInput) (*Resource, error) {
+	fmt.Printf("calling RPC\n")
 	var res Resource
-	if err := p.client.Call("Plugin.GetResource", id, &res); err != nil {
+	if err := p.client.Call("Plugin.GetResource", input, &res); err != nil {
 		return nil, err
 	}
 
@@ -54,9 +68,11 @@ func (s *ProviderRPCServer) Schema(args any, resp *Schema) error {
 	return nil
 }
 
-func (s *ProviderRPCServer) GetResource(id Identifier, resp *Resource) error {
+func (s *ProviderRPCServer) GetResource(input GetResurceInput, resp *Resource) error {
 	// TODO: pass in context?
-	r, err := s.ClientRegistry.GetResource(context.Background(), id)
+	logger := hclog.New(&hclog.LoggerOptions{})
+	logger.Info("GETTING RPC", "input", input)
+	r, err := s.ClientRegistry.GetResource(context.Background(), input.ResourceType, input.IdentifierFields)
 	if err != nil {
 		return err
 	}
@@ -93,9 +109,11 @@ type Identifier interface {
 }
 
 type Resource struct {
-	State      ResourceState
-	Identifier Identifier
-	Config     any
+	State            ResourceState
+	Provider         string
+	Type             string
+	IdentifierFields []FieldValue
+	ConfigFields     []FieldValue
 }
 
 func AddIdentifierValueToEvalCtx(ctx *hcl.EvalContext, block *hcl.Block, value cty.Value) {
@@ -173,51 +191,21 @@ func DecodeField(ctx *hcl.EvalContext, expr hcl.Expression, f Field, s Schema) (
 		variable := expr.Variables()[0]
 		subtype := variable.SimpleSplit().Rel[1].(hcl.TraverseAttr).Name
 		sub := s.Resources[subtype].IdentifierFields
-		fv.Metadata["oneof_type"] = subtype
+		fv.Metadata["identifier_type"] = subtype
 		val, diag := expr.Value(ctx)
 		if diag.HasErrors() {
 			return FieldValue{}, diag
 		}
 
 		m := val.AsValueMap()
-		vals := []FieldValue{
-			// {
-			// 	Name:  fmt.Sprintf("%s_metadata", f.Name),
-			// 	Type:  "string",
-			// 	Value: subtype,
-			// },
-		}
-		for _, f := range sub {
-			var v any
-			switch f.Type {
-			case "string":
-				v = m[f.Name].AsString()
-			}
-
-			fv := FieldValue{
-				Type:  f.Type,
-				Name:  f.Name,
-				Value: v,
-			}
-			vals = append(vals, fv)
-		}
-
-		fv.Value = vals
-
-	default:
-		// TODO: Will this work with nested maps?
-		val, diag := expr.Value(ctx)
-		if diag.HasErrors() {
-			return FieldValue{}, diag
-		}
-
-		m := val.AsValueMap()
-		vals, err := parseValues(m, s.Resources[f.Type].IdentifierFields, s)
+		vals, err := parseValues(m, sub, s)
 		if err != nil {
 			return FieldValue{}, err
 		}
-
 		fv.Value = vals
+
+	default:
+		return FieldValue{}, fmt.Errorf("unsupported type: %q", f.Type)
 	}
 
 	return fv, nil
@@ -231,13 +219,16 @@ func FieldValuesToCtyType(fields []FieldValue) cty.Type {
 		switch f.Type {
 		case "string":
 			m[f.Name] = cty.String
-		default:
+		case "identifier":
 			vals, ok := f.Value.([]FieldValue)
 			if !ok {
 				panic(fmt.Sprintf("expected list of field values, got %T", f.Value))
 			}
 			t := FieldValuesToCtyType(vals)
 			m[f.Name] = t
+		default:
+			// TODO: Return error.
+			panic(fmt.Sprintf("unexpected type %q", f.Type))
 		}
 	}
 
@@ -261,13 +252,15 @@ func fieldValuesToMap(fields []FieldValue) map[string]any {
 		switch f.Type {
 		case "string":
 			m[f.Name] = f.Value
-		default:
+		case "identifier":
 			vals, ok := f.Value.([]FieldValue)
 			if !ok {
 				panic(fmt.Sprintf("expected list of field values, got %T", f.Value))
 			}
 
 			m[f.Name] = fieldValuesToMap(vals)
+		default:
+			panic(fmt.Sprintf("unexpected type: %q", f.Type))
 		}
 	}
 
@@ -290,7 +283,7 @@ func parseValues(m map[string]cty.Value, fields []Field, schema Schema) ([]Field
 			for k, v := range metadataValue {
 				metadata[k] = v.AsString()
 			}
-			oneofType := metadata["oneof_type"]
+			oneofType := metadata["identifier_type"]
 			subVals, err := parseValues(m[f.Name].AsValueMap(), schema.Resources[oneofType].IdentifierFields, schema)
 			if err != nil {
 				return nil, err
@@ -302,17 +295,66 @@ func parseValues(m map[string]cty.Value, fields []Field, schema Schema) ([]Field
 				Metadata: metadata,
 			})
 		default:
-			subvals, err := parseValues(m[f.Name].AsValueMap(), schema.Resources[f.Name].IdentifierFields, schema)
-			if err != nil {
-				return nil, err
-			}
-			vals = append(vals, FieldValue{
-				Type:  f.Type,
-				Name:  f.Name,
-				Value: subvals,
-			})
+			return nil, fmt.Errorf("unexpected type: %q", f.Type)
 		}
 	}
 
 	return vals, nil
+}
+
+type Operation struct {
+	ResourceType     string
+	Provider         string
+	IdentifierFields []FieldValue
+	ConfigFields     []FieldValue
+	Action           string
+	Version          string
+}
+
+type State struct {
+	Resources map[string]Resource
+}
+
+func (s State) Apply(op Operation) error {
+	var parts []string
+	for _, f := range op.IdentifierFields {
+		parts = append(parts, fieldValueToString(f))
+	}
+	id := fmt.Sprintf("%s://%s", op.ResourceType, strings.Join(parts, "/"))
+	switch op.Action {
+	case "create":
+		r, ok := s.Resources[id]
+		if ok {
+			if r.State != ResourceStateNotExists {
+				return fmt.Errorf("resource already exists")
+			}
+		}
+
+		s.Resources[id] = Resource{
+			Provider:         op.Provider,
+			Type:             op.ResourceType,
+			IdentifierFields: op.IdentifierFields,
+			ConfigFields:     op.ConfigFields,
+			State:            ResourceStateExists,
+		}
+
+		return nil
+	default:
+		return fmt.Errorf("unsupported action: %q", op.Action)
+	}
+}
+
+func fieldValueToString(fv FieldValue) string {
+	switch fv.Type {
+	case "string":
+		return strings.Join([]string{fv.Name, fv.Value.(string)}, "/")
+	case "identifier":
+		var parts []string
+		for _, v := range fv.Value.([]FieldValue) {
+			parts = append(parts, fieldValueToString(v))
+		}
+		return strings.Join(parts, "/")
+	default:
+		panic(fmt.Sprintf("unexpected type: %q", fv.Type))
+	}
 }

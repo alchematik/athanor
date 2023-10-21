@@ -48,8 +48,6 @@ func convertIdentifierType(part IdentifierPart) (string, error) {
 		return "string", nil
 	case "identifier_oneof":
 		return "identifier", nil
-	case "resource":
-		return part.Resource, nil
 	default:
 		return "", fmt.Errorf("unknown type: %s", part.Type)
 	}

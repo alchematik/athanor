@@ -1,6 +1,7 @@
 package main
 
 import (
+	// "encoding/gob"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -8,7 +9,9 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+
+	// "github.com/hashicorp/go-hclog"
+	// "sort"
 
 	"github.com/alchematik/athanor/internal/parser"
 	"github.com/alchematik/athanor/internal/provider"
@@ -21,7 +24,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/urfave/cli/v2"
 	"github.com/zclconf/go-cty/cty"
-	"golang.org/x/mod/semver"
+	// "golang.org/x/mod/semver"
 )
 
 var blockTypes = []hcl.BlockHeaderSchema{
@@ -174,7 +177,9 @@ func main() {
 								Variables: map[string]cty.Value{},
 							}
 
-							// var ids []any
+							pluginClients := map[string]*plugin.Client{}
+							providerClients := map[string]*provider.ProviderRPCClient{}
+
 							for providerType, providerMap := range providers {
 								for alias, providerData := range providerMap {
 									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider")
@@ -189,7 +194,10 @@ func main() {
 											"provider": &provider.ProviderPlugin{},
 										},
 										Cmd: exec.Command(fp),
+										// Logger: hclog.NewNullLogger(),
 									})
+
+									pluginClients[alias] = client
 
 									rpcClient, err := client.Client()
 									if err != nil {
@@ -206,7 +214,14 @@ func main() {
 										return fmt.Errorf("not a client: %T", raw)
 									}
 
-									schema, err := providerClient.Schema()
+									providerClients[alias] = providerClient
+								}
+							}
+
+							// var ids []any
+							for _, providerMap := range providers {
+								for alias := range providerMap {
+									schema, err := providerClients[alias].Schema()
 									if err != nil {
 										return err
 									}
@@ -215,16 +230,24 @@ func main() {
 									if err := dag.AddVertex("root"); err != nil {
 										return err
 									}
-
-									for name, r := range schema.Resources {
+									for name := range schema.Resources {
 										if err := dag.AddVertex(name); err != nil {
 											return err
 										}
-										for _, dep := range r.DependsOn {
-											dag.AddEdge(dep, name)
-										}
+									}
+
+									for name, r := range schema.Resources {
 										if len(r.DependsOn) == 0 {
-											dag.AddEdge("root", name)
+											if err := dag.AddEdge("root", name); err != nil {
+												return err
+											}
+											continue
+										}
+
+										for _, dep := range r.DependsOn {
+											if err := dag.AddEdge(dep, name); err != nil {
+												return err
+											}
 										}
 									}
 
@@ -242,7 +265,6 @@ func main() {
 										for _, f := range s {
 											hclAttrs = append(hclAttrs, hcl.AttributeSchema{Name: f.Name})
 										}
-										fmt.Printf("SCHEMA: %+v\n", s)
 										for _, b := range blocks {
 											content, diag := b.Body.Content(&hcl.BodySchema{Attributes: hclAttrs})
 											if diag.HasErrors() {
@@ -268,42 +290,13 @@ func main() {
 											provider.AddIdentifierValueToEvalCtx(evalCtx, b, val)
 										}
 									}
-
-									client.Kill()
 								}
 							}
 
 							var ops []provider.Operation
-							for providerType, p := range providers {
-								for alias, providerData := range p {
-									fp := filepath.Join(providersPath, providerType, providerData.Version, "provider")
-									var handshakeConfig = plugin.HandshakeConfig{
-										ProtocolVersion:  1,
-										MagicCookieKey:   "BASIC_PLUGIN",
-										MagicCookieValue: "hello",
-									}
-									client := plugin.NewClient(&plugin.ClientConfig{
-										HandshakeConfig: handshakeConfig,
-										Plugins: map[string]plugin.Plugin{
-											"provider": &provider.ProviderPlugin{},
-										},
-										Cmd: exec.Command(fp),
-									})
-
-									rpcClient, err := client.Client()
-									if err != nil {
-										return err
-									}
-
-									raw, err := rpcClient.Dispense("provider")
-									if err != nil {
-										return err
-									}
-
-									providerClient, ok := raw.(*provider.ProviderRPCClient)
-									if !ok {
-										return fmt.Errorf("not a client: %T", raw)
-									}
+							for _, p := range providers {
+								for alias := range p {
+									providerClient := providerClients[alias]
 									for _, b := range opBlocks[alias] {
 										bs := &hcl.BodySchema{
 											Attributes: []hcl.AttributeSchema{
@@ -328,7 +321,7 @@ func main() {
 
 										idAttr := content.Attributes["id"]
 										t := b.Labels[1]
-										ivf, err := provider.DecodeField(evalCtx, idAttr.Expr, provider.Field{Name: "id", Type: t}, schema)
+										ivf, err := provider.DecodeField(evalCtx, idAttr.Expr, provider.Field{Name: "id", Type: "identifier"}, schema)
 										if err != nil {
 											return err
 										}
@@ -339,7 +332,7 @@ func main() {
 											return err
 										}
 
-										fmt.Printf("version: %s, id: %+v\n", vfv.Value, ivf.Value)
+										var cfv []provider.FieldValue
 										for _, b := range content.Blocks {
 											if b.Type == "config" {
 												var attrs []hcl.AttributeSchema
@@ -352,52 +345,80 @@ func main() {
 													return diag
 												}
 
-												var fvs []provider.FieldValue
 												for _, f := range schema.Resources[t].ConfigFields {
 													if attr, ok := configContent.Attributes[f.Name]; ok {
 														fv, err := provider.DecodeField(evalCtx, attr.Expr, f, schema)
 														if err != nil {
 															return err
 														}
-														fvs = append(fvs, fv)
+														cfv = append(cfv, fv)
 													}
 												}
 
-												fmt.Printf("config: %+v\n", fvs)
+												fmt.Printf("config: %+v\n", cfv)
 											}
 										}
+										op := provider.Operation{
+											Provider:         alias,
+											ResourceType:     b.Labels[1],
+											IdentifierFields: ivf.Value.([]provider.FieldValue),
+											ConfigFields:     cfv,
+											Version:          vfv.Value.(string),
+											Action:           b.Type,
+										}
 
-										// ops = append(ops, op)
+										ops = append(ops, op)
 									}
-									client.Kill()
 								}
 							}
 
-							fmt.Printf("providers: %v\n", providers)
-
-							resourceOperations := map[string][]provider.Operation{}
+							state := provider.State{
+								Resources: map[string]provider.Resource{},
+							}
 							for _, op := range ops {
-								id := op.ForIdentifier().String()
-								resourceOperations[id] = append(resourceOperations[id], op)
+								state.Apply(op)
 							}
 
-							resources := map[string]*provider.Resource{}
-							for id, operations := range resourceOperations {
-								sort.Slice(operations, func(i, j int) bool {
-									return semver.Compare(operations[i].ForVersion(), operations[j].ForVersion()) < 0
-								})
-
-								resource := &provider.Resource{}
-								for _, op := range operations {
-									op.Apply(resource)
+							for _, v := range state.Resources {
+								client := providerClients[v.Provider]
+								fmt.Printf("getting resource: %+v\n", v)
+								if _, err := client.GetResource(provider.GetResurceInput{
+									IdentifierFields: v.IdentifierFields,
+									ResourceType:     v.Type,
+								}); err != nil {
+									return err
 								}
-								resources[id] = resource
+								// fmt.Printf(">> %v, %+v\n", k, v)
 
 							}
 
-							for _, rs := range resources {
-								fmt.Printf("resource state: %+v\n", rs)
+							for _, c := range pluginClients {
+								c.Kill()
 							}
+
+							// resourceOperations := map[string][]provider.Operation{}
+							// for _, op := range ops {
+							// 	id := op.ForIdentifier().String()
+							// 	resourceOperations[id] = append(resourceOperations[id], op)
+							// }
+							//
+							// resources := map[string]*provider.Resource{}
+							// for id, operations := range resourceOperations {
+							// 	sort.Slice(operations, func(i, j int) bool {
+							// 		return semver.Compare(operations[i].ForVersion(), operations[j].ForVersion()) < 0
+							// 	})
+							//
+							// 	resource := &provider.Resource{}
+							// 	for _, op := range operations {
+							// 		op.Apply(resource)
+							// 	}
+							// 	resources[id] = resource
+							//
+							// }
+							//
+							// for _, rs := range resources {
+							// 	fmt.Printf("resource state: %+v\n", rs)
+							// }
 
 							return nil
 						},

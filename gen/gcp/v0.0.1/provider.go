@@ -22,20 +22,20 @@ type ClientRegistry struct {
 	ResourcePolicyClient resource_policy.Client
 }
 
-func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Identifier) (*provider.Resource, error) {
-	switch id := identifier.(type) {
+func (r *ClientRegistry) GetResource(ctx context.Context, resourceType string, identifier []provider.FieldValue) (*provider.Resource, error) {
+	switch resourceType {
 
-	case *bucket.Identifier:
-		return bucket.GetResource(ctx, r.BucketClient, id)
+	case "bucket":
+		return bucket.GetResource(ctx, r.BucketClient, identifier)
 
-	case *bucket_object.Identifier:
-		return bucket_object.GetResource(ctx, r.BucketObjectClient, id)
+	case "bucket_object":
+		return bucket_object.GetResource(ctx, r.BucketObjectClient, identifier)
 
-	case *resource_policy.Identifier:
-		return resource_policy.GetResource(ctx, r.ResourcePolicyClient, id)
+	case "resource_policy":
+		return resource_policy.GetResource(ctx, r.ResourcePolicyClient, identifier)
 
 	default:
-		return nil, fmt.Errorf("unrecognized identifier type: %T", identifier)
+		return nil, fmt.Errorf("unrecognized identifier type: %T", resourceType)
 	}
 }
 

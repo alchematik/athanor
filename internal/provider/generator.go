@@ -47,8 +47,6 @@ func identifierPartGoType(part IdentifierPart) (string, error) {
 		return "string", nil
 	case "identifier_oneof":
 		return "any", nil
-	case "resource":
-		return fmt.Sprintf("*%s.Identifier", part.Resource), nil
 	default:
 		return "", fmt.Errorf("unknown type: %q", part.Type)
 	}

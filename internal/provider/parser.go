@@ -32,17 +32,15 @@ type IdentifierPart struct {
 	Description string   `hcl:"description"`
 	IsNamed     bool     `hcl:"is_named,optional"`
 	Choices     []string `hcl:"choices,optional"`
-	Resource    string   `hcl:"resource,optional"`
 }
 
 type ConfigPart struct {
-	Name        string   `hcl:"name,label"`
-	Type        string   `hcl:"type"`
-	Description string   `hcl:"description"`
-	Immutable   bool     `hcl:"immutable,optional"`
-	Key         string   `hcl:"key,optional"`
-	Value       string   `hcl:"value,optional"`
-	Choices     []string `hcl:"choices,optional"`
+	Name        string `hcl:"name,label"`
+	Type        string `hcl:"type"`
+	Description string `hcl:"description"`
+	Immutable   bool   `hcl:"immutable,optional"`
+	Key         string `hcl:"key,optional"`
+	Value       string `hcl:"value,optional"`
 }
 
 type Resource struct {
@@ -56,8 +54,6 @@ func (r Resource) Dependencies() []string {
 	var deps []string
 	for _, id := range r.Identifier {
 		switch id.Type {
-		case "resource":
-			deps = append(deps, id.Name)
 		case "identifier_oneof":
 			for _, c := range id.Choices {
 				deps = append(deps, c)

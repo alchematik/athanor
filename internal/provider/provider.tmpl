@@ -12,14 +12,14 @@ type ClientRegistry struct {
 {{ end }}
 }
 
-func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Identifier) (*provider.Resource, error) {
-  switch id := identifier.(type) {
+func (r *ClientRegistry) GetResource(ctx context.Context, resourceType string, identifier []provider.FieldValue) (*provider.Resource, error) {
+  switch resourceType {
 {{ range .Schema.Resources }}
-  case *{{ .Name }}.Identifier:
-    return {{ .Name }}.GetResource(ctx, r.{{ toPascalCase .Name}}Client, id)
+  case "{{ .Name }}":
+    return {{ .Name }}.GetResource(ctx, r.{{ toPascalCase .Name}}Client, identifier)
 {{ end }}
   default:
-    return nil, fmt.Errorf("unrecognized identifier type: %T", identifier)
+    return nil, fmt.Errorf("unrecognized identifier type: %T", resourceType)
   }
 }
 

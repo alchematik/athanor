@@ -10,7 +10,7 @@ func ResourceSchema() provider.ResourceSchema {
 
 			{
 				Name: "bucket",
-				Type: "bucket",
+				Type: "identifier",
 			},
 
 			{

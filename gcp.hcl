@@ -7,15 +7,15 @@ resource "bucket" {
   modifiers = ["create", "delete"]
   identifier "project" {
     type        = "string"
-    description = "the project that the bucket belongs to."
+    description = "the project that the bucket belongs to"
   }
   identifier "region" {
     type        = "string"
-    description = "the region that the bucket belongs in."
+    description = "the region that the bucket belongs in"
   }
   identifier "name" {
     type        = "string"
-    description = "the name of the bucket."
+    description = "the name of the bucket"
     is_named    = true
   }
 }
@@ -23,20 +23,22 @@ resource "bucket" {
 resource "bucket_object" {
   modifiers = ["create", "delete"]
 	identifier "bucket" {
-		type        = "resource"
-		resource    = "bucket"
-		description = "the bucket that the object belongs to."
+    type    = "identifier_oneof"
+    choices = [
+      "bucket"
+    ]
+		description = "the bucket that the object belongs to"
 	}
 	identifier "name" {
 		type        = "string"
 		is_named    = true
-		description = "the name of the bucket_object."
+		description = "the name of the bucket_object"
 	}
 	config "contents" {
 		/* type        = "file" */
 		type = "string"
 		immutable   = true
-	  description = "the path to the file to upload."
+	  description = "the path to the file to upload"
 	}
 }
 
@@ -47,11 +49,11 @@ resource "resource_policy" {
     choices = [
       "bucket"
     ]
-    description = "the resource that the policy belongs to."
+    description = "the resource that the policy belongs to"
   }
   identifier "name" {
     type        = "string"
     is_named    = true
-    description = "the name of the resource policy."
+    description = "the name of the resource policy"
   }
 }

@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"strings"
+
+	"github.com/alchematik/athanor/provider"
 )
 
 // Identifier is the identifier for a bucket.
@@ -30,4 +32,28 @@ func (id *Identifier) String() string {
 	parts = append(parts, "bucket", fmt.Sprintf("%s", id.Name))
 
 	return strings.Join(parts, "/")
+}
+
+func FieldValuesToIdentifier(fieldValues []provider.FieldValue) *Identifier {
+	var id Identifier
+
+	for _, fv := range fieldValues {
+		switch fv.Name {
+
+		case "account":
+
+			id.Account = fv.Value.(string)
+
+		case "region":
+
+			id.Region = fv.Value.(string)
+
+		case "name":
+
+			id.Name = fv.Value.(string)
+
+		}
+	}
+
+	return &id
 }

@@ -14,14 +14,14 @@ type ClientRegistry struct {
 	BucketClient bucket.Client
 }
 
-func (r *ClientRegistry) GetResource(ctx context.Context, identifier provider.Identifier) (*provider.Resource, error) {
-	switch id := identifier.(type) {
+func (r *ClientRegistry) GetResource(ctx context.Context, resourceType string, identifier []provider.FieldValue) (*provider.Resource, error) {
+	switch resourceType {
 
-	case *bucket.Identifier:
-		return bucket.GetResource(ctx, r.BucketClient, id)
+	case "bucket":
+		return bucket.GetResource(ctx, r.BucketClient, identifier)
 
 	default:
-		return nil, fmt.Errorf("unrecognized identifier type: %T", identifier)
+		return nil, fmt.Errorf("unrecognized identifier type: %T", resourceType)
 	}
 }
 
