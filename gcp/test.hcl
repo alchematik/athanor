@@ -9,9 +9,9 @@ provider "aws" {
 }
 
 id "gcp" "bucket" "test-bucket" {
-  project  = "test-project"
-  region   = "us-va"
-  name     = "test-bucket"
+  project  = "textapp-389501"
+  region   = "us-east4"
+  name     = "text-app-function-repo-test-2"
 }
 
 create "gcp" "bucket" {
@@ -30,6 +30,12 @@ create "gcp" "bucket_object" {
   config {
     contents = "bla"
   }
+  /*
+  config {
+    contents = get.gcp.bucket
+  }
+
+  */
 }
 
 id "gcp" "resource_policy" "bucket-policy" {
@@ -52,3 +58,20 @@ create "aws" "bucket" {
   version = "v0.0.1"
   id      = id.aws.bucket.test-bucket
 }
+
+/*
+
+id "gcp" "bucket_and_object" "test" {
+  bucket_name = "my-bucket"
+  object_name = "my-object"
+}
+
+create "gcp" "bucket_and_object" {
+  id = id.gcp.bucket_and_object.test
+  version = "v0.0.1"
+  config {
+    contents = "bla"
+  }
+}
+
+*/

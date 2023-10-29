@@ -17,14 +17,16 @@ func (p Parser) Parse(name string, data []byte) (Schema, error) {
 }
 
 type Schema struct {
-	Provider  Provider   `hcl:"provider,block"`
+	Name    string `hcl:"name"`
+	Version string `hcl:"version"`
+	// Provider  Provider   `hcl:"config,block"`
 	Resources []Resource `hcl:"resource,block"`
 }
 
-type Provider struct {
-	Version string `hcl:"version"`
-	Name    string `hcl:"name"`
-}
+// type Provider struct {
+// 	Version string `hcl:"version"`
+// 	Name    string `hcl:"name"`
+// }
 
 type IdentifierPart struct {
 	Name        string   `hcl:"name,label"`

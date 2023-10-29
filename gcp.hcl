@@ -1,7 +1,5 @@
-provider {
-	version = "v0.0.1"
-	name    = "gcp"
-}
+version = "v0.0.1"
+name    = "gcp"
 
 resource "bucket" {
   modifiers = ["create", "delete"]
@@ -57,3 +55,25 @@ resource "resource_policy" {
     description = "the name of the resource policy"
   }
 }
+
+/*
+
+resource "bucket_and_object" {
+  modifiers = ["create", "delete"]
+  identifier "bucket_name" {
+    type = "string"
+  }
+  identifier "object_name" {
+    type = "string"
+  }
+  config "contents" {
+    type = "string"
+  }
+}
+
+group "bucket_and_object" {
+
+}
+
+
+*/

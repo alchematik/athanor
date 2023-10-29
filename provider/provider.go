@@ -8,7 +8,7 @@ import (
 	"net/rpc"
 	"strings"
 
-	"github.com/hashicorp/go-hclog"
+	// "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
 	"github.com/hashicorp/hcl/v2"
 
@@ -18,7 +18,8 @@ import (
 )
 
 var (
-	NotFoundError = errors.New("not found")
+	NotFoundError     = errors.New("not found")
+	UnauthorizedError = errors.New("unauthorized")
 )
 
 func init() {
@@ -49,7 +50,6 @@ type GetResurceInput struct {
 }
 
 func (p *ProviderRPCClient) GetResource(input GetResurceInput) (*Resource, error) {
-	fmt.Printf("calling RPC\n")
 	var res Resource
 	if err := p.client.Call("Plugin.GetResource", input, &res); err != nil {
 		return nil, err
@@ -70,14 +70,12 @@ func (s *ProviderRPCServer) Schema(args any, resp *Schema) error {
 
 func (s *ProviderRPCServer) GetResource(input GetResurceInput, resp *Resource) error {
 	// TODO: pass in context?
-	logger := hclog.New(&hclog.LoggerOptions{})
-	logger.Info("GETTING RPC", "input", input)
 	r, err := s.ClientRegistry.GetResource(context.Background(), input.ResourceType, input.IdentifierFields)
 	if err != nil {
 		return err
 	}
 
-	resp = r
+	*resp = *r
 	return nil
 }
 
@@ -114,6 +112,7 @@ type Resource struct {
 	Type             string
 	IdentifierFields []FieldValue
 	ConfigFields     []FieldValue
+	DependsOn        []Resource
 }
 
 func AddIdentifierValueToEvalCtx(ctx *hcl.EvalContext, block *hcl.Block, value cty.Value) {
@@ -309,6 +308,7 @@ type Operation struct {
 	ConfigFields     []FieldValue
 	Action           string
 	Version          string
+	DependsOn        [][]FieldValue
 }
 
 type State struct {

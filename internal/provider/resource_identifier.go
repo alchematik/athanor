@@ -12,7 +12,7 @@ import (
 //go:embed resource_identifier.tmpl
 var resourceIdentifier string
 
-func (g Generator) GenerateResourceIdentifier(provider Provider, resource Resource) ([]byte, error) {
+func (g Generator) GenerateResourceIdentifier(name, version string, resource Resource) ([]byte, error) {
 	tmpl, err := template.New("resource_identifier").
 		Funcs(template.FuncMap{
 			"toPascalCase":         toPascalCase,
@@ -38,7 +38,8 @@ func (g Generator) GenerateResourceIdentifier(provider Provider, resource Resour
 	}
 
 	tmplData := map[string]any{
-		"Provider": provider,
+		"Name":     name,
+		"Version":  version,
 		"Resource": resource,
 		"Imports":  imports,
 		"Metadata": metadata,

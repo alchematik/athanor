@@ -1,7 +1,5 @@
-provider {
-  version = "v0.0.1"
-  name    = "aws"
-}
+version = "v0.0.1"
+name    = "aws"
 
 resource "bucket" {
   modifiers = ["create", "delete"]

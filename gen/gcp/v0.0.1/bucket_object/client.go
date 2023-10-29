@@ -15,7 +15,7 @@ type Client interface {
 }
 
 type BucketObject struct {
-	Identigier *Identifier
+	Identifier *Identifier
 	Config     *Config
 }
 

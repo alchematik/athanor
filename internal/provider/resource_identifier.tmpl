@@ -17,7 +17,7 @@ type Identifier struct {
 func (id *Identifier) String() string {
   var parts []string
 {{ if eq (len .Resource.Dependencies) 0 }}
-  parts = append(parts, "{{ .Provider.Name }}", "{{ .Provider.Version }}")
+  parts = append(parts, "{{ .Name }}", "{{ .Version }}")
 {{ end }}
   
 {{ range .Resource.Identifier }}

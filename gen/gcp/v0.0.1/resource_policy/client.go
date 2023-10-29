@@ -15,7 +15,7 @@ type Client interface {
 }
 
 type ResourcePolicy struct {
-	Identigier *Identifier
+	Identifier *Identifier
 	Config     *Config
 }
 

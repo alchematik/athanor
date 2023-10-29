@@ -4,13 +4,16 @@ import (
 	// "encoding/gob"
 	"errors"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"io/fs"
 	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sync"
 
-	// "github.com/hashicorp/go-hclog"
+	"github.com/cenkalti/backoff/v4"
+	"github.com/hashicorp/go-hclog"
 	// "sort"
 
 	"github.com/alchematik/athanor/internal/parser"
@@ -194,7 +197,11 @@ func main() {
 											"provider": &provider.ProviderPlugin{},
 										},
 										Cmd: exec.Command(fp),
-										// Logger: hclog.NewNullLogger(),
+										// Logger: hclog.New(&hclog.LoggerOptions{
+										// 	Output: os.Stdout,
+										// 	Level:  hclog.Trace,
+										// }),
+										Logger: hclog.NewNullLogger(),
 									})
 
 									pluginClients[alias] = client
@@ -379,17 +386,36 @@ func main() {
 								state.Apply(op)
 							}
 
-							for _, v := range state.Resources {
-								client := providerClients[v.Provider]
-								fmt.Printf("getting resource: %+v\n", v)
-								if _, err := client.GetResource(provider.GetResurceInput{
-									IdentifierFields: v.IdentifierFields,
-									ResourceType:     v.Type,
-								}); err != nil {
-									return err
-								}
-								// fmt.Printf(">> %v, %+v\n", k, v)
+							nextState := provider.State{
+								Resources: map[string]provider.Resource{},
+							}
+							wg := errgroup.Group{}
+							lock := sync.Mutex{}
+							for id, v := range state.Resources {
+								id := id
+								v := v
+								wg.Go(func() error {
+									return backoff.Retry(func() error {
 
+										lock.Lock()
+										client := providerClients[v.Provider]
+										lock.Unlock()
+
+										res, err := client.GetResource(provider.GetResurceInput{
+											IdentifierFields: v.IdentifierFields,
+											ResourceType:     v.Type,
+										})
+										if err != nil {
+											return err
+										}
+
+										lock.Lock()
+										nextState.Resources[id] = *res
+										lock.Unlock()
+
+										return nil
+									}, backoff.NewExponentialBackOff())
+								})
 							}
 
 							for _, c := range pluginClients {
@@ -458,7 +484,7 @@ func main() {
 								return err
 							}
 
-							outPath := filepath.Join(ctx.String("out"), schema.Provider.Name, schema.Provider.Version)
+							outPath := filepath.Join(ctx.String("out"), schema.Name, schema.Version)
 							if err := os.MkdirAll(outPath, 0777); err != nil {
 								return err
 							}
@@ -468,7 +494,7 @@ func main() {
 								ResourceDir: outPath,
 							}
 							for _, r := range schema.Resources {
-								data, err := g.GenerateResourceIdentifier(schema.Provider, r)
+								data, err := g.GenerateResourceIdentifier(schema.Name, schema.Version, r)
 								if err != nil {
 									return err
 								}
