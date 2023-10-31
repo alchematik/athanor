@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package alchematik.athanor.translator.v1;
+
+service Translator {
+  rpc ReadProviderBlueprint(ReadProviderBlueprintRequest) returns (ReadProviderBluepintResponse);
+}
+
+message ReadProviderBlueprintRequest {
+
+}
+
+message ReadProviderBluepintResponse {
+
+}

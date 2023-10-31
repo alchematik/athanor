@@ -72,7 +72,36 @@ resource "bucket_and_object" {
 }
 
 group "bucket_and_object" {
+  modifiers = ["create", "delete"]
 
+  identifier "bucket_project" {
+    type = "string"
+  }
+  identifier "bucket_region" {
+    type = "string"
+  }
+  identifier "bucket_name" {
+    type = "string"
+  }
+  identifier "object_name" {
+    type = "string"
+  }
+  config "contents" {
+    type = "string"
+  }
+
+  resources {
+    id "gcp" "bucket" "test-bucket" {
+      project  = bucket_project
+      region   = bucket_region
+      name     = bucket_name
+    }
+
+    id "gcp" "bucket_object" "test-object" {
+      bucket   = id.gcp.bucket.test-bucket
+      name     = "test"
+    }
+  }
 }
 
 

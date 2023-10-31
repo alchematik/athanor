@@ -28,7 +28,6 @@ func main() {
 	ctx := context.Background()
 	client, err := storage.NewClient(ctx)
 	if err != nil {
-		logger.Error("ERROR >>> ", err)
 		return
 	}
 	r := gen.ClientRegistry{

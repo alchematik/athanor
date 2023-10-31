@@ -1,18 +1,22 @@
-generate: generate/aws generate/gcp
+generate:
+	go run ./cmd/athanor/main.go provider generate ./test/provider/config.json
 
-generate/aws:
-	go run ./cmd/athanor/main.go provider generate -mod github.com/alchematik/athanor -out ./gen ./aws.hcl
+#generate/aws:
+#	go run ./cmd/athanor/main.go provider generate -mod github.com/alchematik/athanor -out ./gen ./aws.hcl
+#
+#generate/gcp:
+#	go run ./cmd/athanor/main.go provider generate -mod github.com/alchematik/athanor -out ./gen ./gcp.hcl
 
-generate/gcp:
-	go run ./cmd/athanor/main.go provider generate -mod github.com/alchematik/athanor -out ./gen ./gcp.hcl
-
-build: build/aws build/gcp
+build: build/json
 
 build/aws:
 	go build -o .providers/aws/v0.0.1/provider ./test/aws/
 
 build/gcp:
 	go build -o .providers/gcp/v0.0.1/provider ./test/gcp/
+
+build/json:
+	go build -o .translators/json/v0.0.1/translator ./test/json
 
 blueprint/show:
 	go run ./cmd/athanor/main.go blueprint show -providers ./.providers ./gcp
