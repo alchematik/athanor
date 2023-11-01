@@ -526,7 +526,9 @@ func main() {
 								return fmt.Errorf("expected TranslatorClient, got %T", raw)
 							}
 
-							out, err := translatorClient.ReadProviderBlueprint(ctx.Context, &translatorpb.ReadProviderBlueprintRequest{})
+							out, err := translatorClient.ReadProviderBlueprint(ctx.Context, &translatorpb.ReadProviderBlueprintRequest{
+								Path: config.Path,
+							})
 							if err != nil {
 								return err
 							}

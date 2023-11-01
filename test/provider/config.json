@@ -1,5 +1,5 @@
 {
-  "path": "",
+  "path": "./test/provider/gcp/json/blueprint.json",
   "reader": {
     "name": "json",
     "version": "v0.0.1",

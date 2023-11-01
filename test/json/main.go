@@ -2,18 +2,44 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/hashicorp/go-plugin"
+	"os"
 
+	blueprintpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
+	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/translator"
 
-	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Server struct {
 }
 
+type ProviderBlueprint struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
 func (s *Server) ReadProviderBlueprint(ctx context.Context, req *translatorpb.ReadProviderBlueprintRequest) (*translatorpb.ReadProviderBluepintResponse, error) {
-	return &translatorpb.ReadProviderBluepintResponse{}, nil
+	path := req.GetPath()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return &translatorpb.ReadProviderBluepintResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	var bp ProviderBlueprint
+	if err := json.Unmarshal(data, &bp); err != nil {
+		return &translatorpb.ReadProviderBluepintResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	return &translatorpb.ReadProviderBluepintResponse{
+		Blueprint: &blueprintpb.ProviderBlueprint{
+			Name:    bp.Name,
+			Version: bp.Version,
+		},
+	}, nil
 }
 
 func main() {
