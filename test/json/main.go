@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/hashicorp/go-plugin"
+	"io/fs"
 	"os"
+	"path/filepath"
 
-	blueprintpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
+	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/consumer/v1"
+	providerpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/translator"
 
@@ -17,20 +20,62 @@ import (
 type Server struct {
 }
 
-func (s *Server) ReadProviderBlueprint(ctx context.Context, req *translatorpb.ReadProviderBlueprintRequest) (*translatorpb.ReadProviderBluepintResponse, error) {
+func (s *Server) ReadProviderBlueprint(ctx context.Context, req *translatorpb.ReadProviderBlueprintRequest) (*translatorpb.ReadProviderBlueprintResponse, error) {
 	path := req.GetPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return &translatorpb.ReadProviderBluepintResponse{}, status.Error(codes.Internal, err.Error())
+		return &translatorpb.ReadProviderBlueprintResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	var bp *blueprintpb.ProviderBlueprint
+	var bp *providerpb.Blueprint
 	if err := json.Unmarshal(data, &bp); err != nil {
-		return &translatorpb.ReadProviderBluepintResponse{}, status.Error(codes.Internal, err.Error())
+		return &translatorpb.ReadProviderBlueprintResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	return &translatorpb.ReadProviderBluepintResponse{
+	return &translatorpb.ReadProviderBlueprintResponse{
 		Blueprint: bp,
+	}, nil
+}
+
+func (s *Server) ReadConsumerBlueprint(ctx context.Context, req *translatorpb.ReadConsumerBlueprintRequest) (*translatorpb.ReadConsumerBlueprintResponse, error) {
+	path := req.GetPath()
+	var resources []*consumerpb.Resource
+	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+
+		if err != nil {
+			return err
+		}
+
+		ext := filepath.Ext(path)
+		if ext != ".json" {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+
+		var bp consumerpb.Blueprint
+		if err := json.Unmarshal(data, &bp); err != nil {
+			return err
+		}
+
+		resources = append(resources, bp.GetResources()...)
+
+		return nil
+	})
+	if err != nil {
+		return &translatorpb.ReadConsumerBlueprintResponse{}, status.Error(codes.Internal, err.Error())
+	}
+
+	return &translatorpb.ReadConsumerBlueprintResponse{
+		Blueprint: &consumerpb.Blueprint{
+			Resources: resources,
+		},
 	}, nil
 }
 

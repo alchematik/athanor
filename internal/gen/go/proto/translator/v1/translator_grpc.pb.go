@@ -20,13 +20,15 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	Translator_ReadProviderBlueprint_FullMethodName = "/alchematik.athanor.translator.v1.Translator/ReadProviderBlueprint"
+	Translator_ReadConsumerBlueprint_FullMethodName = "/alchematik.athanor.translator.v1.Translator/ReadConsumerBlueprint"
 )
 
 // TranslatorClient is the client API for Translator service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TranslatorClient interface {
-	ReadProviderBlueprint(ctx context.Context, in *ReadProviderBlueprintRequest, opts ...grpc.CallOption) (*ReadProviderBluepintResponse, error)
+	ReadProviderBlueprint(ctx context.Context, in *ReadProviderBlueprintRequest, opts ...grpc.CallOption) (*ReadProviderBlueprintResponse, error)
+	ReadConsumerBlueprint(ctx context.Context, in *ReadConsumerBlueprintRequest, opts ...grpc.CallOption) (*ReadConsumerBlueprintResponse, error)
 }
 
 type translatorClient struct {
@@ -37,9 +39,18 @@ func NewTranslatorClient(cc grpc.ClientConnInterface) TranslatorClient {
 	return &translatorClient{cc}
 }
 
-func (c *translatorClient) ReadProviderBlueprint(ctx context.Context, in *ReadProviderBlueprintRequest, opts ...grpc.CallOption) (*ReadProviderBluepintResponse, error) {
-	out := new(ReadProviderBluepintResponse)
+func (c *translatorClient) ReadProviderBlueprint(ctx context.Context, in *ReadProviderBlueprintRequest, opts ...grpc.CallOption) (*ReadProviderBlueprintResponse, error) {
+	out := new(ReadProviderBlueprintResponse)
 	err := c.cc.Invoke(ctx, Translator_ReadProviderBlueprint_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *translatorClient) ReadConsumerBlueprint(ctx context.Context, in *ReadConsumerBlueprintRequest, opts ...grpc.CallOption) (*ReadConsumerBlueprintResponse, error) {
+	out := new(ReadConsumerBlueprintResponse)
+	err := c.cc.Invoke(ctx, Translator_ReadConsumerBlueprint_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -50,15 +61,19 @@ func (c *translatorClient) ReadProviderBlueprint(ctx context.Context, in *ReadPr
 // All implementations should embed UnimplementedTranslatorServer
 // for forward compatibility
 type TranslatorServer interface {
-	ReadProviderBlueprint(context.Context, *ReadProviderBlueprintRequest) (*ReadProviderBluepintResponse, error)
+	ReadProviderBlueprint(context.Context, *ReadProviderBlueprintRequest) (*ReadProviderBlueprintResponse, error)
+	ReadConsumerBlueprint(context.Context, *ReadConsumerBlueprintRequest) (*ReadConsumerBlueprintResponse, error)
 }
 
 // UnimplementedTranslatorServer should be embedded to have forward compatible implementations.
 type UnimplementedTranslatorServer struct {
 }
 
-func (UnimplementedTranslatorServer) ReadProviderBlueprint(context.Context, *ReadProviderBlueprintRequest) (*ReadProviderBluepintResponse, error) {
+func (UnimplementedTranslatorServer) ReadProviderBlueprint(context.Context, *ReadProviderBlueprintRequest) (*ReadProviderBlueprintResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ReadProviderBlueprint not implemented")
+}
+func (UnimplementedTranslatorServer) ReadConsumerBlueprint(context.Context, *ReadConsumerBlueprintRequest) (*ReadConsumerBlueprintResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReadConsumerBlueprint not implemented")
 }
 
 // UnsafeTranslatorServer may be embedded to opt out of forward compatibility for this service.
@@ -90,6 +105,24 @@ func _Translator_ReadProviderBlueprint_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Translator_ReadConsumerBlueprint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadConsumerBlueprintRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TranslatorServer).ReadConsumerBlueprint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Translator_ReadConsumerBlueprint_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TranslatorServer).ReadConsumerBlueprint(ctx, req.(*ReadConsumerBlueprintRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Translator_ServiceDesc is the grpc.ServiceDesc for Translator service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -100,6 +133,10 @@ var Translator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ReadProviderBlueprint",
 			Handler:    _Translator_ReadProviderBlueprint_Handler,
+		},
+		{
+			MethodName: "ReadConsumerBlueprint",
+			Handler:    _Translator_ReadConsumerBlueprint_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

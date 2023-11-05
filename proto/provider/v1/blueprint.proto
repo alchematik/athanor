@@ -2,9 +2,9 @@ syntax = "proto3";
 
 import "google/protobuf/struct.proto";
 
-package alchematik.athanor.blueprint.v1;
+package alchematik.athanor.provider.v1;
 
-message ProviderBlueprint {
+message Blueprint {
   string name = 1;
   string version = 2;
   repeated Resource resources = 3;

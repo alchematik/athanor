@@ -1,0 +1,8 @@
+{
+  "path": "./test/consumer/json/",
+  "reader": {
+    "name": "json",
+    "version": "v0.0.1",
+    "dir": "./.translators"
+  }
+}

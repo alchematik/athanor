@@ -1,0 +1,21 @@
+{
+  "resources": [
+    {
+      "provider": {
+        "name": "gcp",
+        "version": "v0.0.1"
+      },
+      "type": "bucket",
+      "exists": true,
+      "identifier": [
+        {
+          "name": "project",
+          "type": "VALUE_LOADER_TYPE_STATIC",
+          "static": {
+            "value": "my-project"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -67,8 +67,74 @@ func main() {
 						Name: "show",
 						Action: func(ctx *cli.Context) error {
 							/*
-								- read blueprint files
+								- read config file
+								- get input directory
+								- start translator plugin
+								- get blueprint object back
+								- start athanor plugin
+								- feed blueprint to athanor
+									- receive state of resource back
 							*/
+							type PluginConfig struct {
+								Name    string `json:"name"`
+								Version string `json:"version"`
+								Dir     string `json:"dir"`
+							}
+							type Config struct {
+								Path   string       `json:"path"`
+								Reader PluginConfig `json:"reader"`
+							}
+
+							configPath := ctx.Args().First()
+							configFile, err := os.ReadFile(configPath)
+							if err != nil {
+								return err
+							}
+
+							var config Config
+							if err := json.Unmarshal(configFile, &config); err != nil {
+								return err
+							}
+
+							pluginPath := filepath.Join(config.Reader.Dir, config.Reader.Name, config.Reader.Version, "translator")
+
+							handle := plugin.NewClient(&plugin.ClientConfig{
+								HandshakeConfig: translator.HandshakeConfig,
+								Plugins: map[string]plugin.Plugin{
+									"translator": &translator.Plugin{},
+								},
+								Cmd:              exec.Command("sh", "-c", pluginPath),
+								AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+							})
+
+							dispensor, err := handle.Client()
+							if err != nil {
+								return err
+							}
+
+							raw, err := dispensor.Dispense("translator")
+							if err != nil {
+								return err
+							}
+
+							translatorClient, ok := raw.(translatorpb.TranslatorClient)
+							if !ok {
+								return fmt.Errorf("expected TranslatorClient, got %T", raw)
+							}
+
+							out, err := translatorClient.ReadConsumerBlueprint(ctx.Context, &translatorpb.ReadConsumerBlueprintRequest{
+								Path: config.Path,
+							})
+							if err != nil {
+								return err
+							}
+
+							data, err := json.MarshalIndent(out, "", "  ")
+							if err != nil {
+								return err
+							}
+
+							fmt.Printf(">>>>>>>>>>>> %v\n", string(data))
 							return nil
 						},
 					},
