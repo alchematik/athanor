@@ -12,7 +12,84 @@
           "name": "project",
           "type": "VALUE_LOADER_TYPE_STATIC",
           "static": {
+            "type": "string",
             "value": "my-project"
+          }
+        },
+        {
+          "name": "region",
+          "type": "VALUE_LOADER_TYPE_STATIC",
+          "static": {
+            "type": "string",
+            "value": "us-east-4"
+          }
+        },
+        {
+          "name": "name",
+          "type": "VALUE_LOADER_TYPE_STATIC",
+          "static": {
+            "type": "string",
+            "value": "my-bucket"
+          }
+        }
+      ]
+    },
+    {
+      "provider": {
+        "name": "gcp",
+        "version": "v0.0.1"
+      },
+      "type": "bucket",
+      "exists": true,
+      "identifier": [
+        {
+          "name": "bucket",
+          "type": "VALUE_LOADER_TYPE_STATIC",
+          "static": {
+            "type": "loaders",
+            "value": [
+              {
+                "name": "project",
+                "type": "VALUE_LOADER_TYPE_STATIC",
+                "static": {
+                  "type": "string",
+                  "value": "my-project"
+                }
+              },
+              {
+                "name": "region",
+                "type": "VALUE_LOADER_TYPE_STATIC",
+                "static": {
+                  "type": "string",
+                  "value": "us-east-4"
+                }
+              },
+              {
+                "name": "name",
+                "type": "VALUE_LOADER_TYPE_STATIC",
+                "static": {
+                  "type": "string",
+                  "value": "my-bucket"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "name": "name",
+          "type": "VALUE_LOADER_TYPE_STATIC",
+          "static": {
+            "type": "string",
+            "value": "my-object"
+          }
+        }
+      ],
+      "config": [
+        {
+          "name": "contents",
+          "type": "VALUE_LOADER_TYPE_FILE",
+          "file": {
+            "path": "./my-file.txt"
           }
         }
       ]

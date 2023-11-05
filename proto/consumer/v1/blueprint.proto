@@ -37,6 +37,7 @@ enum ValueLoaderType {
 
 message ValueLoaderStaticConfig {
   google.protobuf.Value value = 1;
+  string type = 2;
 }
 
 message ValueLoaderFileConfig {
