@@ -61,6 +61,20 @@ func main() {
 		Name: "athanor",
 		Commands: []*cli.Command{
 			{
+				Name: "state",
+				Subcommands: []*cli.Command{
+					{
+						Name: "show",
+						Action: func(ctx *cli.Context) error {
+							/*
+								- read blueprint files
+							*/
+							return nil
+						},
+					},
+				},
+			},
+			{
 				Name: "blueprint",
 				Subcommands: []*cli.Command{
 					{
@@ -459,188 +473,88 @@ func main() {
 				Subcommands: []*cli.Command{
 					{
 						Name: "generate",
-						Flags: []cli.Flag{
-							&cli.StringFlag{
-								Name:    "out",
-								Aliases: []string{"o"},
-								Value:   ".",
-							},
-							// &cli.StringFlag{
-							// 	Name:     "mod",
-							// 	Required: true,
-							// },
-						},
-						Action: func(ctx *cli.Context) error {
-							/*
-								TODO:
-									- Read config
-									- Get plugin
-									- Start plugin
+						Subcommands: []*cli.Command{
+							{
+								Name: "manifest",
+								Action: func(ctx *cli.Context) error {
+									type PluginConfig struct {
+										Name    string `json:"name"`
+										Version string `json:"version"`
+										Dir     string `json:"dir"`
+									}
+									type Config struct {
+										Path   string       `json:"path"`
+										Out    string       `json:"out"`
+										Reader PluginConfig `json:"reader"`
+									}
 
+									configPath := ctx.Args().First()
+									configFile, err := os.ReadFile(configPath)
+									if err != nil {
+										return err
+									}
 
-							*/
-							type PluginConfig struct {
-								Name    string `json:"name"`
-								Version string `json:"version"`
-								Dir     string `json:"dir"`
-							}
-							type Config struct {
-								Path   string       `json:"path"`
-								Reader PluginConfig `json:"reader"`
-							}
+									var config Config
+									if err := json.Unmarshal(configFile, &config); err != nil {
+										return err
+									}
 
-							configPath := ctx.Args().First()
-							configFile, err := os.ReadFile(configPath)
-							if err != nil {
-								return err
-							}
+									pluginPath := filepath.Join(config.Reader.Dir, config.Reader.Name, config.Reader.Version, "translator")
 
-							var config Config
-							if err := json.Unmarshal(configFile, &config); err != nil {
-								return err
-							}
+									handle := plugin.NewClient(&plugin.ClientConfig{
+										HandshakeConfig: translator.HandshakeConfig,
+										Plugins: map[string]plugin.Plugin{
+											"translator": &translator.Plugin{},
+										},
+										Cmd:              exec.Command("sh", "-c", pluginPath),
+										AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+									})
 
-							pluginPath := filepath.Join(config.Reader.Dir, config.Reader.Name, config.Reader.Version, "translator")
+									dispensor, err := handle.Client()
+									if err != nil {
+										return err
+									}
 
-							handle := plugin.NewClient(&plugin.ClientConfig{
-								HandshakeConfig: translator.HandshakeConfig,
-								Plugins: map[string]plugin.Plugin{
-									"translator": &translator.Plugin{},
+									raw, err := dispensor.Dispense("translator")
+									if err != nil {
+										return err
+									}
+
+									translatorClient, ok := raw.(translatorpb.TranslatorClient)
+									if !ok {
+										return fmt.Errorf("expected TranslatorClient, got %T", raw)
+									}
+
+									out, err := translatorClient.ReadProviderBlueprint(ctx.Context, &translatorpb.ReadProviderBlueprintRequest{
+										Path: config.Path,
+									})
+									if err != nil {
+										return err
+									}
+
+									data, err := json.MarshalIndent(out, "", "  ")
+									if err != nil {
+										return err
+									}
+
+									fmt.Printf("OUT >>> %+v\n", string(data))
+
+									if err := os.MkdirAll(filepath.Dir(config.Out), 0777); err != nil {
+										return err
+									}
+
+									f, err := os.Create(config.Out)
+									if err != nil {
+										return err
+									}
+
+									if _, err := f.Write(data); err != nil {
+										return err
+									}
+
+									return nil
 								},
-								Cmd:              exec.Command("sh", "-c", pluginPath),
-								AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-							})
-
-							dispensor, err := handle.Client()
-							if err != nil {
-								return err
-							}
-
-							raw, err := dispensor.Dispense("translator")
-							if err != nil {
-								return err
-							}
-
-							translatorClient, ok := raw.(translatorpb.TranslatorClient)
-							if !ok {
-								return fmt.Errorf("expected TranslatorClient, got %T", raw)
-							}
-
-							out, err := translatorClient.ReadProviderBlueprint(ctx.Context, &translatorpb.ReadProviderBlueprintRequest{
-								Path: config.Path,
-							})
-							if err != nil {
-								return err
-							}
-
-							fmt.Printf("OUT >>> %+v\n", out)
-
-							// schemaPath := ctx.Args().First()
-							// if schemaPath == "" {
-							// 	return fmt.Errorf("must provide path to schema")
-							// }
-							//
-							// data, err := os.ReadFile(schemaPath)
-							// if err != nil {
-							// 	return err
-							// }
-							//
-							// p := generator.Parser{}
-							// schema, err := p.Parse(schemaPath, data)
-							// if err != nil {
-							// 	return err
-							// }
-							//
-							// outPath := filepath.Join(ctx.String("out"), schema.Name, schema.Version)
-							// if err := os.MkdirAll(outPath, 0777); err != nil {
-							// 	return err
-							// }
-							//
-							// g := generator.Generator{
-							// 	ModName:     ctx.String("mod"),
-							// 	ResourceDir: outPath,
-							// }
-							// for _, r := range schema.Resources {
-							// 	data, err := g.GenerateResourceIdentifier(schema.Name, schema.Version, r)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	resourcePath := filepath.Join(outPath, r.Name)
-							// 	if err := os.MkdirAll(resourcePath, 0777); err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	identifierPath := filepath.Join(resourcePath, "identifier.go")
-							// 	f, err := os.Create(identifierPath)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	if _, err := f.Write(data); err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	data, err = g.GenerateResourceOp(r)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	opPath := filepath.Join(resourcePath, "op.go")
-							// 	f, err = os.Create(opPath)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	if _, err := f.Write(data); err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	data, err = g.GenerateClient(r)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	clientPath := filepath.Join(resourcePath, "client.go")
-							// 	f, err = os.Create(clientPath)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	if _, err := f.Write(data); err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	resourceFilePath := filepath.Join(resourcePath, "resource.go")
-							// 	f, err = os.Create(resourceFilePath)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	data, err = g.GenerateResource(r)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	if _, err := f.Write(data); err != nil {
-							// 		return err
-							// 	}
-							// }
-							//
-							// providerData, err := g.GenerateProvider(schema)
-							// if err != nil {
-							// 	return err
-							// }
-							// providerPath := filepath.Join(outPath, "provider.go")
-							// f, err := os.Create(providerPath)
-							// if err != nil {
-							// 	return err
-							// }
-							// if _, err := f.Write(providerData); err != nil {
-							// 	return err
-							// }
-
-							return nil
+							},
 						},
 					},
 				},

@@ -1,3 +1,4 @@
 .providers/
 .translators/
+.manifests/
 .DS_Store

@@ -1,5 +1,6 @@
 {
   "path": "./test/provider/gcp/json/blueprint.json",
+  "out": "./.manifests/gcp/v0.0.1/manifest.json",
   "reader": {
     "name": "json",
     "version": "v0.0.1",

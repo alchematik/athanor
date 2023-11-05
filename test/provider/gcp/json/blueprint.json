@@ -1,4 +1,80 @@
 {
   "name": "gcp",
-  "version": "v0.0.1"
+  "version": "v0.0.1",
+  "resources": [
+    {
+      "name": "bucket",
+      "identifier": [
+        {
+          "name": "project",
+          "type": "string"
+        },
+        {
+          "name": "region",
+          "type": "string"
+        },
+        {
+          "name": "region",
+          "type": "string"
+        }
+      ],
+      "config": [
+        {
+          "name": "expiration",
+          "type": "string"
+        }
+      ],
+      "operations": [
+        {
+          "type": "get",
+          "backend": {
+            "name": "gcp",
+            "version": "v0.0.1",
+            "config": {              
+            }                        
+          }
+        }
+      ]
+    },
+    {
+      "name": "bucket_object",
+      "identifier": [
+        {
+          "name": "bucket",
+          "type": "object",
+          "fields": [
+            {
+              "name": "project",
+              "type": "string"
+            },
+            {
+              "name": "region",
+              "type": "string"
+            },
+            {
+              "name": "region",
+              "type": "string"
+            }
+          ]
+        }
+      ],
+      "config": [
+        {
+          "name": "contents",
+          "type": "string"
+        }
+      ],
+      "operations": [
+        {
+          "type": "get",
+          "backend": {
+            "name": "gcp",
+            "version": "v0.0.1",
+            "config": {              
+            }                        
+          }
+        }
+      ]
+    }
+  ]
 }

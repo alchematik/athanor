@@ -17,11 +17,6 @@ import (
 type Server struct {
 }
 
-type ProviderBlueprint struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
-}
-
 func (s *Server) ReadProviderBlueprint(ctx context.Context, req *translatorpb.ReadProviderBlueprintRequest) (*translatorpb.ReadProviderBluepintResponse, error) {
 	path := req.GetPath()
 	data, err := os.ReadFile(path)
@@ -29,16 +24,13 @@ func (s *Server) ReadProviderBlueprint(ctx context.Context, req *translatorpb.Re
 		return &translatorpb.ReadProviderBluepintResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
-	var bp ProviderBlueprint
+	var bp *blueprintpb.ProviderBlueprint
 	if err := json.Unmarshal(data, &bp); err != nil {
 		return &translatorpb.ReadProviderBluepintResponse{}, status.Error(codes.Internal, err.Error())
 	}
 
 	return &translatorpb.ReadProviderBluepintResponse{
-		Blueprint: &blueprintpb.ProviderBlueprint{
-			Name:    bp.Name,
-			Version: bp.Version,
-		},
+		Blueprint: bp,
 	}, nil
 }
 
