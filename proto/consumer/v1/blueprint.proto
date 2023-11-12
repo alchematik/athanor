@@ -1,18 +1,28 @@
 syntax = "proto3";
-import "google/protobuf/struct.proto";
 
 package alchematik.athanor.consumer.v1;
 
+import "google/protobuf/struct.proto";
+
 message Blueprint {
-  repeated Resource resources = 1;
+  repeated BlueprintResource resources = 1;
+  repeated ValueLoader output = 2;
+}
+
+message BlueprintResource {
+  oneof entity {
+    Resource resource = 1;
+    Blueprint Blueprint = 2;
+  }
 }
 
 message Resource {
-  Provider provider = 1;
-  string type = 2;
-  bool exists = 3;
-  repeated ValueLoader identifier = 4;
-  repeated ValueLoader config = 5;
+  string id = 1; 
+  Provider provider = 2;
+  string type = 3;
+  bool exists = 4;
+  ValueLoader identifier = 5;
+  ValueLoader config = 6;
 }
 
 message Provider {
@@ -22,10 +32,12 @@ message Provider {
 
 message ValueLoader {
   string name = 1;
-  ValueLoaderType type = 2;
+  string id = 2;
+  ValueLoaderType type = 3;
   oneof config {
-    ValueLoaderStaticConfig static = 3;
-    ValueLoaderFileConfig file = 4;
+    ValueLoaderStaticConfig static = 4;
+    ValueLoaderFileConfig file = 5;
+    ValueLoaderReferenceConfig reference = 6;
   }
 }
 
@@ -33,6 +45,7 @@ enum ValueLoaderType {
   VALUE_LOADER_TYPE_UNSPECIFIED = 0;
   VALUE_LOADER_TYPE_STATIC = 1;
   VALUE_LOADER_TYPE_FILE = 2;
+  VALUE_LOADER_TYPE_REFERENCE = 3;
 }
 
 message ValueLoaderStaticConfig {
@@ -42,4 +55,8 @@ message ValueLoaderStaticConfig {
 
 message ValueLoaderFileConfig {
   string path = 1;
+}
+
+message ValueLoaderReferenceConfig {
+  string id = 1;
 }

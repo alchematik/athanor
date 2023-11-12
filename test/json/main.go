@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"github.com/hashicorp/go-plugin"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -13,6 +13,7 @@ import (
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/translator"
 
+	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -39,7 +40,7 @@ func (s *Server) ReadProviderBlueprint(ctx context.Context, req *translatorpb.Re
 
 func (s *Server) ReadConsumerBlueprint(ctx context.Context, req *translatorpb.ReadConsumerBlueprintRequest) (*translatorpb.ReadConsumerBlueprintResponse, error) {
 	path := req.GetPath()
-	var resources []*consumerpb.Resource
+	var resources []*consumerpb.BlueprintResource
 	err := filepath.Walk(path, func(path string, info fs.FileInfo, err error) error {
 		if info.IsDir() {
 			return nil
@@ -61,7 +62,7 @@ func (s *Server) ReadConsumerBlueprint(ctx context.Context, req *translatorpb.Re
 
 		var bp consumerpb.Blueprint
 		if err := json.Unmarshal(data, &bp); err != nil {
-			return err
+			return fmt.Errorf("error unmarshaling json: %v\n", err)
 		}
 
 		resources = append(resources, bp.GetResources()...)

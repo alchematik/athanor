@@ -1,54 +1,23 @@
 {
   "resources": [
     {
-      "provider": {
-        "name": "gcp",
-        "version": "v0.0.1"
-      },
-      "type": "bucket",
-      "exists": true,
-      "identifier": [
-        {
-          "name": "project",
-          "type": "VALUE_LOADER_TYPE_STATIC",
-          "static": {
-            "type": "string",
-            "value": "my-project"
-          }
+      "resource": {
+        "id": "my-bucket",
+        "provider": {
+          "name": "gcp",
+          "version": "v0.0.1"
         },
-        {
-          "name": "region",
+        "type": "bucket",
+        "exists": true,
+        "identifier": {
+          "id": "my-bucket.identifier",
+          "name": "identifier",
           "type": "VALUE_LOADER_TYPE_STATIC",
           "static": {
-            "type": "string",
-            "value": "us-east-4"
-          }
-        },
-        {
-          "name": "name",
-          "type": "VALUE_LOADER_TYPE_STATIC",
-          "static": {
-            "type": "string",
-            "value": "my-bucket"
-          }
-        }
-      ]
-    },
-    {
-      "provider": {
-        "name": "gcp",
-        "version": "v0.0.1"
-      },
-      "type": "bucket",
-      "exists": true,
-      "identifier": [
-        {
-          "name": "bucket",
-          "type": "VALUE_LOADER_TYPE_STATIC",
-          "static": {
-            "type": "loaders",
+            "type": "list",
             "value": [
               {
+                "id": "my-bucket.identifier.project",
                 "name": "project",
                 "type": "VALUE_LOADER_TYPE_STATIC",
                 "static": {
@@ -57,6 +26,7 @@
                 }
               },
               {
+                "id": "my-bucket.identifier.region",
                 "name": "region",
                 "type": "VALUE_LOADER_TYPE_STATIC",
                 "static": {
@@ -65,6 +35,7 @@
                 }
               },
               {
+                "id": "my-bucket.identifier.region",
                 "name": "name",
                 "type": "VALUE_LOADER_TYPE_STATIC",
                 "static": {
@@ -75,24 +46,82 @@
             ]
           }
         },
-        {
-          "name": "name",
+        "config": {
+          "id": "my-bucket.config",
+          "name": "config",
           "type": "VALUE_LOADER_TYPE_STATIC",
           "static": {
-            "type": "string",
-            "value": "my-object"
+            "type": "list",
+            "value": [
+              {
+                "id": "my-bucket.config.expiration",
+                "name": "expiration",
+                "type": "VALUE_LOADER_TYPE_STATIC",
+                "static": {
+                  "type": "string",
+                  "value": "24h"
+                }
+              }
+            ]
           }
         }
-      ],
-      "config": [
-        {
-          "name": "contents",
-          "type": "VALUE_LOADER_TYPE_FILE",
-          "file": {
-            "path": "./my-file.txt"
+      }
+    },
+    {
+      "resource": {
+        "id": "my-bucket-object",
+        "provider": {
+          "name": "gcp",
+          "version": "v0.0.1"
+        },
+        "type": "bucket_object",
+        "exists": true,
+        "identifier": {
+          "id": "my-bucket-object.identifier",
+          "name": "identifier",
+          "type": "VALUE_LOADER_TYPE_STATIC",
+          "static": {
+            "type": "list",
+            "value": [
+              {
+                "id": "my-bucket-object.identifier.bucket",
+                "name": "bucket",
+                "type": "VALUE_LOADER_TYPE_REFERENCE",
+                "reference": {
+                  "id": "my-bucket.identifier"
+                }
+              },
+              {
+                "id": "my-bucket-object.identifier.name",
+                "name": "name",
+                "type": "VALUE_LOADER_TYPE_STATIC",
+                "static": {
+                  "type": "string",
+                  "value": "my-object"
+                }
+              }
+            ]
+          }
+        },
+        "config": {
+          "id": "my-bucket-object.config",
+          "name": "config",
+          "type": "VALUE_LOADER_TYPE_STATIC",
+          "static": {
+            "type": "list",
+            "value": [
+              {
+                "id": "my-bucket-object.config.contents",
+                "name": "contents",
+                "type": "VALUE_LOADER_TYPE_FILE",
+                "file": {
+                  "path": "./my-file.txt"
+                }
+              }
+            ]
           }
         }
-      ]
+      }
     }
   ]
 }

@@ -4,44 +4,10 @@
   "resources": [
     {
       "name": "bucket",
-      "identifier": [
+      "fields": [
         {
-          "name": "project",
-          "type": "string"
-        },
-        {
-          "name": "region",
-          "type": "string"
-        },
-        {
-          "name": "region",
-          "type": "string"
-        }
-      ],
-      "config": [
-        {
-          "name": "expiration",
-          "type": "string"
-        }
-      ],
-      "operations": [
-        {
-          "type": "get",
-          "backend": {
-            "name": "gcp",
-            "version": "v0.0.1",
-            "config": {              
-            }                        
-          }
-        }
-      ]
-    },
-    {
-      "name": "bucket_object",
-      "identifier": [
-        {
-          "name": "bucket",
-          "type": "object",
+          "name": "identifier",
+          "type": "map",
           "fields": [
             {
               "name": "project",
@@ -56,12 +22,16 @@
               "type": "string"
             }
           ]
-        }
-      ],
-      "config": [
+        },
         {
-          "name": "contents",
-          "type": "string"
+          "name": "config",
+          "type": "map",
+          "fields": [
+            {
+              "name": "expiration",
+              "type": "string"
+            }
+          ]
         }
       ],
       "operations": [
@@ -70,8 +40,54 @@
           "backend": {
             "name": "gcp",
             "version": "v0.0.1",
-            "config": {              
-            }                        
+            "config": {}                        
+          }
+        }
+      ]
+    },
+    {
+      "name": "bucket_object",
+      "fields": [
+        {
+          "name": "identifier",
+          "type": "map",
+          "fields": [
+            {
+              "name": "bucket",
+              "type": "fields",
+              "fields": [
+                {
+                  "name": "project",
+                  "type": "string"
+                },
+                {
+                  "name": "region",
+                  "type": "string"
+                },
+                {
+                  "name": "region",
+                  "type": "string"
+                }
+              ]
+            },
+            {
+              "name": "name",
+              "type": "string"
+            }
+          ]
+        },
+        {
+          "name": "contents",
+          "type": "bytes"
+        }
+      ],
+      "operations": [
+        {
+          "type": "get",
+          "backend": {
+            "name": "gcp",
+            "version": "v0.0.1",
+            "config": {}                        
           }
         }
       ]

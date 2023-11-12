@@ -19,6 +19,9 @@ import (
 
 	"github.com/alchematik/athanor/internal/parser"
 	// "github.com/alchematik/athanor/internal/provider"
+	// "github.com/alchematik/athanor/backend"
+	// backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
+	// consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/consumer/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/provider"
 	"github.com/alchematik/athanor/translator"
@@ -30,6 +33,7 @@ import (
 	"github.com/hashicorp/hcl/v2/hclparse"
 	"github.com/urfave/cli/v2"
 	"github.com/zclconf/go-cty/cty"
+	// "google.golang.org/protobuf/types/known/structpb"
 	// "golang.org/x/mod/semver"
 )
 
@@ -126,7 +130,7 @@ func main() {
 								Path: config.Path,
 							})
 							if err != nil {
-								return err
+								return fmt.Errorf("error reading: %v\n", err)
 							}
 
 							data, err := json.MarshalIndent(out, "", "  ")
@@ -135,6 +139,69 @@ func main() {
 							}
 
 							fmt.Printf(">>>>>>>>>>>> %v\n", string(data))
+
+							// backendHandle := plugin.NewClient(&plugin.ClientConfig{
+							// 	HandshakeConfig: backend.HandshakeConfig,
+							// 	Plugins: map[string]plugin.Plugin{
+							// 		"backend": &backend.Plugin{},
+							// 	},
+							// 	Cmd:              exec.Command("sh", "-c", ".backends/athanor/v0.0.1/backend"),
+							// 	AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+							// })
+							// backendDispensor, err := backendHandle.Client()
+							// if err != nil {
+							// 	return err
+							// }
+
+							// backendRaw, err := backendDispensor.Dispense("backend")
+							// if err != nil {
+							// 	return err
+							// }
+							//
+							// var fields []*structpb.Value
+							// for _, r := range out.Blueprint.Resources {
+							// 	v, err := resourceToValue(r)
+							// 	if err != nil {
+							// 		return err
+							// 	}
+							//
+							// 	fields = append(fields, v)
+							// }
+
+							// val := structpb.NewListValue(&structpb.ListValue{
+							// 	Values: fields,
+							// })
+							//
+							// backendClient := backendRaw.(backendpb.BackendClient)
+							// req := &backendpb.GetResourceRequest{
+							// 	// Type "blueprint" is defined by athanor provider ?
+							// 	Type: "blueprint",
+							// 	Fields: []*backendpb.Field{
+							// 		{
+							// 			Name:  "resources",
+							// 			Type:  "list",
+							// 			Value: val,
+							// 		},
+							// 	},
+							// 	// Identifier: []*backendpb.Field{
+							// 	// 	{
+							// 	// 		Name:  "path",
+							// 	// 		Type:  "string",
+							// 	// 		Value: structpb.NewStringValue(config.Path),
+							// 	// 	},
+							// 	// },
+							// }
+							// getResourceOut, err := backendClient.GetResource(ctx.Context, req)
+							// if err != nil {
+							// 	return err
+							// }
+							//
+							// resourceData, err := json.MarshalIndent(getResourceOut, "", "  ")
+							// if err != nil {
+							// 	return err
+							// }
+							//
+							// fmt.Printf("GET RESOURCE>> %v\n", string(resourceData))
 							return nil
 						},
 					},
