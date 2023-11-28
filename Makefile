@@ -2,7 +2,7 @@ generate:
 	go run ./cmd/athanor/main.go provider generate manifest ./test/provider/config.json
 
 state/show:
-	go run ./cmd/athanor/main.go state show ./test/consumer/config.json
+	go run ./cmd/athanor/main.go state show ./test/consumer/json/blueprint.json
 
 #generate/aws:
 #	go run ./cmd/athanor/main.go provider generate -mod github.com/alchematik/athanor -out ./gen ./aws.hcl

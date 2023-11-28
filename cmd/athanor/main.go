@@ -21,7 +21,7 @@ import (
 	// "github.com/alchematik/athanor/internal/provider"
 	// "github.com/alchematik/athanor/backend"
 	// backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
-	// consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/consumer/v1"
+	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/consumer/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/provider"
 	"github.com/alchematik/athanor/translator"
@@ -79,129 +79,69 @@ func main() {
 								- feed blueprint to athanor
 									- receive state of resource back
 							*/
-							type PluginConfig struct {
-								Name    string `json:"name"`
-								Version string `json:"version"`
-								Dir     string `json:"dir"`
-							}
-							type Config struct {
-								Path   string       `json:"path"`
-								Reader PluginConfig `json:"reader"`
-							}
-
-							configPath := ctx.Args().First()
-							configFile, err := os.ReadFile(configPath)
+							// type PluginConfig struct {
+							// 	Name    string `json:"name"`
+							// 	Version string `json:"version"`
+							// 	Dir     string `json:"dir"`
+							// }
+							// type Config struct {
+							// 	Path   string       `json:"path"`
+							// 	Reader PluginConfig `json:"reader"`
+							// }
+							//
+							p := ctx.Args().First()
+							f, err := os.ReadFile(p)
 							if err != nil {
 								return err
 							}
 
-							var config Config
-							if err := json.Unmarshal(configFile, &config); err != nil {
+							var blueprint consumerpb.Blueprint
+							//
+							// var config Config
+							if err := json.Unmarshal(f, &blueprint); err != nil {
 								return err
 							}
+							//
+							// pluginPath := filepath.Join(config.Reader.Dir, config.Reader.Name, config.Reader.Version, "translator")
+							//
+							// handle := plugin.NewClient(&plugin.ClientConfig{
+							// 	HandshakeConfig: translator.HandshakeConfig,
+							// 	Plugins: map[string]plugin.Plugin{
+							// 		"translator": &translator.Plugin{},
+							// 	},
+							// 	Cmd:              exec.Command("sh", "-c", pluginPath),
+							// 	AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+							// })
+							//
+							// dispensor, err := handle.Client()
+							// if err != nil {
+							// 	return err
+							// }
+							//
+							// raw, err := dispensor.Dispense("translator")
+							// if err != nil {
+							// 	return err
+							// }
+							//
+							// translatorClient, ok := raw.(translatorpb.TranslatorClient)
+							// if !ok {
+							// 	return fmt.Errorf("expected TranslatorClient, got %T", raw)
+							// }
+							//
+							// out, err := translatorClient.ReadConsumerBlueprint(ctx.Context, &translatorpb.ReadConsumerBlueprintRequest{
+							// 	Path: config.Path,
+							// })
+							// if err != nil {
+							// 	return fmt.Errorf("error reading: %v\n", err)
+							// }
 
-							pluginPath := filepath.Join(config.Reader.Dir, config.Reader.Name, config.Reader.Version, "translator")
-
-							handle := plugin.NewClient(&plugin.ClientConfig{
-								HandshakeConfig: translator.HandshakeConfig,
-								Plugins: map[string]plugin.Plugin{
-									"translator": &translator.Plugin{},
-								},
-								Cmd:              exec.Command("sh", "-c", pluginPath),
-								AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-							})
-
-							dispensor, err := handle.Client()
-							if err != nil {
-								return err
-							}
-
-							raw, err := dispensor.Dispense("translator")
-							if err != nil {
-								return err
-							}
-
-							translatorClient, ok := raw.(translatorpb.TranslatorClient)
-							if !ok {
-								return fmt.Errorf("expected TranslatorClient, got %T", raw)
-							}
-
-							out, err := translatorClient.ReadConsumerBlueprint(ctx.Context, &translatorpb.ReadConsumerBlueprintRequest{
-								Path: config.Path,
-							})
-							if err != nil {
-								return fmt.Errorf("error reading: %v\n", err)
-							}
-
-							data, err := json.MarshalIndent(out, "", "  ")
+							data, err := json.MarshalIndent(&blueprint, "", "  ")
 							if err != nil {
 								return err
 							}
 
 							fmt.Printf(">>>>>>>>>>>> %v\n", string(data))
 
-							// backendHandle := plugin.NewClient(&plugin.ClientConfig{
-							// 	HandshakeConfig: backend.HandshakeConfig,
-							// 	Plugins: map[string]plugin.Plugin{
-							// 		"backend": &backend.Plugin{},
-							// 	},
-							// 	Cmd:              exec.Command("sh", "-c", ".backends/athanor/v0.0.1/backend"),
-							// 	AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-							// })
-							// backendDispensor, err := backendHandle.Client()
-							// if err != nil {
-							// 	return err
-							// }
-
-							// backendRaw, err := backendDispensor.Dispense("backend")
-							// if err != nil {
-							// 	return err
-							// }
-							//
-							// var fields []*structpb.Value
-							// for _, r := range out.Blueprint.Resources {
-							// 	v, err := resourceToValue(r)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	fields = append(fields, v)
-							// }
-
-							// val := structpb.NewListValue(&structpb.ListValue{
-							// 	Values: fields,
-							// })
-							//
-							// backendClient := backendRaw.(backendpb.BackendClient)
-							// req := &backendpb.GetResourceRequest{
-							// 	// Type "blueprint" is defined by athanor provider ?
-							// 	Type: "blueprint",
-							// 	Fields: []*backendpb.Field{
-							// 		{
-							// 			Name:  "resources",
-							// 			Type:  "list",
-							// 			Value: val,
-							// 		},
-							// 	},
-							// 	// Identifier: []*backendpb.Field{
-							// 	// 	{
-							// 	// 		Name:  "path",
-							// 	// 		Type:  "string",
-							// 	// 		Value: structpb.NewStringValue(config.Path),
-							// 	// 	},
-							// 	// },
-							// }
-							// getResourceOut, err := backendClient.GetResource(ctx.Context, req)
-							// if err != nil {
-							// 	return err
-							// }
-							//
-							// resourceData, err := json.MarshalIndent(getResourceOut, "", "  ")
-							// if err != nil {
-							// 	return err
-							// }
-							//
-							// fmt.Printf("GET RESOURCE>> %v\n", string(resourceData))
 							return nil
 						},
 					},

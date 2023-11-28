@@ -74,9 +74,7 @@ func (s *Server) ReadConsumerBlueprint(ctx context.Context, req *translatorpb.Re
 	}
 
 	return &translatorpb.ReadConsumerBlueprintResponse{
-		Blueprint: &consumerpb.Blueprint{
-			Resources: resources,
-		},
+		Blueprint: &consumerpb.Blueprint{},
 	}, nil
 }
 

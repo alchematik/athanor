@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package alchematik.athanor.state.v1;
+
+message Blueprint {
+  repeated State states = 1;
+}
+
+message State {
+  oneof type {
+    ResourceState resource = 1;
+  }
+}
+
+message ResourceState {
+  Value identifier = 1;
+  Value config = 2;
+  Value attrs = 3; 
+}
+
+message Value {
+  oneof type {
+    LiteralValue literal = 1;
+    CollectionValue collection = 2;
+  }
+}
+
+message LiteralValue {
+  string string_value = 1;
+  uint32 int_value = 2;
+  float float_value = 3;
+}
+
+message CollectionValue {
+  map<string, Value> map_collection = 1;
+  repeated Value list_collection = 2;
+}

@@ -1,0 +1,39 @@
+
+syntax = "proto3";
+
+package alchematik.athanor.lang.v1;
+
+message Blueprint {
+  repeated Stmt stmts = 1;
+}
+
+message Stmt {
+  oneof type {
+    ResourceStmt resource = 1;
+  }
+}
+
+
+message ResourceStmt {
+  Expr identifier = 1;
+  Expr config = 2; 
+}
+
+message Expr {
+  oneof type {
+    LiteralExpr literal = 1;
+    CollectionExpr collection = 2;
+  }
+}
+
+message LiteralExpr {
+  string string_literal = 1;
+  uint32 int_literal = 2;
+  float float_literal = 3;
+}
+
+message CollectionExpr {
+  map<string, Expr> map_collection = 1;
+  repeated Expr list_collection = 2;
+}
+

@@ -2,61 +2,37 @@ syntax = "proto3";
 
 package alchematik.athanor.consumer.v1;
 
-import "google/protobuf/struct.proto";
-
 message Blueprint {
-  repeated BlueprintResource resources = 1;
-  repeated ValueLoader output = 2;
+  repeated Stmt stmts = 1;
 }
 
-message BlueprintResource {
-  oneof entity {
-    Resource resource = 1;
-    Blueprint Blueprint = 2;
+message Stmt {
+  oneof type {
+    ResourceStmt resource = 1;
   }
 }
 
-message Resource {
-  string id = 1; 
-  Provider provider = 2;
-  string type = 3;
-  bool exists = 4;
-  ValueLoader identifier = 5;
-  ValueLoader config = 6;
+
+message ResourceStmt {
+  Expr identifier = 1;
+  Expr config = 2; 
 }
 
-message Provider {
-  string name = 1;
-  string version = 2;
-}
-
-message ValueLoader {
-  string name = 1;
-  string id = 2;
-  ValueLoaderType type = 3;
-  oneof config {
-    ValueLoaderStaticConfig static = 4;
-    ValueLoaderFileConfig file = 5;
-    ValueLoaderReferenceConfig reference = 6;
+message Expr {
+  oneof type {
+    string string_literal = 1;
+    uint32 int_literal = 2;
+    float float_literal = 3;
+    ListExpr list = 4;
+    MapExpr map = 5;
   }
 }
 
-enum ValueLoaderType {
-  VALUE_LOADER_TYPE_UNSPECIFIED = 0;
-  VALUE_LOADER_TYPE_STATIC = 1;
-  VALUE_LOADER_TYPE_FILE = 2;
-  VALUE_LOADER_TYPE_REFERENCE = 3;
+message ListExpr {
+  repeated Expr elements = 1;
 }
 
-message ValueLoaderStaticConfig {
-  google.protobuf.Value value = 1;
-  string type = 2;
+message MapExpr {
+  map<string, Expr> entries = 1;
 }
 
-message ValueLoaderFileConfig {
-  string path = 1;
-}
-
-message ValueLoaderReferenceConfig {
-  string id = 1;
-}
