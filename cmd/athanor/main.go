@@ -18,10 +18,17 @@ import (
 	// "sort"
 
 	"github.com/alchematik/athanor/internal/parser"
+
+	"github.com/alchematik/athanor/blueprint"
+	"github.com/alchematik/athanor/blueprint/expr"
+	"github.com/alchematik/athanor/blueprint/stmt"
+	"github.com/alchematik/athanor/build/state"
+	"github.com/alchematik/athanor/interpreter"
 	// "github.com/alchematik/athanor/internal/provider"
 	// "github.com/alchematik/athanor/backend"
 	// backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/consumer/v1"
+	// statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/provider"
 	"github.com/alchematik/athanor/translator"
@@ -60,6 +67,60 @@ var blockTypes = []hcl.BlockHeaderSchema{
 	},
 }
 
+func convertBlueprint(bp *consumerpb.Blueprint) (blueprint.Blueprint, error) {
+	var out blueprint.Blueprint
+	for _, s := range bp.Stmts {
+		st, err := convertStmt(s)
+		if err != nil {
+			return out, err
+		}
+
+		out.Stmts = append(out.Stmts, st)
+	}
+
+	return out, nil
+}
+
+func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
+	switch s := st.GetType().(type) {
+	case *consumerpb.Stmt_Resource:
+		id, err := convertExpr(s.Resource.GetIdentifier())
+		if err != nil {
+			return nil, err
+		}
+		config, err := convertExpr(s.Resource.GetConfig())
+		if err != nil {
+			return nil, err
+		}
+		return stmt.Resource{
+			Identifier: id,
+			Config:     config,
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid stmt: %T", st)
+	}
+}
+
+func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
+	switch e := ex.GetType().(type) {
+	case *consumerpb.Expr_StringLiteral:
+		return expr.String{Value: e.StringLiteral}, nil
+	case *consumerpb.Expr_Map:
+		m := expr.Map{Entries: map[string]expr.Type{}}
+		for k, v := range e.Map.GetEntries() {
+			var err error
+			m.Entries[k], err = convertExpr(v)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return m, nil
+	default:
+		return nil, fmt.Errorf("invalid expr: %T", ex)
+	}
+}
+
 func main() {
 	app := cli.App{
 		Name: "athanor",
@@ -70,25 +131,6 @@ func main() {
 					{
 						Name: "show",
 						Action: func(ctx *cli.Context) error {
-							/*
-								- read config file
-								- get input directory
-								- start translator plugin
-								- get blueprint object back
-								- start athanor plugin
-								- feed blueprint to athanor
-									- receive state of resource back
-							*/
-							// type PluginConfig struct {
-							// 	Name    string `json:"name"`
-							// 	Version string `json:"version"`
-							// 	Dir     string `json:"dir"`
-							// }
-							// type Config struct {
-							// 	Path   string       `json:"path"`
-							// 	Reader PluginConfig `json:"reader"`
-							// }
-							//
 							p := ctx.Args().First()
 							f, err := os.ReadFile(p)
 							if err != nil {
@@ -96,51 +138,61 @@ func main() {
 							}
 
 							var blueprint consumerpb.Blueprint
-							//
-							// var config Config
 							if err := json.Unmarshal(f, &blueprint); err != nil {
 								return err
 							}
-							//
-							// pluginPath := filepath.Join(config.Reader.Dir, config.Reader.Name, config.Reader.Version, "translator")
-							//
-							// handle := plugin.NewClient(&plugin.ClientConfig{
-							// 	HandshakeConfig: translator.HandshakeConfig,
-							// 	Plugins: map[string]plugin.Plugin{
-							// 		"translator": &translator.Plugin{},
-							// 	},
-							// 	Cmd:              exec.Command("sh", "-c", pluginPath),
-							// 	AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-							// })
-							//
-							// dispensor, err := handle.Client()
-							// if err != nil {
-							// 	return err
-							// }
-							//
-							// raw, err := dispensor.Dispense("translator")
-							// if err != nil {
-							// 	return err
-							// }
-							//
-							// translatorClient, ok := raw.(translatorpb.TranslatorClient)
-							// if !ok {
-							// 	return fmt.Errorf("expected TranslatorClient, got %T", raw)
-							// }
-							//
-							// out, err := translatorClient.ReadConsumerBlueprint(ctx.Context, &translatorpb.ReadConsumerBlueprintRequest{
-							// 	Path: config.Path,
-							// })
-							// if err != nil {
-							// 	return fmt.Errorf("error reading: %v\n", err)
-							// }
 
 							data, err := json.MarshalIndent(&blueprint, "", "  ")
 							if err != nil {
 								return err
 							}
 
-							fmt.Printf(">>>>>>>>>>>> %v\n", string(data))
+							fmt.Printf("IN >>>>>>>>>>>> %v\n", string(data))
+
+							bp, err := convertBlueprint(&blueprint)
+							if err != nil {
+								return err
+							}
+
+							in := interpreter.Interpreter{}
+							env := interpreter.Environment{
+								Objects: map[string]state.Type{},
+							}
+							bld, err := in.Interpret(env, bp)
+							if err != nil {
+								return err
+							}
+
+							/*
+
+								*** Evaluate ***
+								- Iterate through each statement.
+								- Evaluate the statement.
+
+							*/
+							// var blueprintState statepb.Blueprint
+							// for _, stmt := range blueprint.Stmts {
+							// 	switch {
+							// 	case stmt.GetResource() != nil:
+							// 		var resourceState statepb.ResourceState
+							// 		resource := stmt.GetResource()
+							// 		idExpr := resource.GetIdentifier()
+							// 		// TODO: Introduce evaluator.
+							//
+							// 		blueprintState.States = append(blueprintState.States, &statepb.State{
+							// 			Type: &statepb.State_Resource{
+							// 				Resource: &resourceState,
+							// 			},
+							// 		})
+							// 	}
+							// }
+							//
+							data, err = json.MarshalIndent(bld, "", "  ")
+							if err != nil {
+								return err
+							}
+
+							fmt.Printf("OUT >>>>>>>>>>>> %v\n", string(data))
 
 							return nil
 						},

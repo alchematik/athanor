@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package alchematik.athanor.state.v1;
 
-message Blueprint {
+message Build {
   repeated State states = 1;
 }
 
@@ -20,18 +20,19 @@ message ResourceState {
 
 message Value {
   oneof type {
-    LiteralValue literal = 1;
-    CollectionValue collection = 2;
+    string string_value = 1;
+    uint32 int_value = 2;
+    float float_value = 3;
+    ListValue list = 4;
+    MapValue map = 5;
   }
 }
 
-message LiteralValue {
-  string string_value = 1;
-  uint32 int_value = 2;
-  float float_value = 3;
+message ListValue {
+  repeated Value elements = 1;
 }
 
-message CollectionValue {
-  map<string, Value> map_collection = 1;
-  repeated Value list_collection = 2;
+message MapValue {
+  map<string, Value> entries = 1;
 }
+
