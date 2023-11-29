@@ -7,7 +7,6 @@ import (
 	"github.com/alchematik/athanor/blueprint/expr"
 	"github.com/alchematik/athanor/blueprint/stmt"
 	"github.com/alchematik/athanor/build"
-	"github.com/alchematik/athanor/build/state"
 	"github.com/alchematik/athanor/build/value"
 )
 
@@ -18,7 +17,7 @@ type Interpreter struct {
 }
 
 type Environment struct {
-	Objects map[string]state.Type
+	Objects map[string]value.Type
 }
 
 func (in Interpreter) Interpret(env Environment, b blueprint.Blueprint) (build.Build, error) {
@@ -32,6 +31,8 @@ func (in Interpreter) Interpret(env Environment, b blueprint.Blueprint) (build.B
 				return bld, err
 			}
 
+			env.Objects[r.Name] = r
+
 			bld.States = append(bld.States, r)
 		}
 	}
@@ -39,18 +40,19 @@ func (in Interpreter) Interpret(env Environment, b blueprint.Blueprint) (build.B
 	return bld, nil
 }
 
-func (in Interpreter) InterpretResourceStmt(env Environment, r stmt.Resource) (state.Resource, error) {
+func (in Interpreter) InterpretResourceStmt(env Environment, r stmt.Resource) (value.Resource, error) {
 	id, err := in.InterpretExpr(env, r.Identifier)
 	if err != nil {
-		return state.Resource{}, err
+		return value.Resource{}, err
 	}
 
 	config, err := in.InterpretExpr(env, r.Identifier)
 	if err != nil {
-		return state.Resource{}, err
+		return value.Resource{}, err
 	}
 
-	return state.Resource{
+	return value.Resource{
+		Name:       r.Name,
 		Identifier: id,
 		Config:     config,
 		Attrs:      value.Unresolved{},
@@ -73,6 +75,39 @@ func (in Interpreter) InterpretExpr(env Environment, ex expr.Type) (value.Type, 
 		}
 
 		return m, nil
+	case expr.Get:
+		name := e.Name
+		var m map[string]value.Type
+
+		// Nil means we're accessing properties on current environment.
+		if _, ok := e.Object.(expr.Nil); ok {
+			m = env.Objects
+		} else {
+			objVal, err := in.InterpretExpr(env, e.Object)
+			if err != nil {
+				return nil, err
+			}
+
+			switch obj := objVal.(type) {
+			case value.Map:
+				m = obj.Entries
+			case value.Resource:
+				m = map[string]value.Type{
+					"identifier": obj.Identifier,
+					"config":     obj.Config,
+					"attrs":      obj.Attrs,
+				}
+			default:
+				return nil, fmt.Errorf("cannot access property %q", name)
+			}
+		}
+
+		val, ok := m[name]
+		if !ok {
+			return nil, fmt.Errorf("property %q not set", name)
+		}
+
+		return val, nil
 	default:
 		return nil, fmt.Errorf("unknown expr %T", ex)
 	}

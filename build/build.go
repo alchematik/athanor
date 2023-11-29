@@ -1,9 +1,9 @@
 package build
 
 import (
-	"github.com/alchematik/athanor/build/state"
+	"github.com/alchematik/athanor/build/value"
 )
 
 type Build struct {
-	States []state.Type
+	States []value.Type
 }

@@ -15,3 +15,14 @@ type Map struct {
 
 	Entries map[string]Type
 }
+
+type Get struct {
+	Type
+
+	Name   string
+	Object Type
+}
+
+type Nil struct {
+	Type
+}

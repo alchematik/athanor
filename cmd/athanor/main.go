@@ -22,7 +22,7 @@ import (
 	"github.com/alchematik/athanor/blueprint"
 	"github.com/alchematik/athanor/blueprint/expr"
 	"github.com/alchematik/athanor/blueprint/stmt"
-	"github.com/alchematik/athanor/build/state"
+	"github.com/alchematik/athanor/build/value"
 	"github.com/alchematik/athanor/interpreter"
 	// "github.com/alchematik/athanor/internal/provider"
 	// "github.com/alchematik/athanor/backend"
@@ -93,6 +93,7 @@ func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 			return nil, err
 		}
 		return stmt.Resource{
+			Name:       s.Resource.GetName(),
 			Identifier: id,
 			Config:     config,
 		}, nil
@@ -116,8 +117,22 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 		}
 
 		return m, nil
+	case *consumerpb.Expr_Get:
+		obj, err := convertExpr(e.Get.GetObject())
+		if err != nil {
+			return nil, err
+		}
+
+		g := expr.Get{
+			Name:   e.Get.GetName(),
+			Object: obj,
+		}
+
+		return g, nil
+	case *consumerpb.Expr_Nil:
+		return expr.Nil{}, nil
 	default:
-		return nil, fmt.Errorf("invalid expr: %T", ex)
+		return nil, fmt.Errorf("invalid expr: %T", ex.GetType())
 	}
 }
 
@@ -156,7 +171,7 @@ func main() {
 
 							in := interpreter.Interpreter{}
 							env := interpreter.Environment{
-								Objects: map[string]state.Type{},
+								Objects: map[string]value.Type{},
 							}
 							bld, err := in.Interpret(env, bp)
 							if err != nil {

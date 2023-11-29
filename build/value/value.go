@@ -4,6 +4,15 @@ type Type interface {
 	isValueType()
 }
 
+type Resource struct {
+	Type
+
+	Name       string
+	Identifier Type
+	Config     Type
+	Attrs      Type
+}
+
 type String struct {
 	Type
 

@@ -14,8 +14,9 @@ message Stmt {
 
 
 message ResourceStmt {
-  Expr identifier = 1;
-  Expr config = 2; 
+  string name = 1;
+  Expr identifier = 2;
+  Expr config = 3; 
 }
 
 message Expr {
@@ -25,6 +26,8 @@ message Expr {
     float float_literal = 3;
     ListExpr list = 4;
     MapExpr map = 5;
+    GetExpr get = 6;
+    NilExpr nil = 7;
   }
 }
 
@@ -36,3 +39,11 @@ message MapExpr {
   map<string, Expr> entries = 1;
 }
 
+message GetExpr {
+  string name = 1;
+  Expr object = 2;
+}
+
+
+message NilExpr {
+}

@@ -2,6 +2,7 @@
   "stmts": [
     {
       "resource": {
+        "name": "my-bucket",
         "identifier": {
           "map": {
             "entries": {
@@ -22,6 +23,41 @@
             "entries": {
               "expiration": {
                 "string_literal": "24h"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "resource": {
+        "identifier": {
+          "map": {
+            "entries": {
+              "bucket": {
+                "get": {
+                  "name": "identifier",
+                  "object": {
+                    "get": {
+                      "name": "my-bucket",
+                      "object": {
+                        "nil": {}
+                      }
+                    }
+                  }
+                }
+              },
+              "name": {
+                "string_literal": "my-object"
+              }
+            }
+          }
+        },
+        "config": {
+          "map": {
+            "entries": {
+              "contents": {
+                "string_literal": "todo: change to read from file"
               }
             }
           }

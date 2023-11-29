@@ -11,6 +11,7 @@ type Type interface {
 type Resource struct {
 	Type
 
+	Name       string
 	Identifier expr.Type
 	Config     expr.Type
 }
