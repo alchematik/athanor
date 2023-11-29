@@ -58,6 +58,29 @@
             "entries": {
               "contents": {
                 "string_literal": "todo: change to read from file"
+              },
+              "some_field": {
+                "get": {
+                  "name": "foo",
+                  "object": {
+                    "get": {
+                      "name": "bar",
+                      "object": {
+                        "get": {
+                          "name": "attrs",
+                          "object": {
+                            "get": {
+                              "name": "my-bucket",
+                              "object": {
+                                "nil": {}
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
               }
             }
           }

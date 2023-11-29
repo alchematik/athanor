@@ -1,6 +1,7 @@
 package interpreter
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/alchematik/athanor/blueprint"
@@ -13,20 +14,32 @@ import (
 // Stmts and expressions
 
 type Interpreter struct {
-	Environment Environment
+	ResourcesAPI ResourcesAPI
 }
 
 type Environment struct {
 	Objects map[string]value.Type
 }
 
-func (in Interpreter) Interpret(env Environment, b blueprint.Blueprint) (build.Build, error) {
+type ResourcesAPI interface {
+	FetchResource(ctx context.Context, r value.Resource) (value.Resource, error)
+}
+
+type NilResourcesAPI struct {
+}
+
+func (api NilResourcesAPI) FetchResource(ctx context.Context, r value.Resource) (value.Resource, error) {
+	r.Attrs = value.Unresolved{}
+	return r, nil
+}
+
+func (in Interpreter) Interpret(ctx context.Context, env Environment, b blueprint.Blueprint) (build.Build, error) {
 	var bld build.Build
 
 	for _, st := range b.Stmts {
 		switch s := st.(type) {
 		case stmt.Resource:
-			r, err := in.InterpretResourceStmt(env, s)
+			r, err := in.InterpretResourceStmt(ctx, env, s)
 			if err != nil {
 				return bld, err
 			}
@@ -40,13 +53,23 @@ func (in Interpreter) Interpret(env Environment, b blueprint.Blueprint) (build.B
 	return bld, nil
 }
 
-func (in Interpreter) InterpretResourceStmt(env Environment, r stmt.Resource) (value.Resource, error) {
+func (in Interpreter) InterpretResourceStmt(ctx context.Context, env Environment, r stmt.Resource) (value.Resource, error) {
 	id, err := in.InterpretExpr(env, r.Identifier)
 	if err != nil {
 		return value.Resource{}, err
 	}
 
-	config, err := in.InterpretExpr(env, r.Identifier)
+	config, err := in.InterpretExpr(env, r.Config)
+	if err != nil {
+		return value.Resource{}, err
+	}
+
+	input := value.Resource{
+		Identifier: id,
+		Config:     config,
+	}
+
+	out, err := in.ResourcesAPI.FetchResource(ctx, input)
 	if err != nil {
 		return value.Resource{}, err
 	}
@@ -54,8 +77,8 @@ func (in Interpreter) InterpretResourceStmt(env Environment, r stmt.Resource) (v
 	return value.Resource{
 		Name:       r.Name,
 		Identifier: id,
-		Config:     config,
-		Attrs:      value.Unresolved{},
+		Config:     out.Config,
+		Attrs:      out.Attrs,
 	}, nil
 
 }
@@ -76,7 +99,6 @@ func (in Interpreter) InterpretExpr(env Environment, ex expr.Type) (value.Type, 
 
 		return m, nil
 	case expr.Get:
-		name := e.Name
 		var m map[string]value.Type
 
 		// Nil means we're accessing properties on current environment.
@@ -97,14 +119,16 @@ func (in Interpreter) InterpretExpr(env Environment, ex expr.Type) (value.Type, 
 					"config":     obj.Config,
 					"attrs":      obj.Attrs,
 				}
+			case value.Unresolved:
+				return value.Unresolved{}, nil
 			default:
-				return nil, fmt.Errorf("cannot access property %q", name)
+				return nil, fmt.Errorf("cannot access property %q", e.Name)
 			}
 		}
 
-		val, ok := m[name]
+		val, ok := m[e.Name]
 		if !ok {
-			return nil, fmt.Errorf("property %q not set", name)
+			return nil, fmt.Errorf("property %q not set", e.Name)
 		}
 
 		return val, nil

@@ -169,11 +169,13 @@ func main() {
 								return err
 							}
 
-							in := interpreter.Interpreter{}
+							in := interpreter.Interpreter{
+								ResourcesAPI: interpreter.NilResourcesAPI{},
+							}
 							env := interpreter.Environment{
 								Objects: map[string]value.Type{},
 							}
-							bld, err := in.Interpret(env, bp)
+							bld, err := in.Interpret(ctx.Context, env, bp)
 							if err != nil {
 								return err
 							}
