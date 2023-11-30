@@ -5,5 +5,5 @@ import (
 )
 
 type Build struct {
-	States []value.Type
+	Values []value.Type
 }

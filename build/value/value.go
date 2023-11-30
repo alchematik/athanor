@@ -7,8 +7,9 @@ type Type interface {
 type Provider struct {
 	Type
 
-	Name    string
-	Version string
+	Name       string
+	Version    string
+	Dependants map[string]bool
 }
 
 type Resource struct {
@@ -18,6 +19,7 @@ type Resource struct {
 	Identifier Type
 	Config     Type
 	Attrs      Type
+	Dependants map[string]bool
 }
 
 type String struct {
