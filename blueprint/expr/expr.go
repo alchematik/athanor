@@ -26,3 +26,18 @@ type Get struct {
 type Nil struct {
 	Type
 }
+
+type Provider struct {
+	Type
+
+	Name    Type
+	Version Type
+}
+
+type Resource struct {
+	Type
+
+	Provider   Type
+	Identifier Type
+	Config     Type
+}

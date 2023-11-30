@@ -38,33 +38,75 @@ func (in Interpreter) Interpret(ctx context.Context, env Environment, b blueprin
 
 	for _, st := range b.Stmts {
 		switch s := st.(type) {
-		case stmt.Resource:
-			r, err := in.InterpretResourceStmt(ctx, env, s)
+		case stmt.Declare:
+			v, err := in.InterpretExpr(ctx, env, s.Value)
 			if err != nil {
 				return bld, err
 			}
 
-			env.Objects[r.Name] = r
+			env.Objects[s.Alias] = v
 
-			bld.States = append(bld.States, r)
+			if r, ok := v.(value.Resource); ok {
+				bld.States = append(bld.States, r)
+			}
+		default:
+			return bld, fmt.Errorf("unknown stmt %T", st)
 		}
 	}
 
 	return bld, nil
 }
 
-func (in Interpreter) InterpretResourceStmt(ctx context.Context, env Environment, r stmt.Resource) (value.Resource, error) {
-	id, err := in.InterpretExpr(env, r.Identifier)
+func (in Interpreter) InterpretProviderExpr(ctx context.Context, env Environment, p expr.Provider) (value.Provider, error) {
+	name, err := in.InterpretExpr(ctx, env, p.Name)
+	if err != nil {
+		return value.Provider{}, err
+	}
+
+	nameStr, ok := name.(value.String)
+	if !ok {
+		return value.Provider{}, fmt.Errorf("name must be a string")
+	}
+
+	version, err := in.InterpretExpr(ctx, env, p.Version)
+	if err != nil {
+		return value.Provider{}, err
+	}
+
+	versionStr, ok := version.(value.String)
+	if !ok {
+		return value.Provider{}, fmt.Errorf("version must be a string")
+	}
+
+	return value.Provider{
+		Name:    nameStr.Value,
+		Version: versionStr.Value,
+	}, nil
+}
+
+func (in Interpreter) InterpretResourceExpr(ctx context.Context, env Environment, r expr.Resource) (value.Resource, error) {
+	provider, err := in.InterpretExpr(ctx, env, r.Provider)
 	if err != nil {
 		return value.Resource{}, err
 	}
 
-	config, err := in.InterpretExpr(env, r.Config)
+	providerVal, ok := provider.(value.Provider)
+	if !ok {
+		return value.Resource{}, fmt.Errorf("must use a valid provider for resource")
+	}
+
+	id, err := in.InterpretExpr(ctx, env, r.Identifier)
+	if err != nil {
+		return value.Resource{}, err
+	}
+
+	config, err := in.InterpretExpr(ctx, env, r.Config)
 	if err != nil {
 		return value.Resource{}, err
 	}
 
 	input := value.Resource{
+		Provider:   providerVal,
 		Identifier: id,
 		Config:     config,
 	}
@@ -75,15 +117,14 @@ func (in Interpreter) InterpretResourceStmt(ctx context.Context, env Environment
 	}
 
 	return value.Resource{
-		Name:       r.Name,
+		Provider:   providerVal,
 		Identifier: id,
 		Config:     out.Config,
 		Attrs:      out.Attrs,
 	}, nil
-
 }
 
-func (in Interpreter) InterpretExpr(env Environment, ex expr.Type) (value.Type, error) {
+func (in Interpreter) InterpretExpr(ctx context.Context, env Environment, ex expr.Type) (value.Type, error) {
 	switch e := ex.(type) {
 	case expr.String:
 		return value.String{Value: e.Value}, nil
@@ -91,7 +132,7 @@ func (in Interpreter) InterpretExpr(env Environment, ex expr.Type) (value.Type, 
 		m := value.Map{Entries: map[string]value.Type{}}
 		for k, v := range e.Entries {
 			var err error
-			m.Entries[k], err = in.InterpretExpr(env, v)
+			m.Entries[k], err = in.InterpretExpr(ctx, env, v)
 			if err != nil {
 				return nil, err
 			}
@@ -105,7 +146,7 @@ func (in Interpreter) InterpretExpr(env Environment, ex expr.Type) (value.Type, 
 		if _, ok := e.Object.(expr.Nil); ok {
 			m = env.Objects
 		} else {
-			objVal, err := in.InterpretExpr(env, e.Object)
+			objVal, err := in.InterpretExpr(ctx, env, e.Object)
 			if err != nil {
 				return nil, err
 			}
@@ -132,6 +173,10 @@ func (in Interpreter) InterpretExpr(env Environment, ex expr.Type) (value.Type, 
 		}
 
 		return val, nil
+	case expr.Provider:
+		return in.InterpretProviderExpr(ctx, env, e)
+	case expr.Resource:
+		return in.InterpretResourceExpr(ctx, env, e)
 	default:
 		return nil, fmt.Errorf("unknown expr %T", ex)
 	}

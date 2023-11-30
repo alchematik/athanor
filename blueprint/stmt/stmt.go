@@ -8,10 +8,9 @@ type Type interface {
 	isStmtType()
 }
 
-type Resource struct {
+type Declare struct {
 	Type
 
-	Name       string
-	Identifier expr.Type
-	Config     expr.Type
+	Alias string
+	Value expr.Type
 }

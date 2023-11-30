@@ -83,22 +83,18 @@ func convertBlueprint(bp *consumerpb.Blueprint) (blueprint.Blueprint, error) {
 
 func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 	switch s := st.GetType().(type) {
-	case *consumerpb.Stmt_Resource:
-		id, err := convertExpr(s.Resource.GetIdentifier())
+	case *consumerpb.Stmt_Declare:
+		v, err := convertExpr(s.Declare.GetValue())
 		if err != nil {
 			return nil, err
 		}
-		config, err := convertExpr(s.Resource.GetConfig())
-		if err != nil {
-			return nil, err
-		}
-		return stmt.Resource{
-			Name:       s.Resource.GetName(),
-			Identifier: id,
-			Config:     config,
+
+		return stmt.Declare{
+			Alias: s.Declare.GetAlias(),
+			Value: v,
 		}, nil
 	default:
-		return nil, fmt.Errorf("invalid stmt: %T", st)
+		return nil, fmt.Errorf("invalid stmt: %T", st.GetType())
 	}
 }
 
@@ -131,6 +127,42 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 		return g, nil
 	case *consumerpb.Expr_Nil:
 		return expr.Nil{}, nil
+	case *consumerpb.Expr_Resource:
+		provider, err := convertExpr(e.Resource.GetProvider())
+		if err != nil {
+			return nil, err
+		}
+
+		id, err := convertExpr(e.Resource.GetIdentifier())
+		if err != nil {
+			return nil, err
+		}
+
+		config, err := convertExpr(e.Resource.GetConfig())
+		if err != nil {
+			return nil, err
+		}
+
+		return expr.Resource{
+			Provider:   provider,
+			Identifier: id,
+			Config:     config,
+		}, nil
+	case *consumerpb.Expr_Provider:
+		name, err := convertExpr(e.Provider.GetName())
+		if err != nil {
+			return nil, err
+		}
+
+		version, err := convertExpr(e.Provider.GetVersion())
+		if err != nil {
+			return nil, err
+		}
+
+		return expr.Provider{
+			Name:    name,
+			Version: version,
+		}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", ex.GetType())
 	}

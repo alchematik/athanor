@@ -8,16 +8,15 @@ message Blueprint {
 
 message Stmt {
   oneof type {
-    ResourceStmt resource = 1;
+    DeclareStmt declare = 1;
   }
 }
 
-
-message ResourceStmt {
-  string name = 1;
-  Expr identifier = 2;
-  Expr config = 3; 
+message DeclareStmt {
+  string alias = 1;
+  Expr value = 2;
 }
+
 
 message Expr {
   oneof type {
@@ -28,6 +27,8 @@ message Expr {
     MapExpr map = 5;
     GetExpr get = 6;
     NilExpr nil = 7;
+    ProviderExpr provider = 8;
+    ResourceExpr resource = 9;
   }
 }
 
@@ -47,3 +48,15 @@ message GetExpr {
 
 message NilExpr {
 }
+
+message ProviderExpr {
+  Expr name = 1;
+  Expr version = 2;
+}
+
+message ResourceExpr {
+  Expr provider = 1;
+  Expr identifier = 2;
+  Expr config = 3; 
+}
+

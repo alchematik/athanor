@@ -1,28 +1,55 @@
 {
   "stmts": [
     {
-      "resource": {
-        "name": "my-bucket",
-        "identifier": {
-          "map": {
-            "entries": {
-              "account": {
-                "string_literal": "12345"
-              },
-              "region": {
-                "string_literal": "us-east-1"
-              },
-              "name": {
-                "string_literal": "my-bucket"
-              }
+      "declare": {
+        "alias": "gcp",
+        "value": {
+          "provider": {
+            "name": {
+              "string_literal": "gcp"
+            },
+            "version": {
+              "string_literal": "v0.0.1"
             }
           }
-        },
-        "config": {
-          "map": {
-            "entries": {
-              "expiration": {
-                "string_literal": "24h"
+        }
+      }
+    },
+    {
+      "declare": {
+        "alias": "my-bucket",
+        "value": {
+          "resource": {
+            "provider": {
+              "get": {
+                "name": "gcp",
+                "object": {
+                  "nil": {}
+                }
+              }
+            },
+            "identifier": {
+              "map": {
+                "entries": {
+                  "account": {
+                    "string_literal": "12345"
+                  },
+                  "region": {
+                    "string_literal": "us-east-1"
+                  },
+                  "name": {
+                    "string_literal": "my-bucket"
+                  }
+                }
+              }
+            },
+            "config": {
+              "map": {
+                "entries": {
+                  "expiration": {
+                    "string_literal": "24h"
+                  }
+                }
               }
             }
           }
@@ -30,49 +57,62 @@
       }
     },
     {
-      "resource": {
-        "identifier": {
-          "map": {
-            "entries": {
-              "bucket": {
-                "get": {
-                  "name": "identifier",
-                  "object": {
-                    "get": {
-                      "name": "my-bucket",
-                      "object": {
-                        "nil": {}
-                      }
-                    }
-                  }
+      "declare": {
+        "alias": "my-object",
+        "value": {
+          "resource": {
+            "provider": {
+              "get": {
+                "name": "gcp",
+                "object": {
+                  "nil": {}
                 }
-              },
-              "name": {
-                "string_literal": "my-object"
               }
-            }
-          }
-        },
-        "config": {
-          "map": {
-            "entries": {
-              "contents": {
-                "string_literal": "todo: change to read from file"
-              },
-              "some_field": {
-                "get": {
-                  "name": "foo",
-                  "object": {
+            },
+            "identifier": {
+              "map": {
+                "entries": {
+                  "bucket": {
                     "get": {
-                      "name": "bar",
+                      "name": "identifier",
                       "object": {
                         "get": {
-                          "name": "attrs",
+                          "name": "my-bucket",
+                          "object": {
+                            "nil": {}
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "name": {
+                    "string_literal": "my-object"
+                  }
+                }
+              }
+            },
+            "config": {
+              "map": {
+                "entries": {
+                  "contents": {
+                    "string_literal": "todo: change to read from file"
+                  },
+                  "some_field": {
+                    "get": {
+                      "name": "foo",
+                      "object": {
+                        "get": {
+                          "name": "bar",
                           "object": {
                             "get": {
-                              "name": "my-bucket",
+                              "name": "attrs",
                               "object": {
-                                "nil": {}
+                                "get": {
+                                  "name": "my-bucket",
+                                  "object": {
+                                    "nil": {}
+                                  }
+                                }
                               }
                             }
                           }
