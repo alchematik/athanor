@@ -29,7 +29,10 @@ type NilResourcesAPI struct {
 }
 
 func (api NilResourcesAPI) FetchResource(ctx context.Context, r value.Resource) (value.Resource, error) {
-	r.Attrs = value.Unresolved{}
+	r.Attrs = value.Unresolved{
+		Name:   "",
+		Object: r,
+	}
 	return r, nil
 }
 
@@ -107,7 +110,10 @@ func (in Interpreter) InterpretExpr(ctx context.Context, env Environment, st stm
 				}
 
 			case value.Unresolved:
-				return value.Unresolved{}, nil
+				return value.Unresolved{
+					Name:   e.Name,
+					Object: objVal,
+				}, nil
 			default:
 				return nil, fmt.Errorf("cannot access property %q", e.Name)
 			}
@@ -177,22 +183,24 @@ func (in Interpreter) InterpretResourceExpr(ctx context.Context, env Environment
 		return value.Resource{}, err
 	}
 
-	input := value.Resource{
+	var alias string
+	if s, ok := st.(stmt.Declare); ok {
+		alias = s.Alias
+	}
+
+	res := value.Resource{
 		Provider:   providerVal,
 		Identifier: id,
 		Config:     config,
-	}
-
-	out, err := in.ResourcesAPI.FetchResource(ctx, input)
-	if err != nil {
-		return value.Resource{}, err
-	}
-
-	return value.Resource{
-		Provider:   providerVal,
-		Identifier: id,
-		Config:     out.Config,
-		Attrs:      out.Attrs,
+		Attrs: value.Unresolved{
+			Name: "attrs",
+			Object: value.Unresolved{
+				Name:   alias,
+				Object: value.Nil{},
+			},
+		},
 		Dependants: map[string]bool{},
-	}, nil
+	}
+
+	return res, nil
 }

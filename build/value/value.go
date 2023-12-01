@@ -36,4 +36,11 @@ type Map struct {
 
 type Unresolved struct {
 	Type
+
+	Name   string
+	Object Type
+}
+
+type Nil struct {
+	Type
 }
