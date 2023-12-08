@@ -225,12 +225,17 @@ func main() {
 								return err
 							}
 
-							eval := evaluator.Evaluator{}
-							if err := eval.Evaluate(ctx.Context, env); err != nil {
+							eval := evaluator.Evaluator{
+								ResourceEvaluator: evaluator.PlanResourceEvaluator{
+									ValueResolver: evaluator.RealValueResolver{},
+								},
+							}
+							stateEnv, err := eval.Evaluate(ctx.Context, env)
+							if err != nil {
 								return err
 							}
 
-							data, err = json.MarshalIndent(env, "", "  ")
+							data, err = json.MarshalIndent(stateEnv, "", "  ")
 							if err != nil {
 								return err
 							}

@@ -1,7 +1,7 @@
-package value
+package state
 
 type Type interface {
-	isValueType()
+	isStateType()
 }
 
 type Provider struct {
@@ -18,11 +18,7 @@ type Resource struct {
 	Identifier Type
 	Config     Type
 
-	// TODO: Does this belong here?
 	Attrs Type
-
-	// TODO: separate this out?
-	Children map[string]bool
 }
 
 type String struct {
@@ -37,17 +33,9 @@ type Map struct {
 	Entries map[string]Type
 }
 
-type Unresolved struct {
+type Unknown struct {
 	Type
-
-	Name       string
-	Object     Type
-	Unresolved bool
 }
-
-// type Unknown struct {
-// 	Type
-// }
 
 type Nil struct {
 	Type
