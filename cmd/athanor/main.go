@@ -23,6 +23,7 @@ import (
 	"github.com/alchematik/athanor/blueprint/expr"
 	"github.com/alchematik/athanor/blueprint/stmt"
 	"github.com/alchematik/athanor/build/value"
+	"github.com/alchematik/athanor/evaluator"
 	"github.com/alchematik/athanor/interpreter"
 	// "github.com/alchematik/athanor/internal/provider"
 	// "github.com/alchematik/athanor/backend"
@@ -125,6 +126,18 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 		}
 
 		return g, nil
+	case *consumerpb.Expr_IoGet:
+		obj, err := convertExpr(e.IoGet.GetObject())
+		if err != nil {
+			return nil, err
+		}
+
+		g := expr.IOGet{
+			Name:   e.IoGet.GetName(),
+			Object: obj,
+		}
+
+		return g, nil
 	case *consumerpb.Expr_Nil:
 		return expr.Nil{}, nil
 	case *consumerpb.Expr_Resource:
@@ -207,36 +220,17 @@ func main() {
 							env := interpreter.Environment{
 								Objects: map[string]value.Type{},
 							}
-							bld, err := in.Interpret(ctx.Context, env, bp)
+							err = in.Interpret(ctx.Context, env, bp)
 							if err != nil {
 								return err
 							}
 
-							/*
+							eval := evaluator.Evaluator{}
+							if err := eval.Evaluate(ctx.Context, env); err != nil {
+								return err
+							}
 
-								*** Evaluate ***
-								- Iterate through each statement.
-								- Evaluate the statement.
-
-							*/
-							// var blueprintState statepb.Blueprint
-							// for _, stmt := range blueprint.Stmts {
-							// 	switch {
-							// 	case stmt.GetResource() != nil:
-							// 		var resourceState statepb.ResourceState
-							// 		resource := stmt.GetResource()
-							// 		idExpr := resource.GetIdentifier()
-							// 		// TODO: Introduce evaluator.
-							//
-							// 		blueprintState.States = append(blueprintState.States, &statepb.State{
-							// 			Type: &statepb.State_Resource{
-							// 				Resource: &resourceState,
-							// 			},
-							// 		})
-							// 	}
-							// }
-							//
-							data, err = json.MarshalIndent(bld, "", "  ")
+							data, err = json.MarshalIndent(env, "", "  ")
 							if err != nil {
 								return err
 							}

@@ -23,6 +23,13 @@ type Get struct {
 	Object Type
 }
 
+type IOGet struct {
+	Type
+
+	Name   string
+	Object Type
+}
+
 type Nil struct {
 	Type
 }

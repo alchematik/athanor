@@ -7,7 +7,6 @@ import (
 	"github.com/alchematik/athanor/blueprint"
 	"github.com/alchematik/athanor/blueprint/expr"
 	"github.com/alchematik/athanor/blueprint/stmt"
-	"github.com/alchematik/athanor/build"
 	"github.com/alchematik/athanor/build/value"
 )
 
@@ -36,31 +35,22 @@ func (api NilResourcesAPI) FetchResource(ctx context.Context, r value.Resource) 
 	return r, nil
 }
 
-func (in Interpreter) Interpret(ctx context.Context, env Environment, b blueprint.Blueprint) (build.Build, error) {
-	var bld build.Build
-
+func (in Interpreter) Interpret(ctx context.Context, env Environment, b blueprint.Blueprint) error {
 	for _, st := range b.Stmts {
 		switch s := st.(type) {
 		case stmt.Declare:
 			v, err := in.InterpretExpr(ctx, env, s, s.Value)
 			if err != nil {
-				return bld, err
+				return err
 			}
 
 			env.Objects[s.Alias] = v
-
-			switch val := v.(type) {
-			case value.Provider:
-				bld.Values = append(bld.Values, val)
-			case value.Resource:
-				bld.Values = append(bld.Values, val)
-			}
 		default:
-			return bld, fmt.Errorf("unknown stmt %T", st)
+			return fmt.Errorf("unknown stmt %T", st)
 		}
 	}
 
-	return bld, nil
+	return nil
 }
 
 func (in Interpreter) InterpretExpr(ctx context.Context, env Environment, st stmt.Type, ex expr.Type) (value.Type, error) {
@@ -78,6 +68,21 @@ func (in Interpreter) InterpretExpr(ctx context.Context, env Environment, st stm
 		}
 
 		return m, nil
+	case expr.IOGet:
+		objVal, err := in.InterpretExpr(ctx, env, st, e.Object)
+		if err != nil {
+			return nil, err
+		}
+
+		unresolved, ok := objVal.(value.Unresolved)
+		if !ok {
+			return nil, fmt.Errorf("property %q does not belong to unresolved object; use get", e.Name)
+		}
+
+		return value.Unresolved{
+			Name:   e.Name,
+			Object: unresolved,
+		}, nil
 	case expr.Get:
 		var m map[string]value.Type
 
@@ -85,12 +90,10 @@ func (in Interpreter) InterpretExpr(ctx context.Context, env Environment, st stm
 		if _, ok := e.Object.(expr.Nil); ok {
 			m = env.Objects
 			if s, ok := st.(stmt.Declare); ok {
-				dependantAlias := s.Alias
+				childAlias := s.Alias
 				switch v := env.Objects[e.Name].(type) {
-				case value.Provider:
-					v.Dependants[dependantAlias] = true
 				case value.Resource:
-					v.Dependants[dependantAlias] = true
+					v.Children[childAlias] = true
 				}
 			}
 		} else {
@@ -110,10 +113,7 @@ func (in Interpreter) InterpretExpr(ctx context.Context, env Environment, st stm
 				}
 
 			case value.Unresolved:
-				return value.Unresolved{
-					Name:   e.Name,
-					Object: objVal,
-				}, nil
+				return nil, fmt.Errorf("property %q belongs to an unresolved object; use io_get", e.Name)
 			default:
 				return nil, fmt.Errorf("cannot access property %q", e.Name)
 			}
@@ -156,9 +156,8 @@ func (in Interpreter) InterpretProviderExpr(ctx context.Context, env Environment
 	}
 
 	return value.Provider{
-		Name:       nameStr.Value,
-		Version:    versionStr.Value,
-		Dependants: map[string]bool{},
+		Name:    nameStr.Value,
+		Version: versionStr.Value,
 	}, nil
 }
 
@@ -183,6 +182,7 @@ func (in Interpreter) InterpretResourceExpr(ctx context.Context, env Environment
 		return value.Resource{}, err
 	}
 
+	// Get alias of resource.
 	var alias string
 	if s, ok := st.(stmt.Declare); ok {
 		alias = s.Alias
@@ -199,7 +199,7 @@ func (in Interpreter) InterpretResourceExpr(ctx context.Context, env Environment
 				Object: value.Nil{},
 			},
 		},
-		Dependants: map[string]bool{},
+		Children: map[string]bool{},
 	}
 
 	return res, nil

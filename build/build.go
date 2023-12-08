@@ -5,5 +5,10 @@ import (
 )
 
 type Build struct {
-	Values []value.Type
+	Nodes []Node
+}
+
+type Node struct {
+	Value    value.Type
+	Children []Node
 }

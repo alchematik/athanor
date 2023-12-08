@@ -98,10 +98,10 @@
                     "string_literal": "todo: change to read from file"
                   },
                   "some_field": {
-                    "get": {
+                    "io_get": {
                       "name": "foo",
                       "object": {
-                        "get": {
+                        "io_get": {
                           "name": "bar",
                           "object": {
                             "get": {

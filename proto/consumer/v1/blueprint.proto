@@ -29,6 +29,7 @@ message Expr {
     NilExpr nil = 7;
     ProviderExpr provider = 8;
     ResourceExpr resource = 9;
+    IOGetExpr io_get = 10;
   }
 }
 
@@ -45,6 +46,10 @@ message GetExpr {
   Expr object = 2;
 }
 
+message IOGetExpr {
+  string name = 1;
+  Expr object = 2;
+}
 
 message NilExpr {
 }
