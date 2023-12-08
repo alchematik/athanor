@@ -41,9 +41,9 @@ type Unresolved struct {
 	Unresolved bool
 }
 
-// type Unknown struct {
-// 	Type
-// }
+type Unknown struct {
+	Type
+}
 
 type Nil struct {
 	Type

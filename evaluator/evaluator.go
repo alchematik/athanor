@@ -64,6 +64,10 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) er
 	return nil
 }
 
+// TODO: This needs to either
+// * Fetch the remote resource using the identifier and fill in the config and attrs fields, or
+// * Fill in the config field with the static config and set attrs to something (unresolved?).
+// In troduce an interface to evaulate resources?
 func (e Evaluator) EvaluateResource(ctx context.Context, env interpreter.Environment, r value.Resource) (value.Resource, error) {
 	id, err := e.resolveValue(ctx, env, r.Identifier)
 	if err != nil {
@@ -78,15 +82,16 @@ func (e Evaluator) EvaluateResource(ctx context.Context, env interpreter.Environ
 
 	r.Identifier = id
 	r.Config = config
-	r.Attrs = value.Map{
-		Entries: map[string]value.Type{
-			"bar": value.Map{
-				Entries: map[string]value.Type{
-					"foo": value.String{Value: "hi"},
-				},
-			},
-		},
-	}
+	// r.Attrs = value.Map{
+	// 	Entries: map[string]value.Type{
+	// 		"bar": value.Map{
+	// 			Entries: map[string]value.Type{
+	// 				"foo": value.String{Value: "hi"},
+	// 			},
+	// 		},
+	// 	},
+	// }
+	r.Attrs = value.Unknown{}
 
 	return r, nil
 }
@@ -107,8 +112,8 @@ func (e Evaluator) resolveValue(ctx context.Context, env interpreter.Environment
 			v.Entries[k] = resolved
 		}
 		return v, nil
-	// case value.Unknown:
-	// 	return value.Unknown{}, nil
+	case value.Unknown:
+		return value.Unknown{}, nil
 	case value.Unresolved:
 		if _, ok := v.Object.(value.Nil); ok {
 			obj, inEnv := env.Objects[v.Name]
@@ -126,14 +131,14 @@ func (e Evaluator) resolveValue(ctx context.Context, env interpreter.Environment
 
 		var m map[string]value.Type
 		switch obj := resolved.(type) {
-		// case value.Unknown:
-		// 	return value.Unknown{}, nil
 		case value.Resource:
 			m = map[string]value.Type{
 				"identifier": obj.Identifier,
 				"config":     obj.Config,
 				"attrs":      obj.Attrs,
 			}
+		case value.Unknown:
+			return value.Unknown{}, nil
 		case value.Map:
 			m = obj.Entries
 		default:
