@@ -189,9 +189,10 @@ func (in Interpreter) InterpretResourceExpr(ctx context.Context, env Environment
 	}
 
 	res := value.Resource{
-		Provider:   providerVal,
-		Identifier: id,
-		Config:     config,
+		ResourceType: r.ResourceType,
+		Provider:     providerVal,
+		Identifier:   id,
+		Config:       config,
 		Attrs: value.Unresolved{
 			Name: "attrs",
 			Object: value.Unresolved{

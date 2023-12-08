@@ -60,8 +60,9 @@ message ProviderExpr {
 }
 
 message ResourceExpr {
-  Expr provider = 1;
-  Expr identifier = 2;
-  Expr config = 3; 
+  string type = 1;
+  Expr provider = 2;
+  Expr identifier = 3;
+  Expr config = 4; 
 }
 

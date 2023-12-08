@@ -157,9 +157,10 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 		}
 
 		return expr.Resource{
-			Provider:   provider,
-			Identifier: id,
-			Config:     config,
+			ResourceType: e.Resource.GetType(),
+			Provider:     provider,
+			Identifier:   id,
+			Config:       config,
 		}, nil
 	case *consumerpb.Expr_Provider:
 		name, err := convertExpr(e.Provider.GetName())
@@ -240,7 +241,26 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("OUT >>>>>>>>>>>> %v\n", string(data))
+							fmt.Printf("desired state >>>>>>>>>>>> %v\n", string(data))
+
+							remoteEval := evaluator.Evaluator{
+								ResourceEvaluator: evaluator.RemoteResourceEvaluator{
+									ValueResolver:     evaluator.RealValueResolver{},
+									ProviderPluginDir: ".backends",
+								},
+							}
+
+							remoteState, err := remoteEval.Evaluate(ctx.Context, env)
+							if err != nil {
+								return err
+							}
+
+							data, err = json.MarshalIndent(remoteState, "", "  ")
+							if err != nil {
+								return err
+							}
+
+							fmt.Printf("actual state <<<<<<<<<<< %v\n", string(data))
 
 							return nil
 						},

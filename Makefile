@@ -24,6 +24,9 @@ build/json:
 build/backend/athanor:
 	go build -o .backends/athanor/v0.0.1/backend ./cmd/backend
 
+build/backend/gcp:
+	go build -o .backends/gcp/v0.0.1/provider ./cmd/backend
+
 blueprint/show:
 	go run ./cmd/athanor/main.go blueprint show -providers ./.providers ./gcp
 

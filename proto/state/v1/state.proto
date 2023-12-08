@@ -2,17 +2,13 @@ syntax = "proto3";
 
 package alchematik.athanor.state.v1;
 
-message Build {
-  repeated State states = 1;
-}
-
 message State {
   oneof type {
-    ResourceState resource = 1;
+    Resource resource = 1;
   }
 }
 
-message ResourceState {
+message Resource {
   Value identifier = 1;
   Value config = 2;
   Value attrs = 3; 

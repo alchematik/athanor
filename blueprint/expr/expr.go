@@ -44,7 +44,8 @@ type Provider struct {
 type Resource struct {
 	Type
 
-	Provider   Type
-	Identifier Type
-	Config     Type
+	ResourceType string
+	Provider     Type
+	Identifier   Type
+	Config       Type
 }

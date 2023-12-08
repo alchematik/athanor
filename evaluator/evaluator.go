@@ -3,9 +3,17 @@ package evaluator
 import (
 	"context"
 	"fmt"
+	"github.com/alchematik/athanor/backend"
 	"github.com/alchematik/athanor/build/value"
 	"github.com/alchematik/athanor/interpreter"
 	"github.com/alchematik/athanor/state"
+	plugin "github.com/hashicorp/go-plugin"
+	"os/exec"
+	"path/filepath"
+
+	// TODO: This has to be not internal anymore?
+	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
+	statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
 )
 
 type Evaluator struct {
@@ -100,15 +108,121 @@ func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env Environ
 		Config:     config,
 		Attrs:      state.Unknown{},
 	}, nil
-	// r.Attrs = value.Map{
-	// 	Entries: map[string]value.Type{
-	// 		"bar": value.Map{
-	// 			Entries: map[string]value.Type{
-	// 				"foo": value.String{Value: "hi"},
-	// 			},
-	// 		},
-	// 	},
-	// }
+}
+
+type RemoteResourceEvaluator struct {
+	ProviderPluginDir string
+	ValueResolver     ValueResolver
+}
+
+func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env Environment, r value.Resource) (state.Resource, error) {
+	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	pluginPath := filepath.Join(e.ProviderPluginDir, r.Provider.Name, r.Provider.Version, "provider")
+	client := plugin.NewClient(&plugin.ClientConfig{
+		HandshakeConfig: backend.HandshakeConfig,
+		Plugins: map[string]plugin.Plugin{
+			"backend": &backend.Plugin{},
+		},
+		Cmd:              exec.Command("sh", "-c", pluginPath),
+		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+	})
+
+	dispensor, err := client.Client()
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	rawPlug, err := dispensor.Dispense("backend")
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	plug, ok := rawPlug.(backendpb.BackendClient)
+	if !ok {
+		return state.Resource{}, fmt.Errorf("expected BackendClient, got %T", rawPlug)
+	}
+
+	protoID, err := convertProtoValue(id)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	res, err := plug.GetResource(ctx, &backendpb.GetResourceRequest{
+		Type:       r.ResourceType,
+		Identifier: protoID,
+	})
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	config, err := protoToState(res.GetResource().GetConfig())
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	attrs, err := protoToState(res.GetResource().GetAttrs())
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	return state.Resource{
+		Identifier: id,
+		Config:     config,
+		Attrs:      attrs,
+	}, nil
+}
+
+func protoToState(val *statepb.Value) (state.Type, error) {
+	switch v := val.GetType().(type) {
+	case *statepb.Value_Map:
+		entries := map[string]state.Type{}
+		for k, element := range v.Map.GetEntries() {
+			converted, err := protoToState(element)
+			if err != nil {
+				return nil, err
+			}
+			entries[k] = converted
+		}
+
+		return state.Map{Entries: entries}, nil
+	case *statepb.Value_StringValue:
+		return state.String{Value: v.StringValue}, nil
+	default:
+		return nil, fmt.Errorf("unsupported type %T", val.GetType())
+	}
+}
+
+func convertProtoValue(val state.Type) (*statepb.Value, error) {
+	switch v := val.(type) {
+	case state.String:
+		return &statepb.Value{
+			Type: &statepb.Value_StringValue{StringValue: v.Value},
+		}, nil
+	case state.Map:
+		entries := map[string]*statepb.Value{}
+		for k, v := range v.Entries {
+			converted, err := convertProtoValue(v)
+			if err != nil {
+				return nil, err
+			}
+			entries[k] = converted
+		}
+
+		return &statepb.Value{
+			Type: &statepb.Value_Map{
+				Map: &statepb.MapValue{
+					Entries: entries,
+				},
+			},
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown type %T\n", val)
+	}
+
 }
 
 // TODO: This needs to either
@@ -120,7 +234,6 @@ type RealValueResolver struct {
 }
 
 func (e RealValueResolver) ResolveValue(ctx context.Context, env Environment, val value.Type) (state.Type, error) {
-	fmt.Printf("resolving: %T : %v\n", val, val)
 	switch v := val.(type) {
 	case value.String:
 		return state.String{Value: v.Value}, nil
@@ -139,8 +252,6 @@ func (e RealValueResolver) ResolveValue(ctx context.Context, env Environment, va
 		}
 
 		return m, nil
-	// case value.Unknown:
-	// return value.Unknown{}, nil
 	case value.Unresolved:
 		if _, ok := v.Object.(value.Nil); ok {
 			obj, inEnv := env.Objects[v.Name]

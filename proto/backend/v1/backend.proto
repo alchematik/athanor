@@ -3,7 +3,8 @@ syntax = "proto3";
 package alchematik.athanor.backend.v1;
 
 import "google/protobuf/struct.proto";
-import "proto/provider/v1/blueprint.proto";
+/* import "proto/provider/v1/blueprint.proto"; */
+import "proto/state/v1/state.proto";
 
 service Backend {
   rpc GetResource(GetResourceRequest) returns (GetResourceResponse);
@@ -11,27 +12,10 @@ service Backend {
 
 message GetResourceRequest {
   string type = 1;
-  repeated Field identifier = 2;
+  alchematik.athanor.state.v1.Value identifier = 2;
 }
 
 message GetResourceResponse {
-  Resource resource = 1;
+  alchematik.athanor.state.v1.Resource resource = 1;
 }
 
-message Resource {
-  string type = 1;
-  bool exists = 2;
-  repeated Field identifier = 3;
-  repeated Field config = 4;
-}
-
-message Field {
-  string name = 1;
-  string type = 2;
-  google.protobuf.Value value = 3;
-}
-
-message Provider {
-  string name = 1;
-  string version = 2;
-}

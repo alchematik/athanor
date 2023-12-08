@@ -14,9 +14,10 @@ type Provider struct {
 type Resource struct {
 	Type
 
-	Provider   Provider
-	Identifier Type
-	Config     Type
+	ResourceType string
+	Provider     Provider
+	Identifier   Type
+	Config       Type
 
 	// TODO: Does this belong here?
 	Attrs Type
