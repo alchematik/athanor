@@ -21,14 +21,10 @@ type Evaluator struct {
 }
 
 type ResourceEvaluator interface {
-	EvaluateResource(context.Context, Environment, value.Resource) (state.Resource, error)
+	EvaluateResource(context.Context, state.Map, value.Resource) (state.Resource, error)
 }
 
-type Environment struct {
-	Objects map[string]state.Type
-}
-
-func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (Environment, error) {
+func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (state.Map, error) {
 	indegrees := map[string]int{}
 	for alias, val := range env.Objects {
 		if r, ok := val.(value.Resource); ok {
@@ -54,8 +50,8 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (E
 		}
 	}
 
-	stateEnv := Environment{
-		Objects: map[string]state.Type{},
+	stateEnv := state.Map{
+		Entries: map[string]state.Type{},
 	}
 	for len(queue) > 0 {
 		var alias string
@@ -68,9 +64,9 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (E
 
 		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, r)
 		if err != nil {
-			return Environment{}, err
+			return state.Map{}, err
 		}
-		stateEnv.Objects[alias] = s
+		stateEnv.Entries[alias] = s
 
 		for childAlias := range r.Children {
 			indegrees[childAlias]--
@@ -85,14 +81,14 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (E
 }
 
 type ValueResolver interface {
-	ResolveValue(context.Context, Environment, value.Type) (state.Type, error)
+	ResolveValue(context.Context, state.Map, value.Type) (state.Type, error)
 }
 
 type PlanResourceEvaluator struct {
 	ValueResolver ValueResolver
 }
 
-func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env Environment, r value.Resource) (state.Resource, error) {
+func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.Map, r value.Resource) (state.Resource, error) {
 	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -115,7 +111,7 @@ type RemoteResourceEvaluator struct {
 	ValueResolver     ValueResolver
 }
 
-func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env Environment, r value.Resource) (state.Resource, error) {
+func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state.Map, r value.Resource) (state.Resource, error) {
 	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -233,7 +229,7 @@ func convertProtoValue(val state.Type) (*statepb.Value, error) {
 type RealValueResolver struct {
 }
 
-func (e RealValueResolver) ResolveValue(ctx context.Context, env Environment, val value.Type) (state.Type, error) {
+func (e RealValueResolver) ResolveValue(ctx context.Context, env state.Map, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.String:
 		return state.String{Value: v.Value}, nil
@@ -254,7 +250,7 @@ func (e RealValueResolver) ResolveValue(ctx context.Context, env Environment, va
 		return m, nil
 	case value.Unresolved:
 		if _, ok := v.Object.(value.Nil); ok {
-			obj, inEnv := env.Objects[v.Name]
+			obj, inEnv := env.Entries[v.Name]
 			if !inEnv {
 				return nil, fmt.Errorf("object %q not in env", v.Name)
 			}

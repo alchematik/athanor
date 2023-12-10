@@ -23,6 +23,7 @@ import (
 	"github.com/alchematik/athanor/blueprint/expr"
 	"github.com/alchematik/athanor/blueprint/stmt"
 	"github.com/alchematik/athanor/build/value"
+	"github.com/alchematik/athanor/diff"
 	"github.com/alchematik/athanor/evaluator"
 	"github.com/alchematik/athanor/interpreter"
 	// "github.com/alchematik/athanor/internal/provider"
@@ -261,6 +262,20 @@ func main() {
 							}
 
 							fmt.Printf("actual state <<<<<<<<<<< %v\n", string(data))
+
+							// TODO: create diff between local state and remote state.
+
+							d, err := diff.DiffTypes(stateEnv, remoteState)
+							if err != nil {
+								return err
+							}
+
+							data, err = json.MarshalIndent(d, "", "  ")
+							if err != nil {
+								return err
+							}
+
+							fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
 
 							return nil
 						},
