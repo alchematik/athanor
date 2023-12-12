@@ -220,7 +220,8 @@ func main() {
 								ResourcesAPI: interpreter.NilResourcesAPI{},
 							}
 							env := interpreter.Environment{
-								Objects: map[string]value.Type{},
+								Objects:       map[string]value.Type{},
+								DependencyMap: map[string]interpreter.DependencyMap{},
 							}
 							err = in.Interpret(ctx.Context, env, bp)
 							if err != nil {

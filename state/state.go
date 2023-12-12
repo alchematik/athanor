@@ -4,6 +4,15 @@ type Type interface {
 	isStateType()
 }
 
+type Environment struct {
+	Type
+
+	Objects       map[string]Type
+	DependencyMap DependencyMap
+}
+
+type DependencyMap map[string]DependencyMap
+
 type Provider struct {
 	Type
 

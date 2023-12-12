@@ -30,6 +30,13 @@ const (
 
 func DiffTypes(from, to state.Type) (Diff, error) {
 	switch f := from.(type) {
+	case state.Environment:
+		t, ok := to.(state.Environment)
+		if !ok {
+			return Diff{}, fmt.Errorf("expected type %T, got %T", f, to)
+		}
+
+		return Environment(f, t)
 	case state.String:
 		t, ok := to.(state.String)
 		if !ok {
@@ -56,9 +63,90 @@ func DiffTypes(from, to state.Type) (Diff, error) {
 	}
 }
 
-// func Environment(from, to state.Environment) (Diff, error) {
-//   for k, v := range
-// }
+func Environment(from, to state.Environment) (Diff, error) {
+	var op Operation
+	var diffs []Diff
+
+	switch {
+	case len(to.Objects) == 0 && len(from.Objects) != 0:
+		op = OperationDelete
+		for k, v := range from.Objects {
+			diffs = append(diffs, Diff{
+				Operation: OperationDelete,
+				Name:      k,
+				To:        state.Nil{},
+				From:      v,
+			})
+		}
+	case len(to.Objects) != 0 && len(from.Objects) == 0:
+		op = OperationCreate
+		for k, v := range to.Objects {
+			diffs = append(diffs, Diff{
+				Operation: OperationCreate,
+				Name:      k,
+				To:        v,
+				From:      state.Nil{},
+			})
+		}
+	default:
+		for k, v := range to.Objects {
+			fromVal, ok := from.Objects[k]
+			if !ok {
+				diffs = append(diffs, Diff{
+					Name:      k,
+					To:        v,
+					From:      state.Nil{},
+					Operation: OperationCreate,
+				})
+				continue
+			}
+
+			diff, err := DiffTypes(fromVal, v)
+			if err != nil {
+				return Diff{}, err
+			}
+
+			diff.Name = k
+
+			diffs = append(diffs, diff)
+		}
+
+		for k, v := range from.Objects {
+			_, ok := to.Objects[k]
+			if !ok {
+				diffs = append(diffs, Diff{
+					Name:      k,
+					To:        state.Nil{},
+					From:      v,
+					Operation: OperationDelete,
+				})
+			}
+		}
+	}
+
+	if op == OperationEmpty {
+		op = OperationNoop
+
+		for _, diff := range diffs {
+			if diff.Operation != OperationNoop {
+				op = OperationUpdate
+				break
+			}
+		}
+	}
+
+	sort.Slice(diffs, func(i, j int) bool {
+		return diffs[i].Name < diffs[j].Name
+	})
+
+	d := Diff{
+		From:      from,
+		To:        to,
+		Operation: op,
+		Diffs:     diffs,
+	}
+	return d, nil
+}
 
 func Resource(from, to state.Resource) (Diff, error) {
 	config, err := DiffTypes(from.Config, to.Config)

@@ -21,24 +21,31 @@ type Evaluator struct {
 }
 
 type ResourceEvaluator interface {
-	EvaluateResource(context.Context, state.Map, value.Resource) (state.Resource, error)
+	EvaluateResource(context.Context, state.Environment, value.Resource) (state.Resource, error)
 }
 
-func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (state.Map, error) {
-	indegrees := map[string]int{}
-	for alias, val := range env.Objects {
-		if r, ok := val.(value.Resource); ok {
-			if _, ok := indegrees[alias]; !ok {
-				indegrees[alias] = 0
-			}
+func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (state.Environment, error) {
+	// indegrees := map[string]int{}
+	// for alias, val := range env.Objects {
+	// 	if r, ok := val.(value.Resource); ok {
+	// 		if _, ok := indegrees[alias]; !ok {
+	// 			indegrees[alias] = 0
+	// 		}
+	//
+	// 		for childAlias := range r.Children {
+	// 			indegrees[childAlias]++
+	// 		}
+	// 	}
+	// }
 
-			for childAlias := range r.Children {
-				indegrees[childAlias]++
-			}
-		}
+	indegrees := map[string]int{}
+	for alias, m := range env.DependencyMap {
+		indegrees[alias] = len(m)
 	}
 
-	fmt.Printf("indegrees>> %v\n", indegrees)
+	// fmt.Printf(">> %+v\n", env.DependencyMap)
+
+	// fmt.Printf("indegrees>> %v, %v\n", indegrees, other)
 
 	// TODO: detect cycle.
 
@@ -50,8 +57,9 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 		}
 	}
 
-	stateEnv := state.Map{
-		Entries: map[string]state.Type{},
+	stateEnv := state.Environment{
+		Objects:       map[string]state.Type{},
+		DependencyMap: convertDependencyMap(env.DependencyMap),
 	}
 	for len(queue) > 0 {
 		var alias string
@@ -60,13 +68,16 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 		fmt.Printf("evaluating: %q\n", alias)
 
 		v := env.Objects[alias]
-		r := v.(value.Resource)
+		r, ok := v.(value.Resource)
+		if !ok {
+			continue
+		}
 
 		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, r)
 		if err != nil {
-			return state.Map{}, err
+			return state.Environment{}, err
 		}
-		stateEnv.Entries[alias] = s
+		stateEnv.Objects[alias] = s
 
 		for childAlias := range r.Children {
 			indegrees[childAlias]--
@@ -80,15 +91,23 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 	return stateEnv, nil
 }
 
+func convertDependencyMap(m interpreter.DependencyMap) state.DependencyMap {
+	out := state.DependencyMap{}
+	for alias, v := range m {
+		out[alias] = convertDependencyMap(v)
+	}
+	return out
+}
+
 type ValueResolver interface {
-	ResolveValue(context.Context, state.Map, value.Type) (state.Type, error)
+	ResolveValue(context.Context, state.Environment, value.Type) (state.Type, error)
 }
 
 type PlanResourceEvaluator struct {
 	ValueResolver ValueResolver
 }
 
-func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.Map, r value.Resource) (state.Resource, error) {
+func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, r value.Resource) (state.Resource, error) {
 	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -111,7 +130,7 @@ type RemoteResourceEvaluator struct {
 	ValueResolver     ValueResolver
 }
 
-func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state.Map, r value.Resource) (state.Resource, error) {
+func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, r value.Resource) (state.Resource, error) {
 	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -229,7 +248,7 @@ func convertProtoValue(val state.Type) (*statepb.Value, error) {
 type RealValueResolver struct {
 }
 
-func (e RealValueResolver) ResolveValue(ctx context.Context, env state.Map, val value.Type) (state.Type, error) {
+func (e RealValueResolver) ResolveValue(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.String:
 		return state.String{Value: v.Value}, nil
@@ -250,7 +269,7 @@ func (e RealValueResolver) ResolveValue(ctx context.Context, env state.Map, val 
 		return m, nil
 	case value.Unresolved:
 		if _, ok := v.Object.(value.Nil); ok {
-			obj, inEnv := env.Entries[v.Name]
+			obj, inEnv := env.Objects[v.Name]
 			if !inEnv {
 				return nil, fmt.Errorf("object %q not in env", v.Name)
 			}
