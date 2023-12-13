@@ -2,171 +2,242 @@ package diff
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 
 	"github.com/alchematik/athanor/state"
 )
 
-type Differ struct {
+type Type interface {
+	Operation() Operation
 }
 
-type Diff struct {
-	Name      string
-	From      any
-	To        any
-	Operation Operation
-	Diffs     []Diff
+type String struct {
+	From          state.String
+	To            state.String
+	DiffOperation Operation
+}
+
+func (s String) Operation() Operation {
+	return s.DiffOperation
+}
+
+type Map struct {
+	From          state.Map
+	To            state.Map
+	Diffs         map[string]Type
+	DiffOperation Operation
+}
+
+func (m Map) Operation() Operation {
+	return m.DiffOperation
+}
+
+type Resource struct {
+	From          state.Resource
+	To            state.Resource
+	ConfigDiff    Type
+	DiffOperation Operation
+}
+
+func (r Resource) Operation() Operation {
+	return r.DiffOperation
+}
+
+type Environment struct {
+	From          state.Environment
+	To            state.Environment
+	Diffs         map[string]Type
+	Dependencies  map[string][]string
+	DiffOperation Operation
+}
+
+func (e Environment) Operation() Operation {
+	return e.DiffOperation
+}
+
+type Unknown struct {
+}
+
+func (u Unknown) Operation() Operation {
+	return OperationUnknown
 }
 
 type Operation string
 
 const (
-	OperationEmpty  Operation = ""
-	OperationNoop   Operation = "noop"
-	OperationCreate Operation = "create"
-	OperationUpdate Operation = "update"
-	OperationDelete Operation = "delete"
+	OperationEmpty   Operation = ""
+	OperationNoop    Operation = "noop"
+	OperationCreate  Operation = "create"
+	OperationUpdate  Operation = "update"
+	OperationDelete  Operation = "delete"
+	OperationUnknown Operation = "unknown"
 )
 
-func DiffTypes(from, to state.Type) (Diff, error) {
+func Diff(from, to state.Type) (Type, error) {
 	switch f := from.(type) {
 	case state.Environment:
-		t, ok := to.(state.Environment)
-		if !ok {
-			return Diff{}, fmt.Errorf("expected type %T, got %T", f, to)
+		switch t := to.(type) {
+		case state.Environment:
+			return EnvironmentDiff(f, t)
+		case state.Nil:
+			return EnvironmentDiff(f, state.Environment{})
+		default:
+			return nil, fmt.Errorf("invalid type for environment diff: %T", to)
 		}
-
-		return Environment(f, t)
 	case state.String:
-		t, ok := to.(state.String)
-		if !ok {
-			return Diff{}, fmt.Errorf("expected type %T, got %T", f, to)
+		switch t := to.(type) {
+		case state.String:
+			return StringDiff(f, t)
+		case state.Nil:
+			return StringDiff(f, state.String{})
+		default:
+			return nil, fmt.Errorf("invalid type for string diff: %T", to)
 		}
-
-		return String(f, t)
 	case state.Map:
-		t, ok := to.(state.Map)
-		if !ok {
-			return Diff{}, fmt.Errorf("expected type %T, got %T", f, to)
+		switch t := to.(type) {
+		case state.Map:
+			return MapDiff(f, t)
+		case state.Nil:
+			return MapDiff(f, state.Map{Entries: map[string]state.Type{}})
+		default:
+			return nil, fmt.Errorf("invalid type for map diff: %T", to)
 		}
-
-		return Map(f, t)
 	case state.Resource:
-		t, ok := to.(state.Resource)
-		if !ok {
-			return Diff{}, fmt.Errorf("expected type %T, got %T", f, to)
+		switch t := to.(type) {
+		case state.Resource:
+			return ResourceDiff(f, t)
+		case state.Nil:
+			// TODO: Resource state.
+			return ResourceDiff(f, state.Resource{})
+		default:
+			return nil, fmt.Errorf("invalid type for resource diff: %T", to)
 		}
-
-		return Resource(f, t)
+	case state.Nil:
+		switch t := to.(type) {
+		case state.String:
+			return StringDiff(state.String{}, t)
+		case state.Map:
+			return MapDiff(state.Map{}, t)
+		case state.Resource:
+			return ResourceDiff(state.Resource{}, t)
+		case state.Unknown:
+			return Unknown{}, nil
+		default:
+			return nil, fmt.Errorf("invalid type for nil diff: %T", to)
+		}
 	default:
-		return Diff{}, fmt.Errorf("unsupported type: %T", from)
+		return nil, fmt.Errorf("unsupported type for diff: %T", from)
 	}
 }
 
-func Environment(from, to state.Environment) (Diff, error) {
+func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 	var op Operation
-	var diffs []Diff
+	diffs := map[string]Type{}
+	var depMap map[string][]string
 
 	switch {
-	case len(to.Objects) == 0 && len(from.Objects) != 0:
-		op = OperationDelete
-		for k, v := range from.Objects {
-			diffs = append(diffs, Diff{
-				Operation: OperationDelete,
-				Name:      k,
-				To:        state.Nil{},
-				From:      v,
-			})
-		}
-	case len(to.Objects) != 0 && len(from.Objects) == 0:
+	case len(from.Objects) == 0 && len(to.Objects) > 0:
 		op = OperationCreate
+		depMap = to.DependencyMap
 		for k, v := range to.Objects {
-			diffs = append(diffs, Diff{
-				Operation: OperationCreate,
-				Name:      k,
-				To:        v,
-				From:      state.Nil{},
-			})
+			d, err := Diff(state.Nil{}, v)
+			if err != nil {
+				return Environment{}, err
+			}
+
+			diffs[k] = d
+		}
+	case len(from.Objects) > 0 && len(to.Objects) == 0:
+		op = OperationDelete
+
+		// Invert the dep map.
+		depMap = invertDepMap(to.DependencyMap)
+
+		for k, v := range to.Objects {
+			d, err := Diff(v, state.Nil{})
+			if err != nil {
+				return Environment{}, err
+			}
+
+			diffs[k] = d
 		}
 	default:
+		depMap = map[string][]string{}
+
 		for k, v := range to.Objects {
 			fromVal, ok := from.Objects[k]
 			if !ok {
-				diffs = append(diffs, Diff{
-					Name:      k,
-					To:        v,
-					From:      state.Nil{},
-					Operation: OperationCreate,
-				})
-				continue
+				fromVal = state.Nil{}
 			}
 
-			diff, err := DiffTypes(fromVal, v)
+			d, err := Diff(fromVal, v)
 			if err != nil {
-				return Diff{}, err
+				return Environment{}, err
 			}
 
-			diff.Name = k
-
-			diffs = append(diffs, diff)
-		}
-
-		for k, v := range from.Objects {
-			_, ok := to.Objects[k]
-			if !ok {
-				diffs = append(diffs, Diff{
-					Name:      k,
-					To:        state.Nil{},
-					From:      v,
-					Operation: OperationDelete,
-				})
+			switch d.Operation() {
+			case OperationCreate, OperationUpdate, OperationUnknown:
+				depMap[k] = to.DependencyMap[k]
+			case OperationDelete:
+				children := from.DependencyMap[k]
+				for _, child := range children {
+					depMap[child] = append(depMap[child], k)
+				}
+			default:
+				return Environment{}, fmt.Errorf("unsupported operation for environment resource: %v", d.Operation())
 			}
+
+			diffs[k] = d
 		}
-	}
 
-	if op == OperationEmpty {
-		op = OperationNoop
+		if op == OperationEmpty {
+			var hasUnknown bool
+			var hasUpdate bool
+			for _, d := range diffs {
+				switch d.Operation() {
+				case OperationUnknown:
+					hasUnknown = true
+				case OperationNoop:
+				default:
+					hasUpdate = true
+				}
+			}
 
-		for _, diff := range diffs {
-			if diff.Operation != OperationNoop {
+			if hasUpdate {
 				op = OperationUpdate
-				break
+			} else if hasUnknown {
+				op = OperationUnknown
+			} else {
+				op = OperationNoop
 			}
 		}
 	}
 
-	sort.Slice(diffs, func(i, j int) bool {
-		return diffs[i].Name < diffs[j].Name
-	})
-
-	d := Diff{
-		From:      from,
-		To:        to,
-		Operation: op,
-		Diffs:     diffs,
-	}
-	return d, nil
-}
-
-func Resource(from, to state.Resource) (Diff, error) {
-	config, err := DiffTypes(from.Config, to.Config)
-	if err != nil {
-		return Diff{}, err
-	}
-
-	config.Name = "config"
-
-	return Diff{
-		Operation: config.Operation,
-		From:      from,
-		To:        to,
-		Diffs: []Diff{
-			config,
-		},
+	return Environment{
+		DiffOperation: op,
+		Diffs:         diffs,
+		Dependencies:  depMap,
 	}, nil
 }
 
-func String(from, to state.String) (Diff, error) {
+func ResourceDiff(from, to state.Resource) (Resource, error) {
+	config, err := Diff(from.Config, to.Config)
+	if err != nil {
+		return Resource{}, err
+	}
+
+	// TODO: take state into account i.e. exists vs not_exists
+	// TODO: Take unknown fields into account.
+
+	return Resource{
+		DiffOperation: config.Operation(),
+		From:          from,
+		To:            to,
+		ConfigDiff:    config,
+	}, nil
+}
+
+func StringDiff(from, to state.String) (String, error) {
 	var op Operation
 
 	switch {
@@ -180,95 +251,108 @@ func String(from, to state.String) (Diff, error) {
 		op = OperationUpdate
 	}
 
-	d := Diff{
-		From:      from,
-		To:        to,
-		Operation: op,
-	}
-	return d, nil
+	return String{
+		From:          from,
+		To:            to,
+		DiffOperation: op,
+	}, nil
 }
 
-func Map(from, to state.Map) (Diff, error) {
+func MapDiff(from, to state.Map) (Map, error) {
 	var op Operation
-	var diffs []Diff
+	diffs := map[string]Type{}
 
 	switch {
-	case len(to.Entries) == 0 && len(from.Entries) != 0:
+	case len(from.Entries) != 0 && len(to.Entries) == 0:
 		op = OperationDelete
 		for k, v := range from.Entries {
-			diffs = append(diffs, Diff{
-				Operation: OperationDelete,
-				Name:      k,
-				To:        state.Nil{},
-				From:      v,
-			})
+			d, err := Diff(v, state.Nil{})
+			if err != nil {
+				return Map{}, err
+			}
+
+			diffs[k] = d
 		}
-	case len(to.Entries) != 0 && len(from.Entries) == 0:
+	case len(from.Entries) == 0 && len(to.Entries) != 0:
 		op = OperationCreate
 		for k, v := range to.Entries {
-			diffs = append(diffs, Diff{
-				Operation: OperationCreate,
-				Name:      k,
-				To:        v,
-				From:      state.Nil{},
-			})
+			d, err := Diff(state.Nil{}, v)
+			if err != nil {
+				return Map{}, err
+			}
+			diffs[k] = d
 		}
 	default:
 		for k, v := range to.Entries {
 			fromVal, ok := from.Entries[k]
 			if !ok {
-				diffs = append(diffs, Diff{
-					Name:      k,
-					To:        v,
-					From:      state.Nil{},
-					Operation: OperationCreate,
-				})
-				continue
+				fromVal = state.Nil{}
 			}
 
-			diff, err := DiffTypes(fromVal, v)
+			d, err := Diff(fromVal, v)
 			if err != nil {
-				return Diff{}, err
+				return Map{}, err
 			}
 
-			diff.Name = k
-
-			diffs = append(diffs, diff)
+			diffs[k] = d
 		}
 
 		for k, v := range from.Entries {
 			_, ok := to.Entries[k]
 			if !ok {
-				diffs = append(diffs, Diff{
-					Name:      k,
-					To:        state.Nil{},
-					From:      v,
-					Operation: OperationDelete,
-				})
+				d, err := Diff(v, state.Nil{})
+				if err != nil {
+					return Map{}, err
+				}
+
+				diffs[k] = d
 			}
 		}
 	}
 
 	if op == OperationEmpty {
-		op = OperationNoop
-
-		for _, diff := range diffs {
-			if diff.Operation != OperationNoop {
-				op = OperationUpdate
-				break
+		var hasUnknown bool
+		var hasUpdate bool
+		for _, d := range diffs {
+			switch d.Operation() {
+			case OperationUnknown:
+				hasUnknown = true
+			case OperationNoop:
+			default:
+				hasUpdate = true
 			}
+		}
+
+		if hasUpdate {
+			op = OperationUpdate
+		} else if hasUnknown {
+			op = OperationUnknown
+		} else {
+			op = OperationNoop
 		}
 	}
 
-	sort.Slice(diffs, func(i, j int) bool {
-		return diffs[i].Name < diffs[j].Name
-	})
+	return Map{
+		From:          from,
+		To:            to,
+		Diffs:         diffs,
+		DiffOperation: op,
+	}, nil
+}
 
-	d := Diff{
-		From:      from,
-		To:        to,
-		Operation: op,
-		Diffs:     diffs,
+func invertDepMap(m map[string][]string) map[string][]string {
+	inverted := map[string][]string{}
+
+	for child, parents := range m {
+		for _, parent := range parents {
+			inverted[parent] = append(inverted[parent], child)
+		}
 	}
-	return d, nil
+
+	for k, v := range inverted {
+		slices.Sort(v)
+		inverted[k] = slices.Compact(v)
+	}
+
+	return inverted
 }

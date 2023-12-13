@@ -3,6 +3,7 @@ package interpreter
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/alchematik/athanor/blueprint"
 	"github.com/alchematik/athanor/blueprint/expr"
@@ -18,10 +19,10 @@ type Interpreter struct {
 
 type Environment struct {
 	Objects       map[string]value.Type
-	DependencyMap DependencyMap
+	DependencyMap map[string][]string
 }
 
-type DependencyMap map[string]DependencyMap
+type DependencyMap map[string][]string
 
 type ResourcesAPI interface {
 	FetchResource(ctx context.Context, r value.Resource) (value.Resource, error)
@@ -49,7 +50,7 @@ func (in Interpreter) Interpret(ctx context.Context, env Environment, b blueprin
 
 			env.Objects[s.Alias] = v
 			if _, ok := env.DependencyMap[s.Alias]; !ok {
-				env.DependencyMap[s.Alias] = DependencyMap{}
+				env.DependencyMap[s.Alias] = nil
 			}
 		default:
 			return fmt.Errorf("unknown stmt %T", st)
@@ -96,18 +97,12 @@ func (in Interpreter) InterpretExpr(ctx context.Context, env Environment, st stm
 		if _, ok := e.Object.(expr.Nil); ok {
 			m = env.Objects
 			if s, ok := st.(stmt.Declare); ok {
-				switch v := env.Objects[e.Name].(type) {
+				switch env.Objects[e.Name].(type) {
 				case value.Resource:
 					childAlias := s.Alias
-					fmt.Printf("CHILD ALIAS >> %v\n", childAlias)
-					depMap, ok := env.DependencyMap[childAlias]
-					if !ok {
-						depMap = DependencyMap{}
-						env.DependencyMap[childAlias] = depMap
-					}
-
-					depMap[e.Name] = DependencyMap{}
-					v.Children[childAlias] = true
+					env.DependencyMap[e.Name] = append(env.DependencyMap[e.Name], childAlias)
+					slices.Sort(env.DependencyMap[e.Name])
+					env.DependencyMap[e.Name] = slices.Compact(env.DependencyMap[e.Name])
 				}
 			}
 		} else {

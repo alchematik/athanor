@@ -8,10 +8,8 @@ type Environment struct {
 	Type
 
 	Objects       map[string]Type
-	DependencyMap DependencyMap
+	DependencyMap map[string][]string
 }
-
-type DependencyMap map[string]DependencyMap
 
 type Provider struct {
 	Type

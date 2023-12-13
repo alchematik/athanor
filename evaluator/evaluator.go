@@ -25,27 +25,16 @@ type ResourceEvaluator interface {
 }
 
 func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (state.Environment, error) {
-	// indegrees := map[string]int{}
-	// for alias, val := range env.Objects {
-	// 	if r, ok := val.(value.Resource); ok {
-	// 		if _, ok := indegrees[alias]; !ok {
-	// 			indegrees[alias] = 0
-	// 		}
-	//
-	// 		for childAlias := range r.Children {
-	// 			indegrees[childAlias]++
-	// 		}
-	// 	}
-	// }
-
 	indegrees := map[string]int{}
-	for alias, m := range env.DependencyMap {
-		indegrees[alias] = len(m)
+	for parent, children := range env.DependencyMap {
+		if _, ok := indegrees[parent]; !ok {
+			indegrees[parent] = 0
+		}
+
+		for _, child := range children {
+			indegrees[child]++
+		}
 	}
-
-	// fmt.Printf(">> %+v\n", env.DependencyMap)
-
-	// fmt.Printf("indegrees>> %v, %v\n", indegrees, other)
 
 	// TODO: detect cycle.
 
@@ -59,7 +48,7 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 
 	stateEnv := state.Environment{
 		Objects:       map[string]state.Type{},
-		DependencyMap: convertDependencyMap(env.DependencyMap),
+		DependencyMap: env.DependencyMap,
 	}
 	for len(queue) > 0 {
 		var alias string
@@ -79,7 +68,7 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 		}
 		stateEnv.Objects[alias] = s
 
-		for childAlias := range r.Children {
+		for _, childAlias := range env.DependencyMap[alias] {
 			indegrees[childAlias]--
 			if indegrees[childAlias] == 0 {
 				queue = append(queue, childAlias)
@@ -89,14 +78,6 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 	}
 
 	return stateEnv, nil
-}
-
-func convertDependencyMap(m interpreter.DependencyMap) state.DependencyMap {
-	out := state.DependencyMap{}
-	for alias, v := range m {
-		out[alias] = convertDependencyMap(v)
-	}
-	return out
 }
 
 type ValueResolver interface {

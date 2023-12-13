@@ -209,7 +209,7 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("IN >>>>>>>>>>>> %v\n", string(data))
+							// fmt.Printf("IN >>>>>>>>>>>> %v\n", string(data))
 
 							bp, err := convertBlueprint(&blueprint)
 							if err != nil {
@@ -221,7 +221,7 @@ func main() {
 							}
 							env := interpreter.Environment{
 								Objects:       map[string]value.Type{},
-								DependencyMap: map[string]interpreter.DependencyMap{},
+								DependencyMap: map[string][]string{},
 							}
 							err = in.Interpret(ctx.Context, env, bp)
 							if err != nil {
@@ -266,7 +266,7 @@ func main() {
 
 							// TODO: create diff between local state and remote state.
 
-							d, err := diff.DiffTypes(stateEnv, remoteState)
+							d, err := diff.Diff(remoteState, stateEnv)
 							if err != nil {
 								return err
 							}
