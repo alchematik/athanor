@@ -50,6 +50,8 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 		Objects:       map[string]state.Type{},
 		DependencyMap: env.DependencyMap,
 	}
+
+	// TODO: parallelize.
 	for len(queue) > 0 {
 		var alias string
 		alias, queue = queue[0], queue[1:]

@@ -26,6 +26,7 @@ import (
 	"github.com/alchematik/athanor/diff"
 	"github.com/alchematik/athanor/evaluator"
 	"github.com/alchematik/athanor/interpreter"
+	"github.com/alchematik/athanor/reconcile"
 	// "github.com/alchematik/athanor/internal/provider"
 	// "github.com/alchematik/athanor/backend"
 	// backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
@@ -277,6 +278,11 @@ func main() {
 							}
 
 							fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
+
+							reconciler := reconcile.Reconciler{}
+							if err := reconciler.Reconcile(d); err != nil {
+								return err
+							}
 
 							return nil
 						},
