@@ -79,6 +79,131 @@ func (s *Server) GetResource(ctx context.Context, req *backendpb.GetResourceRequ
 	}
 }
 
+func (s *Server) CreateResource(ctx context.Context, req *backendpb.CreateResourceRequest) (*backendpb.CreateResourceResponse, error) {
+	var r *statepb.Resource
+	switch req.GetType() {
+	case "bucket":
+		r = &statepb.Resource{
+			Identifier: req.GetIdentifier(),
+			Config: &statepb.Value{
+				Type: &statepb.Value_Map{
+					Map: &statepb.MapValue{
+						Entries: map[string]*statepb.Value{
+							"expiration": &statepb.Value{Type: &statepb.Value_StringValue{StringValue: "12h"}},
+						},
+					},
+				},
+			},
+			Attrs: &statepb.Value{
+				Type: &statepb.Value_Map{
+					Map: &statepb.MapValue{
+						Entries: map[string]*statepb.Value{
+							"bar": &statepb.Value{
+								Type: &statepb.Value_Map{
+									Map: &statepb.MapValue{
+										Entries: map[string]*statepb.Value{
+											"foo": &statepb.Value{Type: &statepb.Value_StringValue{StringValue: "hi"}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	case "bucket_object":
+		r = &statepb.Resource{
+			Identifier: req.GetIdentifier(),
+			Config: &statepb.Value{
+				Type: &statepb.Value_Map{
+					Map: &statepb.MapValue{
+						Entries: map[string]*statepb.Value{
+							"contents": &statepb.Value{Type: &statepb.Value_StringValue{StringValue: "blablablablabla"}},
+						},
+					},
+				},
+			},
+			Attrs: &statepb.Value{
+				Type: &statepb.Value_Map{
+					Map: &statepb.MapValue{
+						Entries: map[string]*statepb.Value{},
+					},
+				},
+			},
+		}
+	}
+	return &backendpb.CreateResourceResponse{
+		Resource: r,
+	}, nil
+}
+
+func (s *Server) UpdateResource(ctx context.Context, req *backendpb.UpdateResourceRequest) (*backendpb.UpdateResourceResponse, error) {
+	var r *statepb.Resource
+	switch req.GetType() {
+	case "bucket":
+		r = &statepb.Resource{
+			Identifier: req.GetIdentifier(),
+			Config: &statepb.Value{
+				Type: &statepb.Value_Map{
+					Map: &statepb.MapValue{
+						Entries: map[string]*statepb.Value{
+							"expiration": &statepb.Value{Type: &statepb.Value_StringValue{StringValue: "12h"}},
+						},
+					},
+				},
+			},
+			Attrs: &statepb.Value{
+				Type: &statepb.Value_Map{
+					Map: &statepb.MapValue{
+						Entries: map[string]*statepb.Value{
+							"bar": &statepb.Value{
+								Type: &statepb.Value_Map{
+									Map: &statepb.MapValue{
+										Entries: map[string]*statepb.Value{
+											"foo": &statepb.Value{Type: &statepb.Value_StringValue{StringValue: "hi"}},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+	case "bucket_object":
+		r = &statepb.Resource{
+			Identifier: req.GetIdentifier(),
+			Config: &statepb.Value{
+				Type: &statepb.Value_Map{
+					Map: &statepb.MapValue{
+						Entries: map[string]*statepb.Value{
+							"contents":   &statepb.Value{Type: &statepb.Value_StringValue{StringValue: "blablablablabla"}},
+							"some_field": &statepb.Value{Type: &statepb.Value_StringValue{StringValue: "hi"}},
+						},
+					},
+				},
+			},
+			Attrs: &statepb.Value{
+				Type: &statepb.Value_Map{
+					Map: &statepb.MapValue{
+						Entries: map[string]*statepb.Value{},
+					},
+				},
+			},
+		}
+	default:
+		return &backendpb.UpdateResourceResponse{}, status.Errorf(codes.InvalidArgument, "requires resource type")
+	}
+	return &backendpb.UpdateResourceResponse{
+		Resource: r,
+	}, nil
+}
+
+func (s *Server) DeleteResource(ctx context.Context, req *backendpb.DeleteResourceRequest) (*backendpb.DeleteResourceResponse, error) {
+	return &backendpb.DeleteResourceResponse{}, nil
+}
+
 func main() {
 	plugin.Serve(&plugin.ServeConfig{
 		HandshakeConfig: backend.HandshakeConfig,

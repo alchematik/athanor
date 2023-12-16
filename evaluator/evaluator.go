@@ -3,17 +3,18 @@ package evaluator
 import (
 	"context"
 	"fmt"
+	"os/exec"
+	"path/filepath"
+
 	"github.com/alchematik/athanor/backend"
 	"github.com/alchematik/athanor/build/value"
 	"github.com/alchematik/athanor/interpreter"
 	"github.com/alchematik/athanor/state"
-	plugin "github.com/hashicorp/go-plugin"
-	"os/exec"
-	"path/filepath"
-
 	// TODO: This has to be not internal anymore?
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
 	statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
+
+	plugin "github.com/hashicorp/go-plugin"
 )
 
 type Evaluator struct {
@@ -21,7 +22,8 @@ type Evaluator struct {
 }
 
 type ResourceEvaluator interface {
-	EvaluateResource(context.Context, state.Environment, value.Resource) (state.Resource, error)
+	// TODO: Should alias be part of the resource struct?
+	EvaluateResource(context.Context, state.Environment, string, value.Resource) (state.Resource, error)
 }
 
 func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (state.Environment, error) {
@@ -64,11 +66,14 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 			continue
 		}
 
-		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, r)
+		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, alias, r)
 		if err != nil {
 			return state.Environment{}, err
 		}
+
 		stateEnv.Objects[alias] = s
+
+		fmt.Printf("EVALUATE >>>>>>>>> %v\n", s.ResourceType)
 
 		for _, childAlias := range env.DependencyMap[alias] {
 			indegrees[childAlias]--
@@ -90,7 +95,7 @@ type PlanResourceEvaluator struct {
 	ValueResolver ValueResolver
 }
 
-func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, r value.Resource) (state.Resource, error) {
+func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, alias string, r value.Resource) (state.Resource, error) {
 	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -102,9 +107,20 @@ func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.E
 	}
 
 	return state.Resource{
-		Identifier: id,
-		Config:     config,
-		Attrs:      state.Unknown{},
+		Provider: state.Provider{
+			Name:    r.Provider.Name,
+			Version: r.Provider.Version,
+		},
+		ResourceType: r.ResourceType,
+		Identifier:   id,
+		Config:       config,
+		Attrs: state.Unknown{
+			Name: "attrs",
+			Object: state.Unknown{
+				Name:   alias,
+				Object: state.Nil{},
+			},
+		},
 	}, nil
 }
 
@@ -113,7 +129,7 @@ type RemoteResourceEvaluator struct {
 	ValueResolver     ValueResolver
 }
 
-func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, r value.Resource) (state.Resource, error) {
+func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, alias string, r value.Resource) (state.Resource, error) {
 	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -167,10 +183,17 @@ func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state
 		return state.Resource{}, err
 	}
 
+	fmt.Printf("EVALUATING RESOURCE: %v\n", r.ResourceType)
+
 	return state.Resource{
-		Identifier: id,
-		Config:     config,
-		Attrs:      attrs,
+		Provider: state.Provider{
+			Name:    r.Provider.Name,
+			Version: r.Provider.Version,
+		},
+		ResourceType: r.ResourceType,
+		Identifier:   id,
+		Config:       config,
+		Attrs:        attrs,
 	}, nil
 }
 
@@ -274,7 +297,10 @@ func (e RealValueResolver) ResolveValue(ctx context.Context, env state.Environme
 				"attrs":      obj.Attrs,
 			}
 		case state.Unknown:
-			return state.Unknown{}, nil
+			return state.Unknown{
+				Name:   v.Name,
+				Object: resolved,
+			}, nil
 		case state.Map:
 			m = obj.Entries
 		default:

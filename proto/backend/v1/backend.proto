@@ -3,11 +3,13 @@ syntax = "proto3";
 package alchematik.athanor.backend.v1;
 
 import "google/protobuf/struct.proto";
-/* import "proto/provider/v1/blueprint.proto"; */
 import "proto/state/v1/state.proto";
 
 service Backend {
+  rpc CreateResource(CreateResourceRequest) returns (CreateResourceResponse);
+  rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse);
   rpc GetResource(GetResourceRequest) returns (GetResourceResponse);
+  rpc UpdateResource(UpdateResourceRequest) returns (UpdateResourceResponse);
 }
 
 message GetResourceRequest {
@@ -19,3 +21,38 @@ message GetResourceResponse {
   alchematik.athanor.state.v1.Resource resource = 1;
 }
 
+message CreateResourceRequest {
+  string type = 1;
+  alchematik.athanor.state.v1.Value identifier = 2;
+  alchematik.athanor.state.v1.Value config = 3;
+}
+
+message CreateResourceResponse {
+  alchematik.athanor.state.v1.Resource resource = 1;
+}
+
+message DeleteResourceRequest {
+  string type = 1;
+  alchematik.athanor.state.v1.Value identifier = 2;
+}
+
+
+message DeleteResourceResponse {
+
+}
+
+message UpdateResourceRequest {
+  string type = 1;
+  alchematik.athanor.state.v1.Value identifier = 2;
+  alchematik.athanor.state.v1.Value config = 3;
+  repeated Field mask = 4;
+}
+
+message UpdateResourceResponse {
+  alchematik.athanor.state.v1.Resource resource = 1;
+}
+
+message Field {
+  string name = 1;
+  repeated Field sub_fields = 2;
+}

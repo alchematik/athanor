@@ -48,7 +48,7 @@
               "map": {
                 "entries": {
                   "expiration": {
-                    "string_literal": "24h"
+                    "string_literal": "12h"
                   }
                 }
               }

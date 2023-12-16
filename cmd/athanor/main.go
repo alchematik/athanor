@@ -263,7 +263,7 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("actual state <<<<<<<<<<< %v\n", string(data))
+							// fmt.Printf("actual state <<<<<<<<<<< %v\n", string(data))
 
 							// TODO: create diff between local state and remote state.
 
@@ -277,12 +277,22 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
+							// fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
 
-							reconciler := reconcile.Reconciler{}
-							if err := reconciler.Reconcile(d); err != nil {
+							reconciler := reconcile.Reconciler{
+								ProviderPluginDir: ".backends",
+							}
+							reconciledState, err := reconciler.ReconcileEnvironment(ctx.Context, d.(diff.Environment))
+							if err != nil {
 								return err
 							}
+
+							data, err = json.MarshalIndent(reconciledState, "", "  ")
+							if err != nil {
+								return err
+							}
+
+							fmt.Printf("RECONCILED >>>>>>>>>> %v\n", string(data))
 
 							return nil
 						},

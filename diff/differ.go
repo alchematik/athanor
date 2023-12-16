@@ -221,6 +221,7 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 }
 
 func ResourceDiff(from, to state.Resource) (Resource, error) {
+	fmt.Printf("DIFFING RESOURCE: %v\n", to.ResourceType)
 	config, err := Diff(from.Config, to.Config)
 	if err != nil {
 		return Resource{}, err

@@ -21,9 +21,10 @@ type Provider struct {
 type Resource struct {
 	Type
 
-	Provider   Provider
-	Identifier Type
-	Config     Type
+	ResourceType string
+	Provider     Provider
+	Identifier   Type
+	Config       Type
 
 	Attrs Type
 }
@@ -42,6 +43,9 @@ type Map struct {
 
 type Unknown struct {
 	Type
+
+	Name   string
+	Object Type
 }
 
 type Nil struct {
