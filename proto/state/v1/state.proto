@@ -11,7 +11,7 @@ message State {
 message Resource {
   Value identifier = 1;
   Value config = 2;
-  Value attrs = 3; 
+  Value attrs = 3;
 }
 
 message Value {
@@ -31,4 +31,3 @@ message ListValue {
 message MapValue {
   map<string, Value> entries = 1;
 }
-

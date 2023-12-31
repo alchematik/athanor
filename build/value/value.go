@@ -2,11 +2,14 @@ package value
 
 type Type interface {
 	isValueType()
+
+	String() string
 }
 
 type Provider struct {
 	Type
 
+	Alias   string
 	Name    string
 	Version string
 }
@@ -14,16 +17,18 @@ type Provider struct {
 type Resource struct {
 	Type
 
+	Provider   Provider
+	Identifier ResourceIdentifier
+	Config     Type
+	Attrs      Type
+}
+
+type ResourceIdentifier struct {
+	Type
+
+	Alias        string
 	ResourceType string
-	Provider     Provider
-	Identifier   Type
-	Config       Type
-
-	// TODO: Does this belong here?
-	Attrs Type
-
-	// TODO: separate this out?
-	Children map[string]bool
+	Value        Type
 }
 
 type String struct {
@@ -46,10 +51,12 @@ type Unresolved struct {
 	Unresolved bool
 }
 
-// type Unknown struct {
-// 	Type
-// }
-
 type Nil struct {
 	Type
+}
+
+type ResourceRef struct {
+	Type
+
+	Alias string
 }

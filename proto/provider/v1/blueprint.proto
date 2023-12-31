@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-import "google/protobuf/struct.proto";
-
 package alchematik.athanor.provider.v1;
+
+import "google/protobuf/struct.proto";
 
 message Blueprint {
   string name = 1;
@@ -11,7 +11,7 @@ message Blueprint {
 }
 
 message Resource {
-  string name = 1; 
+  string name = 1;
   repeated Field fields = 2;
   repeated Operation operations = 3;
 }
@@ -23,7 +23,7 @@ message Field {
 }
 
 message Operation {
-  string type = 1; 
+  string type = 1;
   Backend backend = 2;
 }
 

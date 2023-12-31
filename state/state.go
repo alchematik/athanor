@@ -7,7 +7,7 @@ type Type interface {
 type Environment struct {
 	Type
 
-	Objects       map[string]Type
+	Resources     map[string]Resource
 	DependencyMap map[string][]string
 }
 
@@ -21,12 +21,17 @@ type Provider struct {
 type Resource struct {
 	Type
 
-	ResourceType string
-	Provider     Provider
-	Identifier   Type
-	Config       Type
+	Provider   Provider
+	Identifier Identifier
+	Config     Type
+	Attrs      Type
+}
 
-	Attrs Type
+type Identifier struct {
+	Type
+
+	ResourceType string
+	Value        Type
 }
 
 type String struct {

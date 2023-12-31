@@ -8,9 +8,16 @@ type Type interface {
 	isStmtType()
 }
 
-type Declare struct {
+type Provider struct {
 	Type
 
-	Alias string
-	Value expr.Type
+	Identifier expr.Type
+}
+
+type Resource struct {
+	Type
+
+	Identifier expr.Type
+	Provider   expr.Type
+	Config     expr.Type
 }

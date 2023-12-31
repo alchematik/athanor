@@ -28,13 +28,11 @@ type ResourceEvaluator interface {
 
 func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (state.Environment, error) {
 	indegrees := map[string]int{}
-	for parent, children := range env.DependencyMap {
-		if _, ok := indegrees[parent]; !ok {
-			indegrees[parent] = 0
-		}
-
-		for _, child := range children {
-			indegrees[child]++
+	parentToChildren := map[string][]string{}
+	for child, parents := range env.DependencyMap {
+		indegrees[child] = len(parents)
+		for _, parent := range parents {
+			parentToChildren[parent] = append(parentToChildren[parent], child)
 		}
 	}
 
@@ -49,8 +47,8 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 	}
 
 	stateEnv := state.Environment{
-		Objects:       map[string]state.Type{},
 		DependencyMap: env.DependencyMap,
+		Resources:     map[string]state.Resource{},
 	}
 
 	// TODO: parallelize.
@@ -60,22 +58,14 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 
 		fmt.Printf("evaluating: %q\n", alias)
 
-		v := env.Objects[alias]
-		r, ok := v.(value.Resource)
-		if !ok {
-			continue
-		}
-
-		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, alias, r)
+		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, alias, env.Resources[alias])
 		if err != nil {
 			return state.Environment{}, err
 		}
 
-		stateEnv.Objects[alias] = s
+		stateEnv.Resources[alias] = s
 
-		fmt.Printf("EVALUATE >>>>>>>>> %v\n", s.ResourceType)
-
-		for _, childAlias := range env.DependencyMap[alias] {
+		for _, childAlias := range parentToChildren[alias] {
 			indegrees[childAlias]--
 			if indegrees[childAlias] == 0 {
 				queue = append(queue, childAlias)
@@ -89,6 +79,7 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 
 type ValueResolver interface {
 	ResolveValue(context.Context, state.Environment, value.Type) (state.Type, error)
+	ResolveResourceIdentifierValue(context.Context, state.Environment, value.ResourceIdentifier) (state.Identifier, error)
 }
 
 type PlanResourceEvaluator struct {
@@ -96,7 +87,7 @@ type PlanResourceEvaluator struct {
 }
 
 func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, alias string, r value.Resource) (state.Resource, error) {
-	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
+	id, err := e.ValueResolver.ResolveResourceIdentifierValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
 	}
@@ -106,22 +97,19 @@ func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.E
 		return state.Resource{}, err
 	}
 
-	return state.Resource{
+	resource := state.Resource{
 		Provider: state.Provider{
 			Name:    r.Provider.Name,
 			Version: r.Provider.Version,
 		},
-		ResourceType: r.ResourceType,
-		Identifier:   id,
-		Config:       config,
-		Attrs: state.Unknown{
-			Name: "attrs",
-			Object: state.Unknown{
-				Name:   alias,
-				Object: state.Nil{},
-			},
-		},
-	}, nil
+		Identifier: id,
+		Config:     config,
+		Attrs:      state.Unknown{},
+	}
+
+	env.Resources[alias] = resource
+
+	return resource, nil
 }
 
 type RemoteResourceEvaluator struct {
@@ -130,7 +118,7 @@ type RemoteResourceEvaluator struct {
 }
 
 func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, alias string, r value.Resource) (state.Resource, error) {
-	id, err := e.ValueResolver.ResolveValue(ctx, env, r.Identifier)
+	id, err := e.ValueResolver.ResolveResourceIdentifierValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
 	}
@@ -166,7 +154,7 @@ func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state
 	}
 
 	res, err := plug.GetResource(ctx, &backendpb.GetResourceRequest{
-		Type:       r.ResourceType,
+		Type:       r.Identifier.ResourceType,
 		Identifier: protoID,
 	})
 	if err != nil {
@@ -183,18 +171,20 @@ func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state
 		return state.Resource{}, err
 	}
 
-	fmt.Printf("EVALUATING RESOURCE: %v\n", r.ResourceType)
-
-	return state.Resource{
+	resource := state.Resource{
 		Provider: state.Provider{
 			Name:    r.Provider.Name,
 			Version: r.Provider.Version,
 		},
-		ResourceType: r.ResourceType,
-		Identifier:   id,
-		Config:       config,
-		Attrs:        attrs,
-	}, nil
+		Identifier: id,
+		Config:     config,
+		Attrs:      attrs,
+	}
+
+	env.Resources[alias] = resource
+	fmt.Printf("setting alias: %v\n", alias)
+
+	return resource, nil
 }
 
 func protoToState(val *statepb.Value) (state.Type, error) {
@@ -246,12 +236,19 @@ func convertProtoValue(val state.Type) (*statepb.Value, error) {
 
 }
 
-// TODO: This needs to either
-// * Fetch the remote resource using the identifier and fill in the config and attrs fields, or
-// * Fill in the config field with the static config and set attrs to something (unresolved?).
-// In troduce an interface to evaulate resources?
-
 type RealValueResolver struct {
+}
+
+func (e RealValueResolver) ResolveResourceIdentifierValue(ctx context.Context, env state.Environment, id value.ResourceIdentifier) (state.Identifier, error) {
+	val, err := e.ResolveValue(ctx, env, id.Value)
+	if err != nil {
+		return state.Identifier{}, err
+	}
+
+	return state.Identifier{
+		ResourceType: id.ResourceType,
+		Value:        val,
+	}, nil
 }
 
 func (e RealValueResolver) ResolveValue(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
@@ -273,9 +270,26 @@ func (e RealValueResolver) ResolveValue(ctx context.Context, env state.Environme
 		}
 
 		return m, nil
+	case value.ResourceIdentifier:
+		val, err := e.ResolveValue(ctx, env, v.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		return state.Identifier{
+			ResourceType: v.ResourceType,
+			Value:        val,
+		}, nil
+	case value.ResourceRef:
+		r, ok := env.Resources[v.Alias]
+		if !ok {
+			return nil, fmt.Errorf("evaluator: resource with alias %q does not exist", v.Alias)
+		}
+
+		return r, nil
 	case value.Unresolved:
 		if _, ok := v.Object.(value.Nil); ok {
-			obj, inEnv := env.Objects[v.Name]
+			obj, inEnv := env.Resources[v.Name]
 			if !inEnv {
 				return nil, fmt.Errorf("object %q not in env", v.Name)
 			}

@@ -86,15 +86,35 @@ func convertBlueprint(bp *consumerpb.Blueprint) (blueprint.Blueprint, error) {
 
 func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 	switch s := st.GetType().(type) {
-	case *consumerpb.Stmt_Declare:
-		v, err := convertExpr(s.Declare.GetValue())
+	case *consumerpb.Stmt_Provider:
+		id, err := convertExpr(s.Provider.GetIdentifier())
 		if err != nil {
 			return nil, err
 		}
 
-		return stmt.Declare{
-			Alias: s.Declare.GetAlias(),
-			Value: v,
+		return stmt.Provider{
+			Identifier: id,
+		}, nil
+	case *consumerpb.Stmt_Resource:
+		id, err := convertExpr(s.Resource.GetIdentifier())
+		if err != nil {
+			return nil, err
+		}
+
+		provider, err := convertExpr(s.Resource.GetProvider())
+		if err != nil {
+			return nil, err
+		}
+
+		config, err := convertExpr(s.Resource.GetConfig())
+		if err != nil {
+			return nil, err
+		}
+
+		return stmt.Resource{
+			Identifier: id,
+			Provider:   provider,
+			Config:     config,
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid stmt: %T", st.GetType())
@@ -103,6 +123,33 @@ func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 
 func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 	switch e := ex.GetType().(type) {
+	case *consumerpb.Expr_ProviderIdentifier:
+		name, err := convertExpr(e.ProviderIdentifier.GetName())
+		if err != nil {
+			return nil, err
+		}
+
+		version, err := convertExpr(e.ProviderIdentifier.GetVersion())
+		if err != nil {
+			return nil, err
+		}
+
+		return expr.ProviderIdentifier{
+			Alias:   e.ProviderIdentifier.GetAlias(),
+			Name:    name,
+			Version: version,
+		}, nil
+	case *consumerpb.Expr_ResourceIdentifier:
+		val, err := convertExpr(e.ResourceIdentifier.GetValue())
+		if err != nil {
+			return expr.ResourceIdentifier{}, err
+		}
+
+		return expr.ResourceIdentifier{
+			Alias:        e.ResourceIdentifier.GetAlias(),
+			ResourceType: e.ResourceIdentifier.GetType(),
+			Value:        val,
+		}, nil
 	case *consumerpb.Expr_StringLiteral:
 		return expr.String{Value: e.StringLiteral}, nil
 	case *consumerpb.Expr_Map:
@@ -142,42 +189,13 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 		return g, nil
 	case *consumerpb.Expr_Nil:
 		return expr.Nil{}, nil
-	case *consumerpb.Expr_Resource:
-		provider, err := convertExpr(e.Resource.GetProvider())
-		if err != nil {
-			return nil, err
-		}
-
-		id, err := convertExpr(e.Resource.GetIdentifier())
-		if err != nil {
-			return nil, err
-		}
-
-		config, err := convertExpr(e.Resource.GetConfig())
-		if err != nil {
-			return nil, err
-		}
-
-		return expr.Resource{
-			ResourceType: e.Resource.GetType(),
-			Provider:     provider,
-			Identifier:   id,
-			Config:       config,
+	case *consumerpb.Expr_GetProvider:
+		return expr.GetProvider{
+			Alias: e.GetProvider.GetAlias(),
 		}, nil
-	case *consumerpb.Expr_Provider:
-		name, err := convertExpr(e.Provider.GetName())
-		if err != nil {
-			return nil, err
-		}
-
-		version, err := convertExpr(e.Provider.GetVersion())
-		if err != nil {
-			return nil, err
-		}
-
-		return expr.Provider{
-			Name:    name,
-			Version: version,
+	case *consumerpb.Expr_GetResource:
+		return expr.GetResource{
+			Alias: e.GetResource.GetAlias(),
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", ex.GetType())
@@ -221,13 +239,16 @@ func main() {
 								ResourcesAPI: interpreter.NilResourcesAPI{},
 							}
 							env := interpreter.Environment{
-								Objects:       map[string]value.Type{},
+								Providers:     map[string]value.Provider{},
+								Resources:     map[string]value.Resource{},
 								DependencyMap: map[string][]string{},
 							}
 							err = in.Interpret(ctx.Context, env, bp)
 							if err != nil {
 								return err
 							}
+
+							fmt.Printf("dep map >>> %+v\n", env.DependencyMap)
 
 							eval := evaluator.Evaluator{
 								ResourceEvaluator: evaluator.PlanResourceEvaluator{

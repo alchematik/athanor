@@ -8,15 +8,20 @@ message Blueprint {
 
 message Stmt {
   oneof type {
-    DeclareStmt declare = 1;
+    ProviderStmt provider = 1;
+    ResourceStmt resource = 2;
   }
 }
 
-message DeclareStmt {
-  string alias = 1;
-  Expr value = 2;
+message ProviderStmt {
+  Expr identifier = 1;
 }
 
+message ResourceStmt {
+  Expr identifier = 1;
+  Expr provider = 2;
+  Expr config = 3;
+}
 
 message Expr {
   oneof type {
@@ -26,10 +31,12 @@ message Expr {
     ListExpr list = 4;
     MapExpr map = 5;
     GetExpr get = 6;
-    NilExpr nil = 7;
-    ProviderExpr provider = 8;
-    ResourceExpr resource = 9;
+    GetProviderExpr get_provider = 7;
+    GetResourceExpr get_resource = 8;
+    NilExpr nil = 9;
     IOGetExpr io_get = 10;
+    ProviderIdentifierExpr provider_identifier = 11;
+    ResourceIdentifierExpr resource_identifier = 12;
   }
 }
 
@@ -46,23 +53,29 @@ message GetExpr {
   Expr object = 2;
 }
 
+message GetProviderExpr {
+  string alias = 1;
+}
+
+message GetResourceExpr {
+  string alias = 1;
+}
+
 message IOGetExpr {
   string name = 1;
   Expr object = 2;
 }
 
-message NilExpr {
+message NilExpr {}
+
+message ProviderIdentifierExpr {
+  string alias = 1;
+  Expr name = 2;
+  Expr version = 3;
 }
 
-message ProviderExpr {
-  Expr name = 1;
-  Expr version = 2;
+message ResourceIdentifierExpr {
+  string alias = 1;
+  string type = 2;
+  Expr value = 3;
 }
-
-message ResourceExpr {
-  string type = 1;
-  Expr provider = 2;
-  Expr identifier = 3;
-  Expr config = 4; 
-}
-

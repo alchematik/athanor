@@ -36,10 +36,7 @@ message DeleteResourceRequest {
   alchematik.athanor.state.v1.Value identifier = 2;
 }
 
-
-message DeleteResourceResponse {
-
-}
+message DeleteResourceResponse {}
 
 message UpdateResourceRequest {
   string type = 1;

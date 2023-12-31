@@ -136,10 +136,10 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 	var depMap map[string][]string
 
 	switch {
-	case len(from.Objects) == 0 && len(to.Objects) > 0:
+	case len(from.Resources) == 0 && len(to.Resources) > 0:
 		op = OperationCreate
 		depMap = to.DependencyMap
-		for k, v := range to.Objects {
+		for k, v := range to.Resources {
 			d, err := Diff(state.Nil{}, v)
 			if err != nil {
 				return Environment{}, err
@@ -147,13 +147,13 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 
 			diffs[k] = d
 		}
-	case len(from.Objects) > 0 && len(to.Objects) == 0:
+	case len(from.Resources) > 0 && len(to.Resources) == 0:
 		op = OperationDelete
 
 		// Invert the dep map.
 		depMap = invertDepMap(to.DependencyMap)
 
-		for k, v := range to.Objects {
+		for k, v := range to.Resources {
 			d, err := Diff(v, state.Nil{})
 			if err != nil {
 				return Environment{}, err
@@ -164,8 +164,9 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 	default:
 		depMap = map[string][]string{}
 
-		for k, v := range to.Objects {
-			fromVal, ok := from.Objects[k]
+		for k, v := range to.Resources {
+			var fromVal state.Type
+			fromVal, ok := from.Resources[k]
 			if !ok {
 				fromVal = state.Nil{}
 			}
@@ -221,7 +222,7 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 }
 
 func ResourceDiff(from, to state.Resource) (Resource, error) {
-	fmt.Printf("DIFFING RESOURCE: %v\n", to.ResourceType)
+	// fmt.Printf("DIFFING RESOURCE: %v\n", to.ResourceType)
 	config, err := Diff(from.Config, to.Config)
 	if err != nil {
 		return Resource{}, err

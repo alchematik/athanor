@@ -30,22 +30,34 @@ type IOGet struct {
 	Object Type
 }
 
-type Nil struct {
+type GetProvider struct {
 	Type
+
+	Alias string
 }
 
-type Provider struct {
+type GetResource struct {
 	Type
 
+	Alias string
+}
+
+type ProviderIdentifier struct {
+	Type
+
+	Alias   string
 	Name    Type
 	Version Type
 }
 
-type Resource struct {
+type ResourceIdentifier struct {
 	Type
 
+	Alias        string
 	ResourceType string
-	Provider     Type
-	Identifier   Type
-	Config       Type
+	Value        Type
+}
+
+type Nil struct {
+	Type
 }

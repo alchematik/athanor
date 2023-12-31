@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package alchematik.athanor.translator.v1;
 
-import "proto/provider/v1/blueprint.proto";
 import "proto/consumer/v1/blueprint.proto";
+import "proto/provider/v1/blueprint.proto";
 
 service Translator {
   rpc ReadProviderBlueprint(ReadProviderBlueprintRequest) returns (ReadProviderBlueprintResponse);
@@ -12,7 +12,6 @@ service Translator {
 
 message ReadProviderBlueprintRequest {
   string path = 1;
-
 }
 
 message ReadProviderBlueprintResponse {
