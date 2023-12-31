@@ -21,13 +21,11 @@ type Reconciler struct {
 
 func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment) (state.Environment, error) {
 	indegrees := map[string]int{}
-	for parent, children := range d.Dependencies {
-		if _, ok := indegrees[parent]; !ok {
-			indegrees[parent] = 0
-		}
-
-		for _, child := range children {
-			indegrees[child]++
+	parentToChildren := map[string][]string{}
+	for child, parents := range d.Dependencies {
+		indegrees[child] = len(parents)
+		for _, parent := range parents {
+			parentToChildren[parent] = append(parentToChildren[parent], child)
 		}
 	}
 
@@ -54,6 +52,7 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 			return state.Environment{}, fmt.Errorf("expected resource diff, got %T", d.Diffs[alias])
 		}
 
+		fmt.Printf("RESOLVING: %v\n", alias)
 		resolved, err := resolve(reconciledEnv, resourceDiff.To)
 		if err != nil {
 			return state.Environment{}, err
@@ -76,7 +75,7 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 
 		reconciledEnv.Resources[alias] = val
 
-		for _, child := range d.Dependencies[alias] {
+		for _, child := range parentToChildren[alias] {
 			indegrees[child]--
 			if indegrees[child] == 0 {
 				queue = append(queue, child)
@@ -132,8 +131,7 @@ func (r Reconciler) ReconcileResource(ctx context.Context, env state.Environment
 
 		// TODO: Check response and make sure we've reconciled.
 		res, err := plug.CreateResource(ctx, &backendpb.CreateResourceRequest{
-			Type:       resource.Identifier.ResourceType,
-			Identifier: protoID,
+			Identifier: protoID.GetIdentifier(),
 			Config:     protoConfig,
 		})
 		if err != nil {
@@ -150,12 +148,14 @@ func (r Reconciler) ReconcileResource(ctx context.Context, env state.Environment
 			return state.Resource{}, err
 		}
 
-		return state.Resource{
+		r := state.Resource{
 			Provider:   resource.Provider,
 			Identifier: resource.Identifier,
 			Config:     resConfig,
 			Attrs:      resAttrs,
-		}, nil
+		}
+
+		return r, nil
 	case diff.OperationDelete:
 		resource := d.To
 
@@ -191,8 +191,7 @@ func (r Reconciler) ReconcileResource(ctx context.Context, env state.Environment
 
 		// TODO: Check resource state and keep reconciling if we have to.
 		_, err = plug.DeleteResource(ctx, &backendpb.DeleteResourceRequest{
-			Type:       resource.Identifier.ResourceType,
-			Identifier: protoID,
+			Identifier: protoID.GetIdentifier(),
 		})
 		if err != nil {
 			return state.Resource{}, err
@@ -243,8 +242,7 @@ func (r Reconciler) ReconcileResource(ctx context.Context, env state.Environment
 		}
 
 		res, err := plug.UpdateResource(ctx, &backendpb.UpdateResourceRequest{
-			Type:       resource.Identifier.ResourceType,
-			Identifier: protoID,
+			Identifier: protoID.GetIdentifier(),
 			Config:     protoConfig,
 			Mask:       mask,
 		})
@@ -345,12 +343,27 @@ func convertProtoValue(val state.Type) (*statepb.Value, error) {
 				},
 			},
 		}, nil
+	case state.Identifier:
+		converted, err := convertProtoValue(v.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		return &statepb.Value{
+			Type: &statepb.Value_Identifier{
+				Identifier: &statepb.Identifier{
+					Type:  v.ResourceType,
+					Value: converted,
+				},
+			},
+		}, nil
 	default:
-		return nil, fmt.Errorf("unknown type %T\n", val)
+		return nil, fmt.Errorf("reconciler: unknown type %T\n", val)
 	}
 }
 
 func resolve(env state.Environment, res state.Type) (state.Type, error) {
+	fmt.Printf("resolve: %T, %+v\n", res, res)
 	switch r := res.(type) {
 	case state.String:
 		return r, nil
@@ -368,6 +381,13 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 		}
 
 		return m, nil
+	case state.ResourceRef:
+		res, ok := env.Resources[r.Alias]
+		if !ok {
+			return nil, fmt.Errorf("resolve: no resource with alias %q found", r.Alias)
+		}
+
+		return res, nil
 	case state.Resource:
 		config, err := resolve(env, r.Config)
 		if err != nil {
@@ -381,15 +401,6 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 			Attrs:      r.Attrs,
 		}, nil
 	case state.Unknown:
-		if _, ok := r.Object.(state.Nil); ok {
-			obj, inEnv := env.Resources[r.Name]
-			if !inEnv {
-				return nil, fmt.Errorf("object %q not in env", r.Name)
-			}
-
-			return obj, nil
-		}
-
 		resolved, err := resolve(env, r.Object)
 		if err != nil {
 			return nil, err

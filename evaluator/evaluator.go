@@ -104,7 +104,12 @@ func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.E
 		},
 		Identifier: id,
 		Config:     config,
-		Attrs:      state.Unknown{},
+		Attrs: state.Unknown{
+			Name: "attrs",
+			Object: state.ResourceRef{
+				Alias: alias,
+			},
+		},
 	}
 
 	env.Resources[alias] = resource
@@ -154,8 +159,7 @@ func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state
 	}
 
 	res, err := plug.GetResource(ctx, &backendpb.GetResourceRequest{
-		Type:       r.Identifier.ResourceType,
-		Identifier: protoID,
+		Identifier: protoID.GetIdentifier(),
 	})
 	if err != nil {
 		return state.Resource{}, err
@@ -230,8 +234,22 @@ func convertProtoValue(val state.Type) (*statepb.Value, error) {
 				},
 			},
 		}, nil
+	case state.Identifier:
+		converted, err := convertProtoValue(v.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		return &statepb.Value{
+			Type: &statepb.Value_Identifier{
+				Identifier: &statepb.Identifier{
+					Type:  v.ResourceType,
+					Value: converted,
+				},
+			},
+		}, nil
 	default:
-		return nil, fmt.Errorf("unknown type %T\n", val)
+		return nil, fmt.Errorf("convert proto: unknown type %T\n", val)
 	}
 
 }

@@ -9,7 +9,7 @@ message State {
 }
 
 message Resource {
-  Value identifier = 1;
+  Identifier identifier = 1;
   Value config = 2;
   Value attrs = 3;
 }
@@ -21,6 +21,7 @@ message Value {
     float float_value = 3;
     ListValue list = 4;
     MapValue map = 5;
+    Identifier identifier = 6;
   }
 }
 
@@ -30,4 +31,9 @@ message ListValue {
 
 message MapValue {
   map<string, Value> entries = 1;
+}
+
+message Identifier {
+  string type = 1;
+  Value value = 2;
 }

@@ -16,7 +16,7 @@ type Server struct {
 }
 
 func (s *Server) GetResource(ctx context.Context, req *backendpb.GetResourceRequest) (*backendpb.GetResourceResponse, error) {
-	t := req.GetType()
+	t := req.GetIdentifier().GetType()
 	switch t {
 	case "bucket":
 		r := &statepb.Resource{
@@ -81,7 +81,7 @@ func (s *Server) GetResource(ctx context.Context, req *backendpb.GetResourceRequ
 
 func (s *Server) CreateResource(ctx context.Context, req *backendpb.CreateResourceRequest) (*backendpb.CreateResourceResponse, error) {
 	var r *statepb.Resource
-	switch req.GetType() {
+	switch req.GetIdentifier().GetType() {
 	case "bucket":
 		r = &statepb.Resource{
 			Identifier: req.GetIdentifier(),
@@ -140,7 +140,7 @@ func (s *Server) CreateResource(ctx context.Context, req *backendpb.CreateResour
 
 func (s *Server) UpdateResource(ctx context.Context, req *backendpb.UpdateResourceRequest) (*backendpb.UpdateResourceResponse, error) {
 	var r *statepb.Resource
-	switch req.GetType() {
+	switch req.GetIdentifier().GetType() {
 	case "bucket":
 		r = &statepb.Resource{
 			Identifier: req.GetIdentifier(),

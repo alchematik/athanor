@@ -13,8 +13,7 @@ service Backend {
 }
 
 message GetResourceRequest {
-  string type = 1;
-  alchematik.athanor.state.v1.Value identifier = 2;
+  alchematik.athanor.state.v1.Identifier identifier = 1;
 }
 
 message GetResourceResponse {
@@ -22,9 +21,8 @@ message GetResourceResponse {
 }
 
 message CreateResourceRequest {
-  string type = 1;
-  alchematik.athanor.state.v1.Value identifier = 2;
-  alchematik.athanor.state.v1.Value config = 3;
+  alchematik.athanor.state.v1.Identifier identifier = 1;
+  alchematik.athanor.state.v1.Value config = 2;
 }
 
 message CreateResourceResponse {
@@ -32,17 +30,15 @@ message CreateResourceResponse {
 }
 
 message DeleteResourceRequest {
-  string type = 1;
-  alchematik.athanor.state.v1.Value identifier = 2;
+  alchematik.athanor.state.v1.Identifier identifier = 1;
 }
 
 message DeleteResourceResponse {}
 
 message UpdateResourceRequest {
-  string type = 1;
-  alchematik.athanor.state.v1.Value identifier = 2;
-  alchematik.athanor.state.v1.Value config = 3;
-  repeated Field mask = 4;
+  alchematik.athanor.state.v1.Identifier identifier = 1;
+  alchematik.athanor.state.v1.Value config = 2;
+  repeated Field mask = 3;
 }
 
 message UpdateResourceResponse {

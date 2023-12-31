@@ -56,3 +56,9 @@ type Unknown struct {
 type Nil struct {
 	Type
 }
+
+type ResourceRef struct {
+	Type
+
+	Alias string
+}
