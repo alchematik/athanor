@@ -9,6 +9,12 @@ type Type interface {
 type Provider struct {
 	Type
 
+	Identifier ProviderIdentifier
+}
+
+type ProviderIdentifier struct {
+	Type
+
 	Alias   string
 	Name    string
 	Version string

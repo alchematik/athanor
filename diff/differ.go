@@ -151,7 +151,7 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 		op = OperationDelete
 
 		// Invert the dep map.
-		depMap = invertDepMap(to.DependencyMap)
+		// depMap = invertDepMap(to.DependencyMap)
 
 		for k, v := range to.Resources {
 			d, err := Diff(v, state.Nil{})

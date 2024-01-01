@@ -235,9 +235,7 @@ func main() {
 								return err
 							}
 
-							in := interpreter.Interpreter{
-								ResourcesAPI: interpreter.NilResourcesAPI{},
-							}
+							in := interpreter.Interpreter{}
 							env := interpreter.Environment{
 								Providers:     map[string]value.Provider{},
 								Resources:     map[string]value.Resource{},
@@ -298,7 +296,7 @@ func main() {
 								return err
 							}
 
-							// fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
+							fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
 
 							reconciler := reconcile.Reconciler{
 								ProviderPluginDir: ".backends",

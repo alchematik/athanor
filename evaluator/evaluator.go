@@ -99,8 +99,8 @@ func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.E
 
 	resource := state.Resource{
 		Provider: state.Provider{
-			Name:    r.Provider.Name,
-			Version: r.Provider.Version,
+			Name:    r.Provider.Identifier.Name,
+			Version: r.Provider.Identifier.Version,
 		},
 		Identifier: id,
 		Config:     config,
@@ -128,7 +128,7 @@ func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state
 		return state.Resource{}, err
 	}
 
-	pluginPath := filepath.Join(e.ProviderPluginDir, r.Provider.Name, r.Provider.Version, "provider")
+	pluginPath := filepath.Join(e.ProviderPluginDir, r.Provider.Identifier.Name, r.Provider.Identifier.Version, "provider")
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: backend.HandshakeConfig,
 		Plugins: map[string]plugin.Plugin{
@@ -177,8 +177,8 @@ func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state
 
 	resource := state.Resource{
 		Provider: state.Provider{
-			Name:    r.Provider.Name,
-			Version: r.Provider.Version,
+			Name:    r.Provider.Identifier.Name,
+			Version: r.Provider.Identifier.Version,
 		},
 		Identifier: id,
 		Config:     config,
