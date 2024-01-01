@@ -9,10 +9,7 @@ import (
 	"github.com/alchematik/athanor/build/value"
 )
 
-// Stmts and expressions
-
-type Interpreter struct {
-}
+type Interpreter struct{}
 
 type Environment struct {
 	Providers     map[string]value.Provider
@@ -24,11 +21,11 @@ func (in Interpreter) Interpret(ctx context.Context, env Environment, b blueprin
 	for _, st := range b.Stmts {
 		switch s := st.(type) {
 		case stmt.Provider:
-			if err := in.InterpretProviderStmt(ctx, env, s); err != nil {
+			if err := in.ProviderStmt(ctx, env, s); err != nil {
 				return err
 			}
 		case stmt.Resource:
-			if err := in.InterpretResourceStmt(ctx, env, s); err != nil {
+			if err := in.ResourceStmt(ctx, env, s); err != nil {
 				return err
 			}
 		default:

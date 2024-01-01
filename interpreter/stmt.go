@@ -8,7 +8,7 @@ import (
 	"github.com/alchematik/athanor/build/value"
 )
 
-func (in Interpreter) InterpretProviderStmt(ctx context.Context, env Environment, s stmt.Provider) error {
+func (in Interpreter) ProviderStmt(ctx context.Context, env Environment, s stmt.Provider) error {
 	id, _, err := in.Expr(ctx, env, s.Identifier)
 	if err != nil {
 		return err
@@ -26,7 +26,7 @@ func (in Interpreter) InterpretProviderStmt(ctx context.Context, env Environment
 	return nil
 }
 
-func (in Interpreter) InterpretResourceStmt(ctx context.Context, env Environment, s stmt.Resource) error {
+func (in Interpreter) ResourceStmt(ctx context.Context, env Environment, s stmt.Resource) error {
 	providerValue, _, err := in.Expr(ctx, env, s.Provider)
 	if err != nil {
 		return err
