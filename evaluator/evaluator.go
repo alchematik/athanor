@@ -22,8 +22,7 @@ type Evaluator struct {
 }
 
 type ResourceEvaluator interface {
-	// TODO: Should alias be part of the resource struct?
-	EvaluateResource(context.Context, state.Environment, string, value.Resource) (state.Resource, error)
+	EvaluateResource(context.Context, state.Environment, value.Resource) (state.Resource, error)
 }
 
 func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (state.Environment, error) {
@@ -58,7 +57,7 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 
 		fmt.Printf("evaluating: %q\n", alias)
 
-		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, alias, env.Resources[alias])
+		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, env.Resources[alias])
 		if err != nil {
 			return state.Environment{}, err
 		}
@@ -86,7 +85,7 @@ type PlanResourceEvaluator struct {
 	ValueResolver ValueResolver
 }
 
-func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, alias string, r value.Resource) (state.Resource, error) {
+func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, r value.Resource) (state.Resource, error) {
 	id, err := e.ValueResolver.ResolveResourceIdentifierValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -107,12 +106,12 @@ func (e PlanResourceEvaluator) EvaluateResource(ctx context.Context, env state.E
 		Attrs: state.Unknown{
 			Name: "attrs",
 			Object: state.ResourceRef{
-				Alias: alias,
+				Alias: r.Identifier.Alias,
 			},
 		},
 	}
 
-	env.Resources[alias] = resource
+	env.Resources[r.Identifier.Alias] = resource
 
 	return resource, nil
 }
@@ -122,7 +121,7 @@ type RemoteResourceEvaluator struct {
 	ValueResolver     ValueResolver
 }
 
-func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, alias string, r value.Resource) (state.Resource, error) {
+func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state.Environment, r value.Resource) (state.Resource, error) {
 	id, err := e.ValueResolver.ResolveResourceIdentifierValue(ctx, env, r.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -185,8 +184,7 @@ func (e RemoteResourceEvaluator) EvaluateResource(ctx context.Context, env state
 		Attrs:      attrs,
 	}
 
-	env.Resources[alias] = resource
-	fmt.Printf("setting alias: %v\n", alias)
+	env.Resources[r.Identifier.Alias] = resource
 
 	return resource, nil
 }

@@ -256,8 +256,7 @@ func main() {
 
 							in := interpreter.Interpreter{}
 							env := interpreter.NewEnvironment()
-							err = in.Interpret(ctx.Context, env, bp)
-							if err != nil {
+							if err := in.Interpret(ctx.Context, env, bp); err != nil {
 								return err
 							}
 
