@@ -8,7 +8,18 @@ import (
 	"github.com/alchematik/athanor/build/value"
 )
 
-func (in Interpreter) ProviderStmt(ctx context.Context, env Environment, s stmt.Provider) error {
+func (in Interpreter) Stmt(ctx context.Context, env Environment, st stmt.Type) error {
+	switch s := st.(type) {
+	case stmt.Provider:
+		return in.providerStmt(ctx, env, s)
+	case stmt.Resource:
+		return in.resourceStmt(ctx, env, s)
+	default:
+		return fmt.Errorf("unknown stmt %T", st)
+	}
+}
+
+func (in Interpreter) providerStmt(ctx context.Context, env Environment, s stmt.Provider) error {
 	id, _, err := in.Expr(ctx, env, s.Identifier)
 	if err != nil {
 		return err
@@ -26,7 +37,7 @@ func (in Interpreter) ProviderStmt(ctx context.Context, env Environment, s stmt.
 	return nil
 }
 
-func (in Interpreter) ResourceStmt(ctx context.Context, env Environment, s stmt.Resource) error {
+func (in Interpreter) resourceStmt(ctx context.Context, env Environment, s stmt.Resource) error {
 	providerValue, _, err := in.Expr(ctx, env, s.Provider)
 	if err != nil {
 		return err
