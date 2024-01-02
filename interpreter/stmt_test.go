@@ -14,13 +14,17 @@ import (
 
 func TestInterpreter_Stmt_Provider(t *testing.T) {
 	testCases := map[string]struct {
-		env         interpreter.Environment
-		expectedEnv interpreter.Environment
+		env         value.Build
+		expectedEnv value.Build
 		stmt        stmt.Type
 		isError     bool
 	}{
 		"new provider": {
-			env: interpreter.NewEnvironment(),
+			env: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
 			stmt: stmt.Provider{
 				Expr: expr.Provider{
 					Identifier: expr.ProviderIdentifier{
@@ -30,7 +34,7 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: interpreter.Environment{
+			expectedEnv: value.Build{
 				Providers: map[string]value.Provider{
 					"my-provider": {
 						Identifier: value.ProviderIdentifier{
@@ -45,7 +49,11 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 			},
 		},
 		"value not provider": {
-			env: interpreter.NewEnvironment(),
+			env: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
 			stmt: stmt.Provider{
 				Expr: expr.ProviderIdentifier{
 					Alias:   "my-provider",
@@ -53,11 +61,19 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					Version: expr.String{Value: "v0.0.1"},
 				},
 			},
-			expectedEnv: interpreter.NewEnvironment(),
-			isError:     true,
+			expectedEnv: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
+			isError: true,
 		},
 		"invalid Provider": {
-			env: interpreter.NewEnvironment(),
+			env: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
 			stmt: stmt.Provider{
 				Expr: expr.Provider{
 					Identifier: expr.ProviderIdentifier{
@@ -67,8 +83,12 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: interpreter.NewEnvironment(),
-			isError:     true,
+			expectedEnv: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
+			isError: true,
 		},
 	}
 
@@ -89,13 +109,17 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 
 func TestInterpreter_Stmt_Resource(t *testing.T) {
 	testCases := map[string]struct {
-		env         interpreter.Environment
-		expectedEnv interpreter.Environment
+		env         value.Build
+		expectedEnv value.Build
 		stmt        stmt.Type
 		isError     bool
 	}{
 		"new resource": {
-			env: interpreter.NewEnvironment(),
+			env: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
 			stmt: stmt.Resource{
 				Expr: expr.Resource{
 					Identifier: expr.ResourceIdentifier{
@@ -113,7 +137,7 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					Config: expr.String{Value: "bar"},
 				},
 			},
-			expectedEnv: interpreter.Environment{
+			expectedEnv: value.Build{
 				Providers: map[string]value.Provider{
 					"my-provider": {
 						Identifier: value.ProviderIdentifier{
@@ -152,7 +176,11 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 			},
 		},
 		"value not Resource": {
-			env: interpreter.NewEnvironment(),
+			env: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
 			stmt: stmt.Resource{
 				Expr: expr.Provider{
 					Identifier: expr.ProviderIdentifier{
@@ -162,11 +190,19 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: interpreter.NewEnvironment(),
-			isError:     true,
+			expectedEnv: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
+			isError: true,
 		},
 		"invalid Resource": {
-			env: interpreter.NewEnvironment(),
+			env: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
 			stmt: stmt.Resource{
 				Expr: expr.Resource{
 					Identifier: expr.ResourceIdentifier{
@@ -184,8 +220,12 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					Config: expr.String{Value: "bar"},
 				},
 			},
-			expectedEnv: interpreter.NewEnvironment(),
-			isError:     true,
+			expectedEnv: value.Build{
+				Providers:     map[string]value.Provider{},
+				Resources:     map[string]value.Resource{},
+				DependencyMap: map[string][]string{},
+			},
+			isError: true,
 		},
 	}
 

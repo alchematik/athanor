@@ -18,12 +18,16 @@ import (
 )
 
 type Evaluator struct {
-	ResourceEvaluator ResourceEvaluator
+	ResourceAPI ResourceAPI
 }
 
-type ResourceEvaluator interface {
-	EvaluateResource(context.Context, state.Environment, value.Resource) (state.Resource, error)
+type ResourceAPI interface {
+	GetResource(context.Context, state.Resource) (state.Resource, error)
 }
+
+// type ResourceEvaluator interface {
+// 	EvaluateResource(context.Context, state.Environment, value.Resource) (state.Resource, error)
+// }
 
 func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (state.Environment, error) {
 	indegrees := map[string]int{}
@@ -57,7 +61,7 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 
 		fmt.Printf("evaluating: %q\n", alias)
 
-		s, err := e.ResourceEvaluator.EvaluateResource(ctx, stateEnv, env.Resources[alias])
+		s, err := e.Evaluate(ctx, stateEnv, env.Resources[alias])
 		if err != nil {
 			return state.Environment{}, err
 		}
@@ -74,11 +78,6 @@ func (e Evaluator) Evaluate(ctx context.Context, env interpreter.Environment) (s
 	}
 
 	return stateEnv, nil
-}
-
-type ValueResolver interface {
-	ResolveValue(context.Context, state.Environment, value.Type) (state.Type, error)
-	ResolveResourceIdentifierValue(context.Context, state.Environment, value.ResourceIdentifier) (state.Identifier, error)
 }
 
 type PlanResourceEvaluator struct {
@@ -252,10 +251,7 @@ func convertProtoValue(val state.Type) (*statepb.Value, error) {
 
 }
 
-type RealValueResolver struct {
-}
-
-func (e RealValueResolver) ResolveResourceIdentifierValue(ctx context.Context, env state.Environment, id value.ResourceIdentifier) (state.Identifier, error) {
+func (e Evaluator) ResolveResourceIdentifierValue(ctx context.Context, env state.Environment, id value.ResourceIdentifier) (state.Identifier, error) {
 	val, err := e.ResolveValue(ctx, env, id.Value)
 	if err != nil {
 		return state.Identifier{}, err
@@ -267,7 +263,7 @@ func (e RealValueResolver) ResolveResourceIdentifierValue(ctx context.Context, e
 	}, nil
 }
 
-func (e RealValueResolver) ResolveValue(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
+func (e Evaluator) ResolveValue(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.String:
 		return state.String{Value: v.Value}, nil

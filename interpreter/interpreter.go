@@ -23,12 +23,17 @@ func NewEnvironment() Environment {
 	}
 }
 
-func (in Interpreter) Interpret(ctx context.Context, env Environment, b blueprint.Blueprint) error {
+func (in Interpreter) Interpret(ctx context.Context, b blueprint.Blueprint) (value.Build, error) {
+	build := value.Build{
+		Providers:     map[string]value.Provider{},
+		Resources:     map[string]value.Resource{},
+		DependencyMap: map[string][]string{},
+	}
 	for _, st := range b.Stmts {
-		if err := in.Stmt(ctx, env, st); err != nil {
-			return err
+		if err := in.Stmt(ctx, build, st); err != nil {
+			return value.Build{}, err
 		}
 	}
 
-	return nil
+	return build, nil
 }

@@ -255,16 +255,16 @@ func main() {
 							}
 
 							in := interpreter.Interpreter{}
-							env := interpreter.NewEnvironment()
-							if err := in.Interpret(ctx.Context, env, bp); err != nil {
+							build, err := in.Interpret(ctx.Context, bp)
+							if err != nil {
 								return err
 							}
 
-							fmt.Printf("dep map >>> %+v\n", env.DependencyMap)
+							fmt.Printf("dep map >>> %+v\n", build.DependencyMap)
 
 							eval := evaluator.Evaluator{
 								ResourceEvaluator: evaluator.PlanResourceEvaluator{
-									ValueResolver: evaluator.RealValueResolver{},
+									ValueResolver: evaluator.ValueResolver{},
 								},
 							}
 							stateEnv, err := eval.Evaluate(ctx.Context, env)
@@ -281,7 +281,7 @@ func main() {
 
 							remoteEval := evaluator.Evaluator{
 								ResourceEvaluator: evaluator.RemoteResourceEvaluator{
-									ValueResolver:     evaluator.RealValueResolver{},
+									ValueResolver:     evaluator.ValueResolver{},
 									ProviderPluginDir: ".backends",
 								},
 							}

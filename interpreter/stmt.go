@@ -8,19 +8,19 @@ import (
 	"github.com/alchematik/athanor/build/value"
 )
 
-func (in Interpreter) Stmt(ctx context.Context, env Environment, st stmt.Type) error {
+func (in Interpreter) Stmt(ctx context.Context, build value.Build, st stmt.Type) error {
 	switch s := st.(type) {
 	case stmt.Provider:
-		return in.providerStmt(ctx, env, s)
+		return in.providerStmt(ctx, build, s)
 	case stmt.Resource:
-		return in.resourceStmt(ctx, env, s)
+		return in.resourceStmt(ctx, build, s)
 	default:
 		return fmt.Errorf("unknown stmt %T", st)
 	}
 }
 
-func (in Interpreter) providerStmt(ctx context.Context, env Environment, s stmt.Provider) error {
-	val, _, err := in.Expr(ctx, env, s.Expr)
+func (in Interpreter) providerStmt(ctx context.Context, build value.Build, s stmt.Provider) error {
+	val, _, err := in.Expr(ctx, build, s.Expr)
 	if err != nil {
 		return err
 	}
@@ -30,13 +30,13 @@ func (in Interpreter) providerStmt(ctx context.Context, env Environment, s stmt.
 		return fmt.Errorf("expected Provider type, got %T", val)
 	}
 
-	env.Providers[provider.Identifier.Alias] = provider
+	build.Providers[provider.Identifier.Alias] = provider
 
 	return nil
 }
 
-func (in Interpreter) resourceStmt(ctx context.Context, env Environment, s stmt.Resource) error {
-	val, children, err := in.Expr(ctx, env, s.Expr)
+func (in Interpreter) resourceStmt(ctx context.Context, build value.Build, s stmt.Resource) error {
+	val, children, err := in.Expr(ctx, build, s.Expr)
 	if err != nil {
 		return err
 	}
@@ -47,9 +47,9 @@ func (in Interpreter) resourceStmt(ctx context.Context, env Environment, s stmt.
 	}
 
 	alias := resource.Identifier.Alias
-	env.DependencyMap[alias] = append(env.DependencyMap[alias], children...)
-	env.Resources[alias] = resource
-	env.Providers[resource.Provider.Identifier.Alias] = resource.Provider
+	build.DependencyMap[alias] = append(build.DependencyMap[alias], children...)
+	build.Resources[alias] = resource
+	build.Providers[resource.Provider.Identifier.Alias] = resource.Provider
 
 	return nil
 }

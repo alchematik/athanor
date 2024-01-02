@@ -2,8 +2,14 @@ package value
 
 type Type interface {
 	isValueType()
+}
 
-	String() string
+type Build struct {
+	Type
+
+	Providers     map[string]Provider
+	Resources     map[string]Resource
+	DependencyMap map[string][]string
 }
 
 type Provider struct {
