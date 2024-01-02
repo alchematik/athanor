@@ -3,13 +3,17 @@
     {
       "provider": {
         "identifier": {
-          "provider_identifier": {
-            "alias": "gcp",
-            "name": {
-              "string_literal": "gcp"
-            },
-            "version": {
-              "string_literal": "v0.0.1"
+          "provider": {
+            "identifier": {
+              "provider_identifier": {
+                "alias": "gcp",
+                "name": {
+                  "string_literal": "gcp"
+                },
+                "version": {
+                  "string_literal": "v0.0.1"
+                }
+              }
             }
           }
         }
@@ -17,104 +21,112 @@
     },
     {
       "resource": {
-        "provider": {
-          "get_provider": {
-            "alias": "gcp"
-          }
-        },
         "identifier": {
-          "resource_identifier": {
-            "alias": "my-bucket",
-            "type": "bucket",
-            "value": {
+          "resource": {
+            "provider": {
+              "get_provider": {
+                "alias": "gcp"
+              }
+            },
+            "identifier": {
+              "resource_identifier": {
+                "alias": "my-bucket",
+                "type": "bucket",
+                "value": {
+                  "map": {
+                    "entries": {
+                      "account": {
+                        "string_literal": "12345"
+                      },
+                      "region": {
+                        "string_literal": "us-east-1"
+                      },
+                      "name": {
+                        "string_literal": "my-bucket"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "config": {
               "map": {
                 "entries": {
-                  "account": {
-                    "string_literal": "12345"
-                  },
-                  "region": {
-                    "string_literal": "us-east-1"
-                  },
-                  "name": {
-                    "string_literal": "my-bucket"
+                  "expiration": {
+                    "string_literal": "12h"
                   }
                 }
               }
             }
           }
-        },
-        "config": {
-          "map": {
-            "entries": {
-              "expiration": {
-                "string_literal": "12h"
-              }
-            }
-          }
         }
       }
     },
     {
       "resource": {
-        "provider": {
-          "get_provider": {
-            "alias": "gcp"
-          }
-        },
         "identifier": {
-          "resource_identifier": {
-            "alias": "my-object",
-            "type": "bucket_object",
-            "value": {
-              "map": {
-                "entries": {
-                  "bucket": {
-                    "resource_identifier": {
-                      "alias": "my-bucket",
-                      "type": "bucket",
-                      "value": {
-                        "map": {
-                          "entries": {
-                            "account": {
-                              "string_literal": "12345"
-                            },
-                            "region": {
-                              "string_literal": "us-east-1"
-                            },
-                            "name": {
-                              "string_literal": "my-bucket"
+          "resource": {
+            "provider": {
+              "get_provider": {
+                "alias": "gcp"
+              }
+            },
+            "identifier": {
+              "resource_identifier": {
+                "alias": "my-object",
+                "type": "bucket_object",
+                "value": {
+                  "map": {
+                    "entries": {
+                      "bucket": {
+                        "resource_identifier": {
+                          "alias": "my-bucket",
+                          "type": "bucket",
+                          "value": {
+                            "map": {
+                              "entries": {
+                                "account": {
+                                  "string_literal": "12345"
+                                },
+                                "region": {
+                                  "string_literal": "us-east-1"
+                                },
+                                "name": {
+                                  "string_literal": "my-bucket"
+                                }
+                              }
                             }
                           }
                         }
+                      },
+                      "name": {
+                        "string_literal": "my-object"
                       }
                     }
-                  },
-                  "name": {
-                    "string_literal": "my-object"
                   }
                 }
               }
-            }
-          }
-        },
-        "config": {
-          "map": {
-            "entries": {
-              "contents": {
-                "string_literal": "todo: change to read from file"
-              },
-              "some_field": {
-                "io_get": {
-                  "name": "foo",
-                  "object": {
+            },
+            "config": {
+              "map": {
+                "entries": {
+                  "contents": {
+                    "string_literal": "todo: change to read from file"
+                  },
+                  "some_field": {
                     "io_get": {
-                      "name": "bar",
+                      "name": "foo",
                       "object": {
-                        "get": {
-                          "name": "attrs",
+                        "io_get": {
+                          "name": "bar",
                           "object": {
-                            "get_resource": {
-                              "alias": "my-bucket"
+                            "get": {
+                              "name": "attrs",
+                              "object": {
+                                "get_resource": {
+                                  "alias": "my-bucket"
+                                }
+                              }
                             }
                           }
                         }

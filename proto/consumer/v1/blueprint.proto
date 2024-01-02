@@ -14,13 +14,11 @@ message Stmt {
 }
 
 message ProviderStmt {
-  Expr identifier = 1;
+  Expr expr = 1;
 }
 
 message ResourceStmt {
-  Expr identifier = 1;
-  Expr provider = 2;
-  Expr config = 3;
+  Expr expr = 1;
 }
 
 message Expr {
@@ -31,12 +29,14 @@ message Expr {
     ListExpr list = 4;
     MapExpr map = 5;
     GetExpr get = 6;
-    GetProviderExpr get_provider = 7;
-    GetResourceExpr get_resource = 8;
-    NilExpr nil = 9;
-    IOGetExpr io_get = 10;
-    ProviderIdentifierExpr provider_identifier = 11;
-    ResourceIdentifierExpr resource_identifier = 12;
+    ProviderExpr provider = 7;
+    ResourceExpr resource = 8;
+    GetProviderExpr get_provider = 9;
+    GetResourceExpr get_resource = 10;
+    NilExpr nil = 11;
+    IOGetExpr io_get = 12;
+    ProviderIdentifierExpr provider_identifier = 13;
+    ResourceIdentifierExpr resource_identifier = 14;
   }
 }
 
@@ -68,10 +68,20 @@ message IOGetExpr {
 
 message NilExpr {}
 
+message ProviderExpr {
+  Expr identifier = 1;
+}
+
 message ProviderIdentifierExpr {
   string alias = 1;
   Expr name = 2;
   Expr version = 3;
+}
+
+message ResourceExpr {
+  Expr provider = 1;
+  Expr identifier = 2;
+  Expr config = 3;
 }
 
 message ResourceIdentifierExpr {

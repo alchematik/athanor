@@ -22,7 +22,6 @@ import (
 	"github.com/alchematik/athanor/blueprint"
 	"github.com/alchematik/athanor/blueprint/expr"
 	"github.com/alchematik/athanor/blueprint/stmt"
-	"github.com/alchematik/athanor/build/value"
 	"github.com/alchematik/athanor/diff"
 	"github.com/alchematik/athanor/evaluator"
 	"github.com/alchematik/athanor/interpreter"
@@ -87,34 +86,24 @@ func convertBlueprint(bp *consumerpb.Blueprint) (blueprint.Blueprint, error) {
 func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 	switch s := st.GetType().(type) {
 	case *consumerpb.Stmt_Provider:
-		id, err := convertExpr(s.Provider.GetIdentifier())
+		// TODO: Change field name.
+		ex, err := convertExpr(s.Provider.GetIdentifier())
 		if err != nil {
 			return nil, err
 		}
 
 		return stmt.Provider{
-			Identifier: id,
+			Expr: ex,
 		}, nil
 	case *consumerpb.Stmt_Resource:
-		id, err := convertExpr(s.Resource.GetIdentifier())
-		if err != nil {
-			return nil, err
-		}
-
-		provider, err := convertExpr(s.Resource.GetProvider())
-		if err != nil {
-			return nil, err
-		}
-
-		config, err := convertExpr(s.Resource.GetConfig())
+		// TODO: Change field name.
+		ex, err := convertExpr(s.Resource.GetIdentifier())
 		if err != nil {
 			return nil, err
 		}
 
 		return stmt.Resource{
-			Identifier: id,
-			Provider:   provider,
-			Config:     config,
+			Expr: ex,
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid stmt: %T", st.GetType())
@@ -123,6 +112,36 @@ func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 
 func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 	switch e := ex.GetType().(type) {
+	case *consumerpb.Expr_Provider:
+		id, err := convertExpr(e.Provider.GetIdentifier())
+		if err != nil {
+			return nil, err
+		}
+
+		return expr.Provider{
+			Identifier: id,
+		}, nil
+	case *consumerpb.Expr_Resource:
+		provider, err := convertExpr(e.Resource.GetProvider())
+		if err != nil {
+			return nil, err
+		}
+
+		id, err := convertExpr(e.Resource.GetIdentifier())
+		if err != nil {
+			return nil, err
+		}
+
+		config, err := convertExpr(e.Resource.GetConfig())
+		if err != nil {
+			return nil, err
+		}
+
+		return expr.Resource{
+			Provider:   provider,
+			Identifier: id,
+			Config:     config,
+		}, nil
 	case *consumerpb.Expr_ProviderIdentifier:
 		name, err := convertExpr(e.ProviderIdentifier.GetName())
 		if err != nil {
@@ -189,13 +208,13 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 		return g, nil
 	case *consumerpb.Expr_Nil:
 		return expr.Nil{}, nil
-	case *consumerpb.Expr_GetProvider:
+	case *consumerpb.Expr_GetProvider_:
 		return expr.GetProvider{
-			Alias: e.GetProvider.GetAlias(),
+			Alias: e.GetProvider_.GetAlias(),
 		}, nil
-	case *consumerpb.Expr_GetResource:
+	case *consumerpb.Expr_GetResource_:
 		return expr.GetResource{
-			Alias: e.GetResource.GetAlias(),
+			Alias: e.GetResource_.GetAlias(),
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", ex.GetType())
@@ -236,11 +255,7 @@ func main() {
 							}
 
 							in := interpreter.Interpreter{}
-							env := interpreter.Environment{
-								Providers:     map[string]value.Provider{},
-								Resources:     map[string]value.Resource{},
-								DependencyMap: map[string][]string{},
-							}
+							env := interpreter.NewEnvironment()
 							err = in.Interpret(ctx.Context, env, bp)
 							if err != nil {
 								return err
