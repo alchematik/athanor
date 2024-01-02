@@ -20,69 +20,36 @@ func (in Interpreter) Stmt(ctx context.Context, env Environment, st stmt.Type) e
 }
 
 func (in Interpreter) providerStmt(ctx context.Context, env Environment, s stmt.Provider) error {
-	id, _, err := in.Expr(ctx, env, s.Identifier)
+	val, _, err := in.Expr(ctx, env, s.Expr)
 	if err != nil {
 		return err
 	}
 
-	providerID, ok := id.(value.ProviderIdentifier)
+	provider, ok := val.(value.Provider)
 	if !ok {
-		return fmt.Errorf("expected Provider type, got %T", id)
+		return fmt.Errorf("expected Provider type, got %T", val)
 	}
 
-	env.Providers[providerID.Alias] = value.Provider{
-		Identifier: providerID,
-	}
+	env.Providers[provider.Identifier.Alias] = provider
 
 	return nil
 }
 
 func (in Interpreter) resourceStmt(ctx context.Context, env Environment, s stmt.Resource) error {
-	providerValue, _, err := in.Expr(ctx, env, s.Provider)
+	val, children, err := in.Expr(ctx, env, s.Expr)
 	if err != nil {
 		return err
 	}
 
-	provider, ok := providerValue.(value.Provider)
+	resource, ok := val.(value.Resource)
 	if !ok {
-		return fmt.Errorf("expected Provider type, got %T", providerValue)
+		return fmt.Errorf("expected Resource type, got %T", val)
 	}
 
-	identifierValue, identifierChildren, err := in.Expr(ctx, env, s.Identifier)
-	if err != nil {
-		return err
-	}
+	alias := resource.Identifier.Alias
+	env.DependencyMap[alias] = append(env.DependencyMap[alias], children...)
+	env.Resources[alias] = resource
+	env.Providers[resource.Provider.Identifier.Alias] = resource.Provider
 
-	identifier, ok := identifierValue.(value.ResourceIdentifier)
-	if !ok {
-		return fmt.Errorf("expectedesesource type, got %T", identifierValue)
-	}
-
-	config, configChildren, err := in.Expr(ctx, env, s.Config)
-	if err != nil {
-		return err
-	}
-
-	var children []string
-	for _, child := range append(identifierChildren, configChildren...) {
-		if child == identifier.Alias {
-			continue
-		}
-
-		children = append(children, child)
-	}
-
-	env.DependencyMap[identifier.Alias] = append(env.DependencyMap[identifier.Alias], children...)
-	env.Resources[identifier.Alias] = value.Resource{
-		Provider:   provider,
-		Identifier: identifier,
-		Config:     config,
-		Attrs: value.Unresolved{
-			Name: "attrs",
-			Object: value.ResourceRef{
-				Alias: identifier.Alias,
-			},
-		},
-	}
 	return nil
 }

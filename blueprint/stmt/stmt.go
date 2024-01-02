@@ -11,13 +11,11 @@ type Type interface {
 type Provider struct {
 	Type
 
-	Identifier expr.Type
+	Expr expr.Type
 }
 
 type Resource struct {
 	Type
 
-	Identifier expr.Type
-	Provider   expr.Type
-	Config     expr.Type
+	Expr expr.Type
 }

@@ -14,8 +14,12 @@ func (in Interpreter) Expr(ctx context.Context, env Environment, ex expr.Type) (
 		return value.String{Value: e.Value}, nil, nil
 	case expr.Map:
 		return in.mapExpr(ctx, env, e)
+	case expr.Provider:
+		return in.provider(ctx, env, e)
 	case expr.ProviderIdentifier:
 		return in.providerIdentifierExpr(ctx, env, e)
+	case expr.Resource:
+		return in.resource(ctx, env, e)
 	case expr.ResourceIdentifier:
 		return in.resourceIdentifierExpr(ctx, env, e)
 	case expr.IOGet:
@@ -39,6 +43,73 @@ func (in Interpreter) Expr(ctx context.Context, env Environment, ex expr.Type) (
 	default:
 		return nil, nil, fmt.Errorf("unknown expr %T", ex)
 	}
+}
+
+func (in Interpreter) provider(ctx context.Context, env Environment, e expr.Provider) (value.Provider, []string, error) {
+	val, children, err := in.Expr(ctx, env, e.Identifier)
+	if err != nil {
+		return value.Provider{}, nil, err
+	}
+
+	id, ok := val.(value.ProviderIdentifier)
+	if !ok {
+		return value.Provider{}, nil, fmt.Errorf("expected ProviderIdentifier type, got %T", val)
+	}
+
+	return value.Provider{
+		Identifier: id,
+	}, children, nil
+}
+
+func (in Interpreter) resource(ctx context.Context, env Environment, e expr.Resource) (value.Resource, []string, error) {
+	providerValue, providerChildren, err := in.Expr(ctx, env, e.Provider)
+	if err != nil {
+		return value.Resource{}, nil, err
+	}
+
+	provider, ok := providerValue.(value.Provider)
+	if !ok {
+		return value.Resource{}, nil, fmt.Errorf("expected Provider type, got %T", providerValue)
+	}
+
+	idVal, idChildren, err := in.Expr(ctx, env, e.Identifier)
+	if err != nil {
+		return value.Resource{}, nil, err
+	}
+
+	id, ok := idVal.(value.ResourceIdentifier)
+	if !ok {
+		return value.Resource{}, nil, fmt.Errorf("expected ResourceIdentifier, got %T", idVal)
+	}
+
+	configVal, configChildren, err := in.Expr(ctx, env, e.Config)
+	if err != nil {
+		return value.Resource{}, nil, err
+	}
+
+	children := append(providerChildren, idChildren...)
+	children = append(children, configChildren...)
+	var out []string
+	for _, child := range children {
+		// Filter out alias to self.
+		if child == id.Alias {
+			continue
+		}
+
+		out = append(out, child)
+	}
+
+	return value.Resource{
+		Provider:   provider,
+		Identifier: id,
+		Config:     configVal,
+		Attrs: value.Unresolved{
+			Name: "attrs",
+			Object: value.ResourceRef{
+				Alias: id.Alias,
+			},
+		},
+	}, out, nil
 }
 
 func (in Interpreter) mapExpr(ctx context.Context, env Environment, e expr.Map) (value.Map, []string, error) {

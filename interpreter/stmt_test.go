@@ -22,10 +22,12 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 		"new provider": {
 			env: interpreter.NewEnvironment(),
 			stmt: stmt.Provider{
-				Identifier: expr.ProviderIdentifier{
-					Alias:   "my-provider",
-					Name:    expr.String{Value: "gcp"},
-					Version: expr.String{Value: "v0.0.1"},
+				Expr: expr.Provider{
+					Identifier: expr.ProviderIdentifier{
+						Alias:   "my-provider",
+						Name:    expr.String{Value: "gcp"},
+						Version: expr.String{Value: "v0.0.1"},
+					},
 				},
 			},
 			expectedEnv: interpreter.Environment{
@@ -42,23 +44,144 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 				DependencyMap: map[string][]string{},
 			},
 		},
-		"value not ProviderIdentifier": {
+		"value not provider": {
 			env: interpreter.NewEnvironment(),
 			stmt: stmt.Provider{
-				Identifier: expr.ResourceIdentifier{
-					Alias: "my-provider",
+				Expr: expr.ProviderIdentifier{
+					Alias:   "my-provider",
+					Name:    expr.String{Value: "gcp"},
+					Version: expr.String{Value: "v0.0.1"},
 				},
 			},
 			expectedEnv: interpreter.NewEnvironment(),
 			isError:     true,
 		},
-		"invalid ProviderIdentifier": {
+		"invalid Provider": {
 			env: interpreter.NewEnvironment(),
 			stmt: stmt.Provider{
-				Identifier: expr.ProviderIdentifier{
-					Alias:   "",
-					Name:    expr.String{Value: "gcp"},
-					Version: expr.String{Value: "v0.0.1"},
+				Expr: expr.Provider{
+					Identifier: expr.ProviderIdentifier{
+						Alias:   "",
+						Name:    expr.String{Value: "gcp"},
+						Version: expr.String{Value: "v0.0.1"},
+					},
+				},
+			},
+			expectedEnv: interpreter.NewEnvironment(),
+			isError:     true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			in := interpreter.Interpreter{}
+			err := in.Stmt(context.Background(), tc.env, tc.stmt)
+			if tc.isError {
+				require.Error(t, err)
+			} else {
+				require.Nil(t, err)
+			}
+
+			require.Equal(t, tc.expectedEnv, tc.env)
+		})
+	}
+}
+
+func TestInterpreter_Stmt_Resource(t *testing.T) {
+	testCases := map[string]struct {
+		env         interpreter.Environment
+		expectedEnv interpreter.Environment
+		stmt        stmt.Type
+		isError     bool
+	}{
+		"new resource": {
+			env: interpreter.NewEnvironment(),
+			stmt: stmt.Resource{
+				Expr: expr.Resource{
+					Identifier: expr.ResourceIdentifier{
+						Alias:        "my-resource",
+						ResourceType: "bucket",
+						Value:        expr.String{Value: "foo"},
+					},
+					Provider: expr.Provider{
+						Identifier: expr.ProviderIdentifier{
+							Alias:   "my-provider",
+							Name:    expr.String{Value: "gcp"},
+							Version: expr.String{Value: "v0.0.1"},
+						},
+					},
+					Config: expr.String{Value: "bar"},
+				},
+			},
+			expectedEnv: interpreter.Environment{
+				Providers: map[string]value.Provider{
+					"my-provider": {
+						Identifier: value.ProviderIdentifier{
+							Alias:   "my-provider",
+							Name:    "gcp",
+							Version: "v0.0.1",
+						},
+					},
+				},
+				Resources: map[string]value.Resource{
+					"my-resource": {
+						Provider: value.Provider{
+							Identifier: value.ProviderIdentifier{
+								Alias:   "my-provider",
+								Name:    "gcp",
+								Version: "v0.0.1",
+							},
+						},
+						Identifier: value.ResourceIdentifier{
+							Alias:        "my-resource",
+							ResourceType: "bucket",
+							Value:        value.String{Value: "foo"},
+						},
+						Config: value.String{Value: "bar"},
+						Attrs: value.Unresolved{
+							Name: "attrs",
+							Object: value.ResourceRef{
+								Alias: "my-resource",
+							},
+						},
+					},
+				},
+				DependencyMap: map[string][]string{
+					"my-resource": nil,
+				},
+			},
+		},
+		"value not Resource": {
+			env: interpreter.NewEnvironment(),
+			stmt: stmt.Resource{
+				Expr: expr.Provider{
+					Identifier: expr.ProviderIdentifier{
+						Alias:   "my-provider",
+						Name:    expr.String{Value: "gcp"},
+						Version: expr.String{Value: "v0.0.1"},
+					},
+				},
+			},
+			expectedEnv: interpreter.NewEnvironment(),
+			isError:     true,
+		},
+		"invalid Resource": {
+			env: interpreter.NewEnvironment(),
+			stmt: stmt.Resource{
+				Expr: expr.Resource{
+					Identifier: expr.ResourceIdentifier{
+						Alias:        "", // Invalid because alias shouldn't be an empty string.
+						ResourceType: "bucket",
+						Value:        expr.String{Value: "foo"},
+					},
+					Provider: expr.Provider{
+						Identifier: expr.ProviderIdentifier{
+							Alias:   "my-provider",
+							Name:    expr.String{Value: "gcp"},
+							Version: expr.String{Value: "v0.0.1"},
+						},
+					},
+					Config: expr.String{Value: "bar"},
 				},
 			},
 			expectedEnv: interpreter.NewEnvironment(),

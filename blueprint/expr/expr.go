@@ -42,12 +42,26 @@ type GetResource struct {
 	Alias string
 }
 
+type Provider struct {
+	Type
+
+	Identifier Type
+}
+
 type ProviderIdentifier struct {
 	Type
 
 	Alias   string
 	Name    Type
 	Version Type
+}
+
+type Resource struct {
+	Type
+
+	Provider   Type
+	Identifier Type
+	Config     Type
 }
 
 type ResourceIdentifier struct {
