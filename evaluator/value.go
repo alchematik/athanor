@@ -59,6 +59,15 @@ func (e Evaluator) resourceIdentifier(ctx context.Context, env state.Environment
 	}, nil
 }
 
+func (e Evaluator) resourceRef(env state.Environment, v value.ResourceRef) (state.Resource, error) {
+	r, ok := env.Resources[v.Alias]
+	if !ok {
+		return state.Resource{}, fmt.Errorf("evaluator: resource with alias %q does not exist", v.Alias)
+	}
+
+	return r, nil
+}
+
 func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.Provider:
@@ -108,12 +117,7 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.T
 	case value.ResourceIdentifier:
 		return e.resourceIdentifier(ctx, env, v)
 	case value.ResourceRef:
-		r, ok := env.Resources[v.Alias]
-		if !ok {
-			return nil, fmt.Errorf("evaluator: resource with alias %q does not exist", v.Alias)
-		}
-
-		return r, nil
+		return e.resourceRef(env, v)
 	case value.Unresolved:
 		if _, ok := v.Object.(value.Nil); ok {
 			obj, inEnv := env.Resources[v.Name]

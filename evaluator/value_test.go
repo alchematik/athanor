@@ -184,3 +184,59 @@ func TestEvaluator_Value_ResourceIdentifier(t *testing.T) {
 		})
 	}
 }
+
+func TestEvaluator_Value_ResourceRef(t *testing.T) {
+	testCases := map[string]struct {
+		env     state.Environment
+		input   value.Type
+		output  state.Type
+		isError bool
+	}{
+		"found resource": {
+			env: state.Environment{
+				Resources: map[string]state.Resource{
+					"my-resource": {
+						Identifier: state.Identifier{
+							Alias:        "my-resource",
+							ResourceType: "bucket",
+							Value:        state.String{Value: "foo"},
+						},
+					},
+				},
+			},
+			input: value.ResourceRef{
+				Alias: "my-resource",
+			},
+			output: state.Resource{
+				Identifier: state.Identifier{
+					Alias:        "my-resource",
+					ResourceType: "bucket",
+					Value:        state.String{Value: "foo"},
+				},
+			},
+		},
+		"resource not found": {
+			env: state.Environment{
+				Resources: map[string]state.Resource{},
+			},
+			input: value.ResourceRef{
+				Alias: "my-resource",
+			},
+			output:  state.Resource{},
+			isError: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			eval := evaluator.Evaluator{}
+			out, err := eval.Value(context.Background(), tc.env, tc.input)
+			require.Equal(t, tc.output, out)
+			if tc.isError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
