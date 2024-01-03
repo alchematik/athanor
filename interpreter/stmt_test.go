@@ -177,7 +177,29 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					"my-resource": nil,
 				},
 				Components: map[string]component.Type{
-					"my-resource": component.Resource{},
+					"my-resource": component.Resource{
+						Value: value.Resource{
+							Provider: value.Provider{
+								Identifier: value.ProviderIdentifier{
+									Alias:   "my-provider",
+									Name:    "gcp",
+									Version: "v0.0.1",
+								},
+							},
+							Identifier: value.ResourceIdentifier{
+								Alias:        "my-resource",
+								ResourceType: "bucket",
+								Value:        value.String{Value: "foo"},
+							},
+							Config: value.String{Value: "bar"},
+							Attrs: value.Unresolved{
+								Name: "attrs",
+								Object: value.ResourceRef{
+									Alias: "my-resource",
+								},
+							},
+						},
+					},
 				},
 			},
 		},

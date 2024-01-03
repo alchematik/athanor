@@ -5,6 +5,7 @@ import (
 
 	"github.com/alchematik/athanor/blueprint"
 	"github.com/alchematik/athanor/build"
+	"github.com/alchematik/athanor/build/component"
 	"github.com/alchematik/athanor/build/value"
 )
 
@@ -15,6 +16,7 @@ func (in Interpreter) Interpret(ctx context.Context, bp blueprint.Blueprint) (bu
 		Providers:     map[string]value.Provider{},
 		Resources:     map[string]value.Resource{},
 		DependencyMap: map[string][]string{},
+		Components:    map[string]component.Type{},
 	}
 	for _, st := range bp.Stmts {
 		if err := in.Stmt(ctx, b, st); err != nil {

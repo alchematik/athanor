@@ -3,6 +3,7 @@ package interpreter
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/alchematik/athanor/blueprint/stmt"
 	"github.com/alchematik/athanor/build"
@@ -49,11 +50,10 @@ func (in Interpreter) resourceStmt(ctx context.Context, b build.Build, s stmt.Re
 	}
 
 	alias := resource.Identifier.Alias
-	b.DependencyMap[alias] = append(b.DependencyMap[alias], children...)
+	b.DependencyMap[alias] = slices.Compact(append(b.DependencyMap[alias], children...))
 	b.Resources[alias] = resource
 	b.Providers[resource.Provider.Identifier.Alias] = resource.Provider
-
-	b.Components[alias] = component.Resource{}
+	b.Components[alias] = component.Resource{Value: resource}
 
 	return nil
 }

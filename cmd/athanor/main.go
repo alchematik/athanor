@@ -19,12 +19,14 @@ import (
 
 	"github.com/alchematik/athanor/internal/parser"
 
+	api "github.com/alchematik/athanor/api/resource"
 	"github.com/alchematik/athanor/blueprint"
 	"github.com/alchematik/athanor/blueprint/expr"
 	"github.com/alchematik/athanor/blueprint/stmt"
 	"github.com/alchematik/athanor/diff"
 	"github.com/alchematik/athanor/evaluator"
 	"github.com/alchematik/athanor/interpreter"
+	plug "github.com/alchematik/athanor/plugin"
 	"github.com/alchematik/athanor/reconcile"
 	// "github.com/alchematik/athanor/internal/provider"
 	// "github.com/alchematik/athanor/backend"
@@ -263,16 +265,15 @@ func main() {
 							fmt.Printf("dep map >>> %+v\n", build.DependencyMap)
 
 							eval := evaluator.Evaluator{
-								ResourceEvaluator: evaluator.PlanResourceEvaluator{
-									ValueResolver: evaluator.ValueResolver{},
-								},
+								ResourceAPI: &api.Unresolved{},
 							}
-							stateEnv, err := eval.Evaluate(ctx.Context, env)
+
+							desiredEnv, err := eval.Evaluate(ctx.Context, build)
 							if err != nil {
 								return err
 							}
 
-							data, err = json.MarshalIndent(stateEnv, "", "  ")
+							data, err = json.MarshalIndent(desiredEnv, "", "  ")
 							if err != nil {
 								return err
 							}
@@ -280,18 +281,23 @@ func main() {
 							fmt.Printf("desired state >>>>>>>>>>>> %v\n", string(data))
 
 							remoteEval := evaluator.Evaluator{
-								ResourceEvaluator: evaluator.RemoteResourceEvaluator{
-									ValueResolver:     evaluator.ValueResolver{},
-									ProviderPluginDir: ".backends",
+								ResourceAPI: api.API{
+									ProviderPluginManager: plug.Provider{
+										Dir: ".backends",
+									},
 								},
+								// ResourceEvaluator: evaluator.RemoteResourceEvaluator{
+								// 	ValueResolver:     evaluator.ValueResolver{},
+								// 	ProviderPluginDir: ".backends",
+								// },
 							}
 
-							remoteState, err := remoteEval.Evaluate(ctx.Context, env)
+							remoteEnv, err := remoteEval.Evaluate(ctx.Context, build)
 							if err != nil {
 								return err
 							}
 
-							data, err = json.MarshalIndent(remoteState, "", "  ")
+							data, err = json.MarshalIndent(remoteEnv, "", "  ")
 							if err != nil {
 								return err
 							}
@@ -300,7 +306,7 @@ func main() {
 
 							// TODO: create diff between local state and remote state.
 
-							d, err := diff.Diff(remoteState, stateEnv)
+							d, err := diff.Diff(remoteEnv, desiredEnv)
 							if err != nil {
 								return err
 							}
