@@ -4,26 +4,10 @@ type Type interface {
 	isValueType()
 }
 
-type Build struct {
-	Type
-
-	Providers     map[string]Provider
-	Resources     map[string]Resource
-	DependencyMap map[string][]string
-}
-
 type Provider struct {
 	Type
 
 	Identifier ProviderIdentifier
-}
-
-type ProviderIdentifier struct {
-	Type
-
-	Alias   string
-	Name    string
-	Version string
 }
 
 type Resource struct {
@@ -33,6 +17,14 @@ type Resource struct {
 	Identifier ResourceIdentifier
 	Config     Type
 	Attrs      Type
+}
+
+type ProviderIdentifier struct {
+	Type
+
+	Alias   string
+	Name    string
+	Version string
 }
 
 type ResourceIdentifier struct {

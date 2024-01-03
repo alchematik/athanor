@@ -6,6 +6,8 @@ import (
 
 	"github.com/alchematik/athanor/blueprint/expr"
 	"github.com/alchematik/athanor/blueprint/stmt"
+	"github.com/alchematik/athanor/build"
+	"github.com/alchematik/athanor/build/component"
 	"github.com/alchematik/athanor/build/value"
 	"github.com/alchematik/athanor/interpreter"
 
@@ -14,13 +16,13 @@ import (
 
 func TestInterpreter_Stmt_Provider(t *testing.T) {
 	testCases := map[string]struct {
-		env         value.Build
-		expectedEnv value.Build
+		env         build.Build
+		expectedEnv build.Build
 		stmt        stmt.Type
 		isError     bool
 	}{
 		"new provider": {
-			env: value.Build{
+			env: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
@@ -34,7 +36,7 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: value.Build{
+			expectedEnv: build.Build{
 				Providers: map[string]value.Provider{
 					"my-provider": {
 						Identifier: value.ProviderIdentifier{
@@ -49,7 +51,7 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 			},
 		},
 		"value not provider": {
-			env: value.Build{
+			env: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
@@ -61,7 +63,7 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					Version: expr.String{Value: "v0.0.1"},
 				},
 			},
-			expectedEnv: value.Build{
+			expectedEnv: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
@@ -69,7 +71,7 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 			isError: true,
 		},
 		"invalid Provider": {
-			env: value.Build{
+			env: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
@@ -83,7 +85,7 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: value.Build{
+			expectedEnv: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
@@ -109,16 +111,17 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 
 func TestInterpreter_Stmt_Resource(t *testing.T) {
 	testCases := map[string]struct {
-		env         value.Build
-		expectedEnv value.Build
+		env         build.Build
+		expectedEnv build.Build
 		stmt        stmt.Type
 		isError     bool
 	}{
 		"new resource": {
-			env: value.Build{
+			env: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
+				Components:    map[string]component.Type{},
 			},
 			stmt: stmt.Resource{
 				Expr: expr.Resource{
@@ -137,7 +140,7 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					Config: expr.String{Value: "bar"},
 				},
 			},
-			expectedEnv: value.Build{
+			expectedEnv: build.Build{
 				Providers: map[string]value.Provider{
 					"my-provider": {
 						Identifier: value.ProviderIdentifier{
@@ -173,10 +176,13 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 				DependencyMap: map[string][]string{
 					"my-resource": nil,
 				},
+				Components: map[string]component.Type{
+					"my-resource": component.Resource{},
+				},
 			},
 		},
 		"value not Resource": {
-			env: value.Build{
+			env: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
@@ -190,7 +196,7 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: value.Build{
+			expectedEnv: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
@@ -198,7 +204,7 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 			isError: true,
 		},
 		"invalid Resource": {
-			env: value.Build{
+			env: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},
@@ -220,7 +226,7 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					Config: expr.String{Value: "bar"},
 				},
 			},
-			expectedEnv: value.Build{
+			expectedEnv: build.Build{
 				Providers:     map[string]value.Provider{},
 				Resources:     map[string]value.Resource{},
 				DependencyMap: map[string][]string{},

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/alchematik/athanor/blueprint/expr"
+	"github.com/alchematik/athanor/build"
 	"github.com/alchematik/athanor/build/value"
 	"github.com/alchematik/athanor/interpreter"
 
@@ -13,14 +14,14 @@ import (
 
 func TestInterpreter_Expr_Map(t *testing.T) {
 	testCases := map[string]struct {
-		build    value.Build
+		build    build.Build
 		expr     expr.Type
 		out      value.Type
 		children []string
 		isError  bool
 	}{
 		"one entry": {
-			build: value.Build{},
+			build: build.Build{},
 			expr: expr.Map{
 				Entries: map[string]expr.Type{
 					"foo": expr.String{Value: "bar"},
@@ -33,7 +34,7 @@ func TestInterpreter_Expr_Map(t *testing.T) {
 			},
 		},
 		"several entries": {
-			build: value.Build{},
+			build: build.Build{},
 			expr: expr.Map{
 				Entries: map[string]expr.Type{
 					"foo": expr.String{Value: "bar"},
@@ -65,14 +66,14 @@ func TestInterpreter_Expr_Map(t *testing.T) {
 
 func TestInterpreter_Expr_Get(t *testing.T) {
 	testCases := map[string]struct {
-		build    value.Build
+		build    build.Build
 		expr     expr.Type
 		out      value.Type
 		children []string
 		isError  bool
 	}{
 		"map, string value entry present": {
-			build: value.Build{},
+			build: build.Build{},
 			expr: expr.Get{
 				Name: "foo",
 				Object: expr.Map{
@@ -84,7 +85,7 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 			out: value.String{Value: "bar"},
 		},
 		"map, entry missing": {
-			build: value.Build{},
+			build: build.Build{},
 			expr: expr.Get{
 				Name: "foo",
 				Object: expr.Map{
@@ -94,11 +95,11 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 			isError: true,
 		},
 		"resource, identifier": {
-			build: value.Build{
+			build: build.Build{
 				Resources: map[string]value.Resource{
 					"my-resource": {
 						Identifier: value.ResourceIdentifier{
-							Alias:        "my-resource-id",
+							Alias:        "my-resource",
 							ResourceType: "bucket",
 							Value:        value.String{Value: "id"},
 						},
@@ -112,14 +113,14 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 				},
 			},
 			out: value.ResourceIdentifier{
-				Alias:        "my-resource-id",
+				Alias:        "my-resource",
 				ResourceType: "bucket",
 				Value:        value.String{Value: "id"},
 			},
 			children: []string{"my-resource"},
 		},
 		"resource, config": {
-			build: value.Build{
+			build: build.Build{
 				Resources: map[string]value.Resource{
 					"my-resource": {
 						Config: value.String{Value: "config-val"},
@@ -136,7 +137,7 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 			children: []string{"my-resource"},
 		},
 		"resource, attrs, unresolved": {
-			build: value.Build{
+			build: build.Build{
 				Resources: map[string]value.Resource{
 					"my-resource": {
 						Attrs: value.Unresolved{
@@ -163,7 +164,7 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 			children: []string{"my-resource"},
 		},
 		"resource, attrs": {
-			build: value.Build{
+			build: build.Build{
 				Resources: map[string]value.Resource{
 					"my-resource": {
 						Attrs: value.String{Value: "foo"},
@@ -180,7 +181,7 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 			children: []string{"my-resource"},
 		},
 		"unresolved": {
-			build: value.Build{
+			build: build.Build{
 				Resources: map[string]value.Resource{
 					"my-resource": {
 						Attrs: value.Unresolved{
@@ -228,14 +229,14 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 
 func TestInterpreter_Expr_IOGet(t *testing.T) {
 	testCases := map[string]struct {
-		build    value.Build
+		build    build.Build
 		expr     expr.Type
 		out      value.Type
 		children []string
 		isError  bool
 	}{
 		"unresolved": {
-			build: value.Build{
+			build: build.Build{
 				Resources: map[string]value.Resource{
 					"my-resource": {
 						Attrs: value.Unresolved{
@@ -297,20 +298,20 @@ func TestInterpreter_Expr_IOGet(t *testing.T) {
 
 func TestInterpreter_Expr_String(t *testing.T) {
 	testCases := map[string]struct {
-		build    value.Build
+		build    build.Build
 		expr     expr.Type
 		out      value.Type
 		children []string
 		isError  bool
 	}{
 		"valid": {
-			build: value.Build{},
+			build: build.Build{},
 			expr:  expr.String{Value: "hello world"},
 			out:   value.String{Value: "hello world"},
 		},
 		// IOGet
 		"io get: unresolved": {
-			build: value.Build{
+			build: build.Build{
 				Resources: map[string]value.Resource{
 					"my-resource": {
 						Attrs: value.Unresolved{
@@ -372,7 +373,7 @@ func TestInterpreter_Expr_String(t *testing.T) {
 
 func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 	testCases := map[string]struct {
-		build    value.Build
+		build    build.Build
 		expr     expr.Type
 		out      value.Type
 		children []string
@@ -480,7 +481,7 @@ func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 
 func TestInterpreter_Expr_ResourceIdentifier(t *testing.T) {
 	testCases := map[string]struct {
-		build    value.Build
+		build    build.Build
 		expr     expr.Type
 		out      value.Type
 		children []string
@@ -543,14 +544,14 @@ func TestInterpreter_Expr_ResourceIdentifier(t *testing.T) {
 
 func TestInterpreter_Expr_GetProvider(t *testing.T) {
 	testCases := map[string]struct {
-		build    value.Build
+		build    build.Build
 		expr     expr.Type
 		out      value.Type
 		children []string
 		isError  bool
 	}{
 		"present": {
-			build: value.Build{
+			build: build.Build{
 				Providers: map[string]value.Provider{
 					"my-provider": {
 						Identifier: value.ProviderIdentifier{
@@ -573,7 +574,7 @@ func TestInterpreter_Expr_GetProvider(t *testing.T) {
 			},
 		},
 		"not present": {
-			build: value.Build{
+			build: build.Build{
 				Providers: map[string]value.Provider{},
 			},
 			expr: expr.GetProvider{
@@ -598,14 +599,14 @@ func TestInterpreter_Expr_GetProvider(t *testing.T) {
 
 func TestInterpreter_Expr_GetResource(t *testing.T) {
 	testCases := map[string]struct {
-		build    value.Build
+		build    build.Build
 		expr     expr.Type
 		out      value.Type
 		children []string
 		isError  bool
 	}{
 		"present": {
-			build: value.Build{
+			build: build.Build{
 				Resources: map[string]value.Resource{
 					"my-resource": {
 						Identifier: value.ResourceIdentifier{
