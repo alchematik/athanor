@@ -65,3 +65,11 @@ func TestEvaluator_Value_Provider(t *testing.T) {
 		})
 	}
 }
+
+func TestEvaluator_Value_String(t *testing.T) {
+	eval := evaluator.Evaluator{}
+	env := state.Environment{}
+	out, err := eval.Value(context.Background(), env, value.String{Value: "foo"})
+	require.NoError(t, err)
+	require.Equal(t, state.String{Value: "foo"}, out)
+}
