@@ -122,3 +122,65 @@ func TestEvaluator_Value_Map(t *testing.T) {
 		})
 	}
 }
+
+func TestEvaluator_Value_ResourceIdentifier(t *testing.T) {
+	testCases := map[string]struct {
+		env     state.Environment
+		input   value.Type
+		output  state.Type
+		isError bool
+	}{
+		"valid": {
+			input: value.ResourceIdentifier{
+				Alias:        "my-resource",
+				ResourceType: "bucket",
+				Value:        value.String{Value: "bucket-id"},
+			},
+			output: state.Identifier{
+				Alias:        "my-resource",
+				ResourceType: "bucket",
+				Value:        state.String{Value: "bucket-id"},
+			},
+		},
+		"missing alias": {
+			input: value.ResourceIdentifier{
+				Alias:        "",
+				ResourceType: "bucket",
+				Value:        value.String{Value: "bucket-id"},
+			},
+			output:  state.Identifier{},
+			isError: true,
+		},
+		"missing resource type": {
+			input: value.ResourceIdentifier{
+				Alias:        "my-resource",
+				ResourceType: "",
+				Value:        value.String{Value: "bucket-id"},
+			},
+			output:  state.Identifier{},
+			isError: true,
+		},
+		"missing value": {
+			input: value.ResourceIdentifier{
+				Alias:        "my-resource",
+				ResourceType: "bucket",
+				Value:        nil,
+			},
+			output:  state.Identifier{},
+			isError: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			eval := evaluator.Evaluator{}
+			out, err := eval.Value(context.Background(), tc.env, tc.input)
+			require.Equal(t, tc.output, out)
+			if tc.isError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

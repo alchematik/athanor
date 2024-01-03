@@ -38,6 +38,27 @@ func (e Evaluator) mapValue(ctx context.Context, env state.Environment, v value.
 	return m, nil
 }
 
+func (e Evaluator) resourceIdentifier(ctx context.Context, env state.Environment, v value.ResourceIdentifier) (state.Identifier, error) {
+	if v.Alias == "" {
+		return state.Identifier{}, fmt.Errorf("alias is required")
+	}
+
+	if v.ResourceType == "" {
+		return state.Identifier{}, fmt.Errorf("resource type is required")
+	}
+
+	val, err := e.Value(ctx, env, v.Value)
+	if err != nil {
+		return state.Identifier{}, err
+	}
+
+	return state.Identifier{
+		Alias:        v.Alias,
+		ResourceType: v.ResourceType,
+		Value:        val,
+	}, nil
+}
+
 func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.Provider:
@@ -85,16 +106,7 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.T
 	case value.Map:
 		return e.mapValue(ctx, env, v)
 	case value.ResourceIdentifier:
-		val, err := e.Value(ctx, env, v.Value)
-		if err != nil {
-			return nil, err
-		}
-
-		return state.Identifier{
-			Alias:        v.Alias,
-			ResourceType: v.ResourceType,
-			Value:        val,
-		}, nil
+		return e.resourceIdentifier(ctx, env, v)
 	case value.ResourceRef:
 		r, ok := env.Resources[v.Alias]
 		if !ok {
