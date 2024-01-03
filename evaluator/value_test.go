@@ -73,3 +73,52 @@ func TestEvaluator_Value_String(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, state.String{Value: "foo"}, out)
 }
+
+func TestEvaluator_Value_Map(t *testing.T) {
+	testCases := map[string]struct {
+		env     state.Environment
+		input   value.Type
+		output  state.Type
+		isError bool
+	}{
+		"single entry": {
+			input: value.Map{
+				Entries: map[string]value.Type{
+					"foo": value.String{Value: "bar"},
+				},
+			},
+			output: state.Map{
+				Entries: map[string]state.Type{
+					"foo": state.String{Value: "bar"},
+				},
+			},
+		},
+		"several entries": {
+			input: value.Map{
+				Entries: map[string]value.Type{
+					"foo": value.String{Value: "bar"},
+					"baz": value.String{Value: "bam"},
+				},
+			},
+			output: state.Map{
+				Entries: map[string]state.Type{
+					"foo": state.String{Value: "bar"},
+					"baz": state.String{Value: "bam"},
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			eval := evaluator.Evaluator{}
+			out, err := eval.Value(context.Background(), tc.env, tc.input)
+			require.Equal(t, tc.output, out)
+			if tc.isError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}

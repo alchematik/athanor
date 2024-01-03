@@ -8,7 +8,7 @@ import (
 	"github.com/alchematik/athanor/state"
 )
 
-func provider(v value.Provider) (state.Provider, error) {
+func (e Evaluator) providerValue(v value.Provider) (state.Provider, error) {
 	if v.Identifier.Name == "" {
 		return state.Provider{}, fmt.Errorf("name is required for provider")
 	}
@@ -21,10 +21,27 @@ func provider(v value.Provider) (state.Provider, error) {
 	}, nil
 }
 
+func (e Evaluator) mapValue(ctx context.Context, env state.Environment, v value.Map) (state.Map, error) {
+	m := state.Map{
+		Entries: map[string]state.Type{},
+	}
+
+	for k, entry := range v.Entries {
+		resolved, err := e.Value(ctx, env, entry)
+		if err != nil {
+			return state.Map{}, err
+		}
+
+		m.Entries[k] = resolved
+	}
+
+	return m, nil
+}
+
 func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.Provider:
-		return provider(v)
+		return e.providerValue(v)
 	case value.Resource:
 		idState, err := e.Value(ctx, env, v.Identifier)
 		if err != nil {
@@ -66,20 +83,7 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.T
 	case value.String:
 		return state.String{Value: v.Value}, nil
 	case value.Map:
-		m := state.Map{
-			Entries: map[string]state.Type{},
-		}
-
-		for k, entry := range v.Entries {
-			resolved, err := e.Value(ctx, env, entry)
-			if err != nil {
-				return nil, err
-			}
-
-			m.Entries[k] = resolved
-		}
-
-		return m, nil
+		return e.mapValue(ctx, env, v)
 	case value.ResourceIdentifier:
 		val, err := e.Value(ctx, env, v.Value)
 		if err != nil {
