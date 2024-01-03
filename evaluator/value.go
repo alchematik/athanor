@@ -8,13 +8,23 @@ import (
 	"github.com/alchematik/athanor/state"
 )
 
+func provider(v value.Provider) (state.Provider, error) {
+	if v.Identifier.Name == "" {
+		return state.Provider{}, fmt.Errorf("name is required for provider")
+	}
+	if v.Identifier.Version == "" {
+		return state.Provider{}, fmt.Errorf("version is required for provider")
+	}
+	return state.Provider{
+		Name:    v.Identifier.Name,
+		Version: v.Identifier.Version,
+	}, nil
+}
+
 func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.Provider:
-		return state.Provider{
-			Name:    v.Identifier.Name,
-			Version: v.Identifier.Version,
-		}, nil
+		return provider(v)
 	case value.Resource:
 		idState, err := e.Value(ctx, env, v.Identifier)
 		if err != nil {
