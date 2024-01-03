@@ -68,6 +68,39 @@ func (e Evaluator) resourceRef(env state.Environment, v value.ResourceRef) (stat
 	return r, nil
 }
 
+func (e Evaluator) unresolvedValue(ctx context.Context, env state.Environment, v value.Unresolved) (state.Type, error) {
+	resolved, err := e.Value(ctx, env, v.Object)
+	if err != nil {
+		return nil, err
+	}
+
+	var m map[string]state.Type
+	switch obj := resolved.(type) {
+	case state.Resource:
+		m = map[string]state.Type{
+			"identifier": obj.Identifier,
+			"config":     obj.Config,
+			"attrs":      obj.Attrs,
+		}
+	case state.Unknown:
+		return state.Unknown{
+			Name:   v.Name,
+			Object: resolved,
+		}, nil
+	case state.Map:
+		m = obj.Entries
+	default:
+		return nil, fmt.Errorf("value type %T has no field %q", v.Object, v.Name)
+	}
+
+	field, ok := m[v.Name]
+	if !ok {
+		return nil, fmt.Errorf("property %q not set", v.Name)
+	}
+
+	return field, nil
+}
+
 func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.Provider:
@@ -119,45 +152,7 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.T
 	case value.ResourceRef:
 		return e.resourceRef(env, v)
 	case value.Unresolved:
-		if _, ok := v.Object.(value.Nil); ok {
-			obj, inEnv := env.Resources[v.Name]
-			if !inEnv {
-				return nil, fmt.Errorf("object %q not in env", v.Name)
-			}
-
-			return obj, nil
-		}
-
-		resolved, err := e.Value(ctx, env, v.Object)
-		if err != nil {
-			return nil, err
-		}
-
-		var m map[string]state.Type
-		switch obj := resolved.(type) {
-		case state.Resource:
-			m = map[string]state.Type{
-				"identifier": obj.Identifier,
-				"config":     obj.Config,
-				"attrs":      obj.Attrs,
-			}
-		case state.Unknown:
-			return state.Unknown{
-				Name:   v.Name,
-				Object: resolved,
-			}, nil
-		case state.Map:
-			m = obj.Entries
-		default:
-			return nil, fmt.Errorf("value type %T has no field %q", v.Object, v.Name)
-		}
-
-		field, ok := m[v.Name]
-		if !ok {
-			return nil, fmt.Errorf("property %q not set", v.Name)
-		}
-
-		return field, nil
+		return e.unresolvedValue(ctx, env, v)
 	default:
 		return nil, fmt.Errorf("unrecognized value type: %T", val)
 	}

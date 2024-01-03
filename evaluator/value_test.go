@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	api "github.com/alchematik/athanor/api/resource"
 	"github.com/alchematik/athanor/build/value"
 	"github.com/alchematik/athanor/evaluator"
 	"github.com/alchematik/athanor/state"
@@ -237,6 +238,145 @@ func TestEvaluator_Value_ResourceRef(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestEvaluator_Value_Unresolved(t *testing.T) {
+	testCases := map[string]struct {
+		env     state.Environment
+		input   value.Type
+		output  state.Type
+		isError bool
+	}{
+		"map entry": {
+			input: value.Unresolved{
+				Name: "foo",
+				Object: value.Map{
+					Entries: map[string]value.Type{
+						"foo": value.String{Value: "bar"},
+					},
+				},
+			},
+			output: state.String{Value: "bar"},
+		},
+		"map entry missing": {
+			input: value.Unresolved{
+				Name: "foo",
+				Object: value.Map{
+					Entries: map[string]value.Type{},
+				},
+			},
+			isError: true,
+		},
+		"resource identifier": {
+			input: value.Unresolved{
+				Name: "identifier",
+				Object: value.Resource{
+					Provider: value.Provider{
+						Identifier: value.ProviderIdentifier{
+							Alias:   "my-provider",
+							Name:    "gcp",
+							Version: "v0.0.1",
+						},
+					},
+					Identifier: value.ResourceIdentifier{
+						Alias:        "my-resource",
+						ResourceType: "bucket",
+						Value:        value.String{Value: "foo"},
+					},
+					Config: value.String{Value: "bar"},
+				},
+			},
+			output: state.Identifier{
+				Alias:        "my-resource",
+				ResourceType: "bucket",
+				Value:        state.String{Value: "foo"},
+			},
+		},
+		"resource config": {
+			input: value.Unresolved{
+				Name: "config",
+				Object: value.Resource{
+					Provider: value.Provider{
+						Identifier: value.ProviderIdentifier{
+							Alias:   "my-provider",
+							Name:    "gcp",
+							Version: "v0.0.1",
+						},
+					},
+					Identifier: value.ResourceIdentifier{
+						Alias:        "my-resource",
+						ResourceType: "bucket",
+						Value:        value.String{Value: "foo"},
+					},
+					Config: value.String{Value: "bar"},
+				},
+			},
+			output: state.String{Value: "bar"},
+		},
+		"resource attrs": {
+			input: value.Unresolved{
+				Name: "attrs",
+				Object: value.Resource{
+					Provider: value.Provider{
+						Identifier: value.ProviderIdentifier{
+							Alias:   "my-provider",
+							Name:    "gcp",
+							Version: "v0.0.1",
+						},
+					},
+					Identifier: value.ResourceIdentifier{
+						Alias:        "my-resource",
+						ResourceType: "bucket",
+						Value:        value.String{Value: "foo"},
+					},
+					Config: value.String{Value: "bar"},
+				},
+			},
+			output: state.Unknown{
+				Name: "attrs",
+				Object: state.ResourceRef{
+					Alias: "my-resource",
+				},
+			},
+		},
+		"resource not a real field": {
+			input: value.Unresolved{
+				Name: "fake",
+				Object: value.Resource{
+					Provider: value.Provider{
+						Identifier: value.ProviderIdentifier{
+							Alias:   "my-provider",
+							Name:    "gcp",
+							Version: "v0.0.1",
+						},
+					},
+					Identifier: value.ResourceIdentifier{
+						Alias:        "my-resource",
+						ResourceType: "bucket",
+						Value:        value.String{Value: "foo"},
+					},
+					Config: value.String{Value: "bar"},
+				},
+			},
+			isError: true,
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			eval := evaluator.Evaluator{
+				ResourceAPI: &api.Unresolved{},
+			}
+			out, err := eval.Value(context.Background(), tc.env, tc.input)
+			if tc.isError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tc.output, out)
 		})
 	}
 }
