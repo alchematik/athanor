@@ -101,48 +101,52 @@ func (e Evaluator) unresolvedValue(ctx context.Context, env state.Environment, v
 	return field, nil
 }
 
+func (e Evaluator) resourceValue(ctx context.Context, env state.Environment, v value.Resource) (state.Resource, error) {
+	idState, err := e.Value(ctx, env, v.Identifier)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	id, ok := idState.(state.Identifier)
+	if !ok {
+		return state.Resource{}, fmt.Errorf("expected Identifier, got %T", idState)
+	}
+
+	config, err := e.Value(ctx, env, v.Config)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	providerState, err := e.Value(ctx, env, v.Provider)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	provider, ok := providerState.(state.Provider)
+	if !ok {
+		return state.Resource{}, fmt.Errorf("expected Provider, got %T", providerState)
+	}
+
+	input := state.Resource{
+		Provider:   provider,
+		Identifier: id,
+		Config:     config,
+	}
+
+	output, err := e.ResourceAPI.GetResource(ctx, input)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	return output, nil
+}
+
 func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
 	switch v := val.(type) {
 	case value.Provider:
 		return e.providerValue(v)
 	case value.Resource:
-		idState, err := e.Value(ctx, env, v.Identifier)
-		if err != nil {
-			return nil, err
-		}
-
-		id, ok := idState.(state.Identifier)
-		if !ok {
-			return nil, fmt.Errorf("expected Identifier, got %T", idState)
-		}
-
-		config, err := e.Value(ctx, env, v.Config)
-		if err != nil {
-			return nil, err
-		}
-
-		providerState, err := e.Value(ctx, env, v.Provider)
-		if err != nil {
-			return nil, err
-		}
-
-		provider, ok := providerState.(state.Provider)
-		if !ok {
-			return nil, fmt.Errorf("expected Provider, got %T", providerState)
-		}
-
-		input := state.Resource{
-			Provider:   provider,
-			Identifier: id,
-			Config:     config,
-		}
-
-		output, err := e.ResourceAPI.GetResource(ctx, input)
-		if err != nil {
-			return nil, err
-		}
-
-		return output, nil
+		return e.resourceValue(ctx, env, v)
 	case value.String:
 		return state.String{Value: v.Value}, nil
 	case value.Map:

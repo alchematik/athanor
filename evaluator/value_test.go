@@ -380,3 +380,70 @@ func TestEvaluator_Value_Unresolved(t *testing.T) {
 		})
 	}
 }
+
+func TestEvaluator_Value_Resource(t *testing.T) {
+	testCases := map[string]struct {
+		env     state.Environment
+		input   value.Type
+		output  state.Type
+		isError bool
+	}{
+		"valid resource": {
+			input: value.Resource{
+				Provider: value.Provider{
+					Identifier: value.ProviderIdentifier{
+						Alias:   "my-provider",
+						Name:    "gcp",
+						Version: "v0.0.1",
+					},
+				},
+				Identifier: value.ResourceIdentifier{
+					Alias:        "my-resource",
+					ResourceType: "bucket",
+					Value:        value.String{Value: "foo"},
+				},
+				Config: value.String{Value: "bar"},
+				Attrs: value.Unresolved{
+					Name: "attrs",
+					Object: value.ResourceRef{
+						Alias: "my-resource",
+					},
+				},
+			},
+			output: state.Resource{
+				Provider: state.Provider{
+					Name:    "gcp",
+					Version: "v0.0.1",
+				},
+				Identifier: state.Identifier{
+					Alias:        "my-resource",
+					ResourceType: "bucket",
+					Value:        state.String{Value: "foo"},
+				},
+				Config: state.String{Value: "bar"},
+				Attrs: state.Unknown{
+					Name: "attrs",
+					Object: state.ResourceRef{
+						Alias: "my-resource",
+					},
+				},
+			},
+		},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			eval := evaluator.Evaluator{
+				ResourceAPI: &api.Unresolved{},
+			}
+			out, err := eval.Value(context.Background(), tc.env, tc.input)
+			if tc.isError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+
+			require.Equal(t, tc.output, out)
+		})
+	}
+}
