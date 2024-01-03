@@ -30,6 +30,7 @@ type Resource struct {
 type Identifier struct {
 	Type
 
+	Alias        string
 	ResourceType string
 	Value        Type
 }
