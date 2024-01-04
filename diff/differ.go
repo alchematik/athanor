@@ -86,20 +86,20 @@ func Diff(from, to state.Type) (Type, error) {
 	case state.String:
 		switch t := to.(type) {
 		case state.String:
-			return StringDiff(f, t)
+			return stringDiff(f, t)
 		case state.Unknown:
 			return Unknown{}, nil
 		case state.Nil:
-			return StringDiff(f, state.String{})
+			return stringDiff(f, state.String{})
 		default:
 			return nil, fmt.Errorf("invalid type for string diff: %T", to)
 		}
 	case state.Map:
 		switch t := to.(type) {
 		case state.Map:
-			return MapDiff(f, t)
+			return mapDiff(f, t)
 		case state.Nil:
-			return MapDiff(f, state.Map{Entries: map[string]state.Type{}})
+			return mapDiff(f, state.Map{Entries: map[string]state.Type{}})
 		default:
 			return nil, fmt.Errorf("invalid type for map diff: %T", to)
 		}
@@ -116,9 +116,9 @@ func Diff(from, to state.Type) (Type, error) {
 	case state.Nil:
 		switch t := to.(type) {
 		case state.String:
-			return StringDiff(state.String{}, t)
+			return stringDiff(state.String{}, t)
 		case state.Map:
-			return MapDiff(state.Map{}, t)
+			return mapDiff(state.Map{}, t)
 		case state.Resource:
 			return ResourceDiff(state.Resource{}, t)
 		case state.Unknown:
@@ -238,7 +238,7 @@ func ResourceDiff(from, to state.Resource) (Resource, error) {
 	}, nil
 }
 
-func StringDiff(from, to state.String) (String, error) {
+func stringDiff(from, to state.String) (String, error) {
 	var op Operation
 
 	switch {
@@ -259,7 +259,7 @@ func StringDiff(from, to state.String) (String, error) {
 	}, nil
 }
 
-func MapDiff(from, to state.Map) (Map, error) {
+func mapDiff(from, to state.Map) (Map, error) {
 	var op Operation
 	diffs := map[string]Type{}
 

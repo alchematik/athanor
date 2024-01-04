@@ -8,6 +8,109 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestResourceDiff(t *testing.T) {
+	testCases := map[string]struct {
+		from state.Type
+		to   state.Type
+		out  diff.Type
+	}{
+		"noop": {
+			from: state.Resource{
+				Config: state.String{Value: "config"},
+			},
+			to: state.Resource{
+				Config: state.String{Value: "config"},
+			},
+			out: diff.Resource{
+				From: state.Resource{
+					Config: state.String{Value: "config"},
+				},
+				To: state.Resource{
+					Config: state.String{Value: "config"},
+				},
+				ConfigDiff: diff.String{
+					From:          state.String{Value: "config"},
+					To:            state.String{Value: "config"},
+					DiffOperation: diff.OperationNoop,
+				},
+				DiffOperation: diff.OperationNoop,
+			},
+		},
+		// "create":  {},
+		"update": {
+			from: state.Resource{
+				Config: state.Map{
+					Entries: map[string]state.Type{
+						"foo": state.String{Value: "before"},
+					},
+				},
+			},
+			to: state.Resource{
+				Config: state.Map{
+					Entries: map[string]state.Type{
+						"foo": state.String{Value: "after"},
+						"bar": state.String{Value: "baz"},
+					},
+				},
+			},
+			out: diff.Resource{
+				From: state.Resource{
+					Config: state.Map{
+						Entries: map[string]state.Type{
+							"foo": state.String{Value: "before"},
+						},
+					},
+				},
+				To: state.Resource{
+					Config: state.Map{
+						Entries: map[string]state.Type{
+							"foo": state.String{Value: "after"},
+							"bar": state.String{Value: "baz"},
+						},
+					},
+				},
+				DiffOperation: diff.OperationUpdate,
+				ConfigDiff: diff.Map{
+					From: state.Map{
+						Entries: map[string]state.Type{
+							"foo": state.String{Value: "before"},
+						},
+					},
+					To: state.Map{
+						Entries: map[string]state.Type{
+							"foo": state.String{Value: "after"},
+							"bar": state.String{Value: "baz"},
+						},
+					},
+					DiffOperation: diff.OperationUpdate,
+					Diffs: map[string]diff.Type{
+						"foo": diff.String{
+							From:          state.String{Value: "before"},
+							To:            state.String{Value: "after"},
+							DiffOperation: diff.OperationUpdate,
+						},
+						"bar": diff.String{
+							From:          state.String{},
+							To:            state.String{Value: "baz"},
+							DiffOperation: diff.OperationCreate,
+						},
+					},
+				},
+			},
+		},
+		// "unknown": {},
+		// "delete": {},
+	}
+
+	for name, tc := range testCases {
+		t.Run(name, func(t *testing.T) {
+			out, err := diff.Diff(tc.from, tc.to)
+			require.NoError(t, err)
+			require.Equal(t, tc.out, out)
+		})
+	}
+}
+
 func TestStringDiff(t *testing.T) {
 	testCases := []struct {
 		description string
