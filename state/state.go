@@ -25,6 +25,7 @@ type Resource struct {
 	Identifier Identifier
 	Config     Type
 	Attrs      Type
+	Exists     Bool
 }
 
 type Identifier struct {
@@ -39,6 +40,12 @@ type String struct {
 	Type
 
 	Value string
+}
+
+type Bool struct {
+	Type
+
+	Value bool
 }
 
 type Map struct {

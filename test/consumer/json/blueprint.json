@@ -2,7 +2,7 @@
   "stmts": [
     {
       "provider": {
-        "identifier": {
+        "expr": {
           "provider": {
             "identifier": {
               "provider_identifier": {
@@ -21,8 +21,11 @@
     },
     {
       "resource": {
-        "identifier": {
+        "expr": {
           "resource": {
+            "exists": {
+              "bool_literal": true
+            },
             "provider": {
               "get_provider": {
                 "alias": "gcp"
@@ -64,8 +67,11 @@
     },
     {
       "resource": {
-        "identifier": {
+        "expr": {
           "resource": {
+            "exists": {
+              "bool_literal": true
+            },
             "provider": {
               "get_provider": {
                 "alias": "gcp"

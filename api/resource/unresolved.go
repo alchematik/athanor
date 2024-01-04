@@ -14,6 +14,7 @@ func (u *Unresolved) GetResource(ctx context.Context, r state.Resource) (state.R
 		Provider:   r.Provider,
 		Identifier: r.Identifier,
 		Config:     r.Config,
+		Exists:     r.Exists,
 		Attrs: state.Unknown{
 			Name: "attrs",
 			Object: state.ResourceRef{

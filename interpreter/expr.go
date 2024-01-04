@@ -13,6 +13,8 @@ func (in Interpreter) Expr(ctx context.Context, b build.Build, ex expr.Type) (va
 	switch e := ex.(type) {
 	case expr.String:
 		return value.String{Value: e.Value}, nil, nil
+	case expr.Bool:
+		return value.Bool{Value: e.Value}, nil, nil
 	case expr.Map:
 		return in.mapExpr(ctx, b, e)
 	case expr.Provider:
@@ -88,8 +90,14 @@ func (in Interpreter) resource(ctx context.Context, b build.Build, e expr.Resour
 		return value.Resource{}, nil, err
 	}
 
+	existsVal, existsChildren, err := in.Expr(ctx, b, e.Exists)
+	if err != nil {
+		return value.Resource{}, nil, err
+	}
+
 	children := append(providerChildren, idChildren...)
 	children = append(children, configChildren...)
+	children = append(children, existsChildren...)
 	var out []string
 	for _, child := range children {
 		// Filter out alias to self.
@@ -104,6 +112,7 @@ func (in Interpreter) resource(ctx context.Context, b build.Build, e expr.Resour
 		Provider:   provider,
 		Identifier: id,
 		Config:     configVal,
+		Exists:     existsVal,
 		Attrs: value.Unresolved{
 			Name: "attrs",
 			Object: value.ResourceRef{

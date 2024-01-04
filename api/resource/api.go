@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
+	statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
 	"github.com/alchematik/athanor/plugin"
 	"github.com/alchematik/athanor/state"
 
-	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
-	statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type API struct {
@@ -30,8 +32,13 @@ func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource,
 		Identifier: id.GetIdentifier(),
 	}
 	response, err := client.GetResource(ctx, request)
+	exists := state.Bool{Value: true}
 	if err != nil {
-		return state.Resource{}, err
+		if status.Code(err) == codes.NotFound {
+			exists.Value = false
+		} else {
+			return state.Resource{}, err
+		}
 	}
 
 	config, err := fromProto(response.GetResource().GetConfig())
@@ -49,6 +56,7 @@ func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource,
 		Identifier: r.Identifier,
 		Config:     config,
 		Attrs:      attrs,
+		Exists:     exists,
 	}, nil
 }
 

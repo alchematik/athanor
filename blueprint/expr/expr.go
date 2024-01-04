@@ -10,6 +10,12 @@ type String struct {
 	Value string
 }
 
+type Bool struct {
+	Type
+
+	Value bool
+}
+
 type Map struct {
 	Type
 
@@ -62,6 +68,7 @@ type Resource struct {
 	Provider   Type
 	Identifier Type
 	Config     Type
+	Exists     Type
 }
 
 type ResourceIdentifier struct {

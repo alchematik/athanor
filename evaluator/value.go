@@ -90,7 +90,7 @@ func (e Evaluator) unresolvedValue(ctx context.Context, env state.Environment, v
 	case state.Map:
 		m = obj.Entries
 	default:
-		return nil, fmt.Errorf("value type %T has no field %q", v.Object, v.Name)
+		return nil, fmt.Errorf("value type %T has no field %q", resolved, v.Name)
 	}
 
 	field, ok := m[v.Name]
@@ -127,10 +127,23 @@ func (e Evaluator) resourceValue(ctx context.Context, env state.Environment, v v
 		return state.Resource{}, fmt.Errorf("expected Provider, got %T", providerState)
 	}
 
+	existsVal, err := e.Value(ctx, env, v.Exists)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	exists, ok := existsVal.(state.Bool)
+	if !ok {
+		return state.Resource{}, fmt.Errorf("exists must be boolean")
+	}
+
+	// fmt.Printf("exists >>>>>>>>>>> %v\n", exists)
+
 	input := state.Resource{
 		Provider:   provider,
 		Identifier: id,
 		Config:     config,
+		Exists:     exists,
 	}
 
 	output, err := e.ResourceAPI.GetResource(ctx, input)
@@ -149,6 +162,8 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.T
 		return e.resourceValue(ctx, env, v)
 	case value.String:
 		return state.String{Value: v.Value}, nil
+	case value.Bool:
+		return state.Bool{Value: v.Value}, nil
 	case value.Map:
 		return e.mapValue(ctx, env, v)
 	case value.ResourceIdentifier:

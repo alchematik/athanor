@@ -20,6 +20,16 @@ func (s String) Operation() Operation {
 	return s.DiffOperation
 }
 
+type Bool struct {
+	From          state.Bool
+	To            state.Bool
+	DiffOperation Operation
+}
+
+func (b Bool) Operation() Operation {
+	return b.DiffOperation
+}
+
 type Map struct {
 	From          state.Map
 	To            state.Map
@@ -35,6 +45,7 @@ type Resource struct {
 	From          state.Resource
 	To            state.Resource
 	ConfigDiff    Type
+	ExistsDiff    Type
 	DiffOperation Operation
 }
 
@@ -94,6 +105,17 @@ func Diff(from, to state.Type) (Type, error) {
 		default:
 			return nil, fmt.Errorf("invalid type for string diff: %T", to)
 		}
+	case state.Bool:
+		switch t := to.(type) {
+		case state.Bool:
+			return boolDiff(f, t)
+		case state.Unknown:
+			return Unknown{}, nil
+		case state.Nil:
+			return boolDiff(f, state.Bool{})
+		default:
+			return nil, fmt.Errorf("invalid type for bool diff: %T", to)
+		}
 	case state.Map:
 		switch t := to.(type) {
 		case state.Map:
@@ -117,6 +139,8 @@ func Diff(from, to state.Type) (Type, error) {
 		switch t := to.(type) {
 		case state.String:
 			return stringDiff(state.String{}, t)
+		case state.Bool:
+			return boolDiff(state.Bool{}, t)
 		case state.Map:
 			return mapDiff(state.Map{}, t)
 		case state.Resource:
@@ -215,6 +239,8 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 	}
 
 	return Environment{
+		From:          from,
+		To:            to,
 		DiffOperation: op,
 		Diffs:         diffs,
 		Dependencies:  depMap,
@@ -227,14 +253,22 @@ func ResourceDiff(from, to state.Resource) (Resource, error) {
 		return Resource{}, err
 	}
 
-	// TODO: take state into account i.e. exists vs not_exists
-	// TODO: Take unknown fields into account.
+	exists, err := Diff(from.Exists, to.Exists)
+	if err != nil {
+		return Resource{}, err
+	}
+
+	op := exists.Operation()
+	if op == OperationNoop {
+		op = config.Operation()
+	}
 
 	return Resource{
-		DiffOperation: config.Operation(),
+		DiffOperation: op,
 		From:          from,
 		To:            to,
 		ConfigDiff:    config,
+		ExistsDiff:    exists,
 	}, nil
 }
 
@@ -253,6 +287,25 @@ func stringDiff(from, to state.String) (String, error) {
 	}
 
 	return String{
+		From:          from,
+		To:            to,
+		DiffOperation: op,
+	}, nil
+}
+
+func boolDiff(from, to state.Bool) (Bool, error) {
+	var op Operation
+
+	switch {
+	case to.Value == from.Value:
+		op = OperationNoop
+	case to.Value && !from.Value:
+		op = OperationCreate
+	case !to.Value && from.Value:
+		op = OperationDelete
+	}
+
+	return Bool{
 		From:          from,
 		To:            to,
 		DiffOperation: op,

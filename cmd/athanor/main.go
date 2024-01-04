@@ -88,8 +88,7 @@ func convertBlueprint(bp *consumerpb.Blueprint) (blueprint.Blueprint, error) {
 func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 	switch s := st.GetType().(type) {
 	case *consumerpb.Stmt_Provider:
-		// TODO: Change field name.
-		ex, err := convertExpr(s.Provider.GetIdentifier())
+		ex, err := convertExpr(s.Provider.GetExpr())
 		if err != nil {
 			return nil, err
 		}
@@ -98,8 +97,7 @@ func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 			Expr: ex,
 		}, nil
 	case *consumerpb.Stmt_Resource:
-		// TODO: Change field name.
-		ex, err := convertExpr(s.Resource.GetIdentifier())
+		ex, err := convertExpr(s.Resource.GetExpr())
 		if err != nil {
 			return nil, err
 		}
@@ -139,10 +137,16 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 			return nil, err
 		}
 
+		exists, err := convertExpr(e.Resource.GetExists())
+		if err != nil {
+			return nil, err
+		}
+
 		return expr.Resource{
 			Provider:   provider,
 			Identifier: id,
 			Config:     config,
+			Exists:     exists,
 		}, nil
 	case *consumerpb.Expr_ProviderIdentifier:
 		name, err := convertExpr(e.ProviderIdentifier.GetName())
@@ -173,6 +177,8 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 		}, nil
 	case *consumerpb.Expr_StringLiteral:
 		return expr.String{Value: e.StringLiteral}, nil
+	case *consumerpb.Expr_BoolLiteral:
+		return expr.Bool{Value: e.BoolLiteral}, nil
 	case *consumerpb.Expr_Map:
 		m := expr.Map{Entries: map[string]expr.Type{}}
 		for k, v := range e.Map.GetEntries() {

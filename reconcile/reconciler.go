@@ -63,6 +63,8 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 			return state.Environment{}, fmt.Errorf("expected resource, got %T", resolved)
 		}
 
+		fmt.Printf("resolved >>>>>>> %+v\n", resolvedResource)
+
 		updatedDiff, err := diff.ResourceDiff(resourceDiff.From, resolvedResource)
 		if err != nil {
 			return state.Environment{}, err
@@ -265,6 +267,7 @@ func (r Reconciler) ReconcileResource(ctx context.Context, env state.Environment
 			Identifier: resource.Identifier,
 			Config:     resConfig,
 			Attrs:      resAttrs,
+			Exists:     state.Bool{Value: true},
 		}, nil
 	default:
 		return state.Resource{}, fmt.Errorf("unsupported operation: %v\n", d.Operation())
@@ -387,6 +390,9 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 			return nil, fmt.Errorf("resolve: no resource with alias %q found", r.Alias)
 		}
 
+		fmt.Printf("found resource\n")
+		// fmt.Printf("found resource >>>>>>>>>>> %v, %+v\n", r.Alias, res)
+
 		return res, nil
 	case state.Resource:
 		config, err := resolve(env, r.Config)
@@ -399,6 +405,7 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 			Identifier: r.Identifier,
 			Config:     config,
 			Attrs:      r.Attrs,
+			Exists:     r.Exists,
 		}, nil
 	case state.Unknown:
 		resolved, err := resolve(env, r.Object)
@@ -406,9 +413,12 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 			return nil, err
 		}
 
+		// fmt.Printf("RESOLVED >>>>>>> %T, %T, %v\n", r.Object, resolved, resolved)
+
 		var m map[string]state.Type
 		switch obj := resolved.(type) {
 		case state.Resource:
+			fmt.Printf("resolved unknown: getting %v on %T %v\n", r.Name, obj.Attrs, obj.Attrs)
 			m = map[string]state.Type{
 				"identifier": obj.Identifier,
 				"config":     obj.Config,
@@ -417,13 +427,15 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 		case state.Map:
 			m = obj.Entries
 		default:
-			return nil, fmt.Errorf("value type %T has no field %q", obj, r.Name)
+			return nil, fmt.Errorf("value type [%T] has no field %q", resolved, r.Name)
 		}
 
 		val, ok := m[r.Name]
 		if !ok {
 			return nil, fmt.Errorf("property %q not set", r.Name)
 		}
+
+		// fmt.Printf("val: %v\n", val)
 
 		return val, nil
 	default:

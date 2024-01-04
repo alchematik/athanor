@@ -26,17 +26,18 @@ message Expr {
     string string_literal = 1;
     uint32 int_literal = 2;
     float float_literal = 3;
-    ListExpr list = 4;
-    MapExpr map = 5;
-    GetExpr get = 6;
-    ProviderExpr provider = 7;
-    ResourceExpr resource = 8;
-    GetProviderExpr get_provider = 9;
-    GetResourceExpr get_resource = 10;
-    NilExpr nil = 11;
-    IOGetExpr io_get = 12;
-    ProviderIdentifierExpr provider_identifier = 13;
-    ResourceIdentifierExpr resource_identifier = 14;
+    bool bool_literal = 4;
+    ListExpr list = 5;
+    MapExpr map = 6;
+    GetExpr get = 7;
+    ProviderExpr provider = 8;
+    ResourceExpr resource = 9;
+    GetProviderExpr get_provider = 10;
+    GetResourceExpr get_resource = 11;
+    NilExpr nil = 12;
+    IOGetExpr io_get = 13;
+    ProviderIdentifierExpr provider_identifier = 14;
+    ResourceIdentifierExpr resource_identifier = 15;
   }
 }
 
@@ -82,6 +83,7 @@ message ResourceExpr {
   Expr provider = 1;
   Expr identifier = 2;
   Expr config = 3;
+  Expr exists = 4;
 }
 
 message ResourceIdentifierExpr {

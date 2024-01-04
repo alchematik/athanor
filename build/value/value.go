@@ -17,6 +17,7 @@ type Resource struct {
 	Identifier ResourceIdentifier
 	Config     Type
 	Attrs      Type
+	Exists     Type
 }
 
 type ProviderIdentifier struct {
@@ -39,6 +40,12 @@ type String struct {
 	Type
 
 	Value string
+}
+
+type Bool struct {
+	Type
+
+	Value bool
 }
 
 type Map struct {
