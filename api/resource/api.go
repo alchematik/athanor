@@ -13,6 +13,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type Field struct {
+	Name      string
+	SubFields []Field
+}
+
 type API struct {
 	ProviderPluginManager plugin.Provider
 }
@@ -58,6 +63,129 @@ func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource,
 		Attrs:      attrs,
 		Exists:     exists,
 	}, nil
+}
+
+func (a API) CreateResource(ctx context.Context, r state.Resource) (state.Resource, error) {
+	client, err := a.ProviderPluginManager.Client(r.Provider)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	id, err := toProto(r.Identifier)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	config, err := toProto(r.Config)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	request := &backendpb.CreateResourceRequest{
+		Identifier: id.GetIdentifier(),
+		Config:     config,
+	}
+	response, err := client.CreateResource(ctx, request)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	resConfig, err := fromProto(response.GetResource().GetConfig())
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	attrs, err := fromProto(response.GetResource().GetAttrs())
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	return state.Resource{
+		Provider:   r.Provider,
+		Identifier: r.Identifier,
+		Config:     resConfig,
+		Attrs:      attrs,
+		Exists:     state.Bool{Value: true},
+	}, nil
+}
+
+func (a API) DeleteResource(ctx context.Context, r state.Resource) error {
+	client, err := a.ProviderPluginManager.Client(r.Provider)
+	if err != nil {
+		return err
+	}
+
+	id, err := toProto(r.Identifier)
+	if err != nil {
+		return err
+	}
+
+	request := &backendpb.DeleteResourceRequest{
+		Identifier: id.GetIdentifier(),
+	}
+	_, err = client.DeleteResource(ctx, request)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (a API) UpdateResource(ctx context.Context, r state.Resource, mask []Field) (state.Resource, error) {
+	client, err := a.ProviderPluginManager.Client(r.Provider)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	id, err := toProto(r.Identifier)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	config, err := toProto(r.Config)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	request := &backendpb.UpdateResourceRequest{
+		Identifier: id.GetIdentifier(),
+		Config:     config,
+		Mask:       toProtoMask(mask),
+	}
+	response, err := client.UpdateResource(ctx, request)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	responseConfig, err := fromProto(response.GetResource().GetConfig())
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	responseAttrs, err := fromProto(response.GetResource().GetAttrs())
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	return state.Resource{
+		Identifier: r.Identifier,
+		Config:     responseConfig,
+		Attrs:      responseAttrs,
+		Exists:     state.Bool{Value: true},
+	}, nil
+}
+
+func toProtoMask(mask []Field) []*backendpb.Field {
+	var protoMask []*backendpb.Field
+	for _, f := range mask {
+		p := &backendpb.Field{
+			Name:      f.Name,
+			SubFields: toProtoMask(f.SubFields),
+		}
+		protoMask = append(protoMask, p)
+	}
+
+	return protoMask
 }
 
 func fromProto(val *statepb.Value) (state.Type, error) {

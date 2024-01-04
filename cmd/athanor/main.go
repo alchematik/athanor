@@ -325,7 +325,11 @@ func main() {
 							fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
 
 							reconciler := reconcile.Reconciler{
-								ProviderPluginDir: ".backends",
+								ResourceAPI: api.API{
+									ProviderPluginManager: plug.Provider{
+										Dir: ".backends",
+									},
+								},
 							}
 							reconciledState, err := reconciler.ReconcileEnvironment(ctx.Context, d.(diff.Environment))
 							if err != nil {

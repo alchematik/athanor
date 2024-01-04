@@ -111,7 +111,7 @@ func Diff(from, to state.Type) (Type, error) {
 	switch f := from.(type) {
 	case state.Environment:
 		if toIsEmpty {
-			return EnvironmentDiff(f, state.Environment{})
+			return environmentDiff(f, state.Environment{})
 		}
 
 		t, ok := to.(state.Environment)
@@ -119,7 +119,7 @@ func Diff(from, to state.Type) (Type, error) {
 			return nil, fmt.Errorf("invalid type for environment diff: %T", to)
 		}
 
-		return EnvironmentDiff(f, t)
+		return environmentDiff(f, t)
 	case state.String:
 		if toIsEmpty {
 			return stringDiff(f, state.String{})
@@ -169,7 +169,7 @@ func Diff(from, to state.Type) (Type, error) {
 	}
 }
 
-func EnvironmentDiff(from, to state.Environment) (Environment, error) {
+func environmentDiff(from, to state.Environment) (Environment, error) {
 	var op Operation
 	diffs := map[string]Type{}
 	var depMap map[string][]string
@@ -216,6 +216,9 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 			case OperationCreate, OperationUpdate, OperationUnknown:
 				depMap[k] = to.DependencyMap[k]
 			case OperationDelete:
+				// This is meant to makes sure that children are deleted before parents.
+				// TODO: Add tests around this behavior and also validate that child resources of the deleted parent
+				// either don't depend on the parent or are also being deleted.
 				children := from.DependencyMap[k]
 				for _, child := range children {
 					depMap[child] = append(depMap[child], k)

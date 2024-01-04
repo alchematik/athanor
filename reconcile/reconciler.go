@@ -3,20 +3,21 @@ package reconcile
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"path/filepath"
 
-	"github.com/alchematik/athanor/backend"
+	api "github.com/alchematik/athanor/api/resource"
 	"github.com/alchematik/athanor/diff"
-	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
-	statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
 	"github.com/alchematik/athanor/state"
-
-	plugin "github.com/hashicorp/go-plugin"
 )
 
 type Reconciler struct {
-	ProviderPluginDir string
+	ResourceAPI ResourceAPI
+}
+
+type ResourceAPI interface {
+	GetResource(context.Context, state.Resource) (state.Resource, error)
+	CreateResource(context.Context, state.Resource) (state.Resource, error)
+	DeleteResource(context.Context, state.Resource) error
+	UpdateResource(context.Context, state.Resource, []api.Field) (state.Resource, error)
 }
 
 func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment) (state.Environment, error) {
@@ -99,192 +100,27 @@ func (r Reconciler) ReconcileResource(ctx context.Context, env state.Environment
 	case diff.OperationNoop:
 		return d.To, nil
 	case diff.OperationCreate:
-		resource := d.To
-
-		pluginPath := filepath.Join(r.ProviderPluginDir, resource.Provider.Name, resource.Provider.Version, "provider")
-		client := plugin.NewClient(&plugin.ClientConfig{
-			HandshakeConfig: backend.HandshakeConfig,
-			Plugins: map[string]plugin.Plugin{
-				"backend": &backend.Plugin{},
-			},
-			Cmd:              exec.Command("sh", "-c", pluginPath),
-			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		})
-
-		dispensor, err := client.Client()
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		rawPlug, err := dispensor.Dispense("backend")
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		plug, ok := rawPlug.(backendpb.BackendClient)
-		if !ok {
-			return state.Resource{}, fmt.Errorf("expected BackendClient, got %T", rawPlug)
-		}
-
-		protoID, err := convertProtoValue(resource.Identifier)
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		protoConfig, err := convertProtoValue(resource.Config)
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		// TODO: Check response and make sure we've reconciled.
-		res, err := plug.CreateResource(ctx, &backendpb.CreateResourceRequest{
-			Identifier: protoID.GetIdentifier(),
-			Config:     protoConfig,
-		})
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		resConfig, err := protoToState(res.GetResource().GetConfig())
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		resAttrs, err := protoToState(res.GetResource().GetAttrs())
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		r := state.Resource{
-			Provider:   resource.Provider,
-			Identifier: resource.Identifier,
-			Config:     resConfig,
-			Attrs:      resAttrs,
-		}
-
-		return r, nil
+		return r.ResourceAPI.CreateResource(ctx, d.To)
 	case diff.OperationDelete:
-		resource := d.To
-
-		pluginPath := filepath.Join(r.ProviderPluginDir, resource.Provider.Name, resource.Provider.Version, "provider")
-		client := plugin.NewClient(&plugin.ClientConfig{
-			HandshakeConfig: backend.HandshakeConfig,
-			Plugins: map[string]plugin.Plugin{
-				"backend": &backend.Plugin{},
-			},
-			Cmd:              exec.Command("sh", "-c", pluginPath),
-			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		})
-
-		dispensor, err := client.Client()
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		rawPlug, err := dispensor.Dispense("backend")
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		plug, ok := rawPlug.(backendpb.BackendClient)
-		if !ok {
-			return state.Resource{}, fmt.Errorf("expected BackendClient, got %T", rawPlug)
-		}
-
-		protoID, err := convertProtoValue(resource.Identifier)
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		// TODO: Check resource state and keep reconciling if we have to.
-		_, err = plug.DeleteResource(ctx, &backendpb.DeleteResourceRequest{
-			Identifier: protoID.GetIdentifier(),
-		})
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		return resource, nil
+		return d.To, r.ResourceAPI.DeleteResource(ctx, d.To)
 	case diff.OperationUpdate:
-		resource := d.To
-
-		pluginPath := filepath.Join(r.ProviderPluginDir, resource.Provider.Name, resource.Provider.Version, "provider")
-		client := plugin.NewClient(&plugin.ClientConfig{
-			HandshakeConfig: backend.HandshakeConfig,
-			Plugins: map[string]plugin.Plugin{
-				"backend": &backend.Plugin{},
-			},
-			Cmd:              exec.Command("sh", "-c", pluginPath),
-			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		})
-
-		dispensor, err := client.Client()
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		rawPlug, err := dispensor.Dispense("backend")
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		plug, ok := rawPlug.(backendpb.BackendClient)
-		if !ok {
-			return state.Resource{}, fmt.Errorf("expected BackendClient, got %T", rawPlug)
-		}
-
-		protoID, err := convertProtoValue(resource.Identifier)
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		protoConfig, err := convertProtoValue(resource.Config)
-		if err != nil {
-			return state.Resource{}, err
-		}
-
 		mask, err := diffToUpdateMask(d.ConfigDiff)
 		if err != nil {
 			return state.Resource{}, err
 		}
 
-		res, err := plug.UpdateResource(ctx, &backendpb.UpdateResourceRequest{
-			Identifier: protoID.GetIdentifier(),
-			Config:     protoConfig,
-			Mask:       mask,
-		})
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		resConfig, err := protoToState(res.GetResource().GetConfig())
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		resAttrs, err := protoToState(res.GetResource().GetAttrs())
-		if err != nil {
-			return state.Resource{}, err
-		}
-
-		return state.Resource{
-			Provider:   resource.Provider,
-			Identifier: resource.Identifier,
-			Config:     resConfig,
-			Attrs:      resAttrs,
-			Exists:     state.Bool{Value: true},
-		}, nil
+		return r.ResourceAPI.UpdateResource(ctx, d.To, mask)
 	default:
 		return state.Resource{}, fmt.Errorf("unsupported operation: %v\n", d.Operation())
 	}
 }
 
-func diffToUpdateMask(d diff.Type) ([]*backendpb.Field, error) {
+func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 	switch t := d.(type) {
 	case diff.Resource:
 		return diffToUpdateMask(t.ConfigDiff)
 	case diff.Map:
-		var fields []*backendpb.Field
+		var fields []api.Field
 		for k, v := range t.Diffs {
 			// Skip noops and deletes.
 			if v.Operation() == diff.OperationNoop || v.Operation() == diff.OperationDelete {
@@ -296,7 +132,7 @@ func diffToUpdateMask(d diff.Type) ([]*backendpb.Field, error) {
 				return nil, err
 			}
 
-			fields = append(fields, &backendpb.Field{Name: k, SubFields: sub})
+			fields = append(fields, api.Field{Name: k, SubFields: sub})
 		}
 
 		return fields, nil
@@ -304,69 +140,6 @@ func diffToUpdateMask(d diff.Type) ([]*backendpb.Field, error) {
 		return nil, nil
 	default:
 		return nil, fmt.Errorf("unsupported type for mask %T\n", d)
-	}
-}
-
-// TODO: Exctact into common package.
-func protoToState(val *statepb.Value) (state.Type, error) {
-	switch v := val.GetType().(type) {
-	case *statepb.Value_Map:
-		entries := map[string]state.Type{}
-		for k, element := range v.Map.GetEntries() {
-			converted, err := protoToState(element)
-			if err != nil {
-				return nil, err
-			}
-			entries[k] = converted
-		}
-
-		return state.Map{Entries: entries}, nil
-	case *statepb.Value_StringValue:
-		return state.String{Value: v.StringValue}, nil
-	default:
-		return nil, fmt.Errorf("unsupported type for converting %v", val)
-	}
-}
-
-func convertProtoValue(val state.Type) (*statepb.Value, error) {
-	switch v := val.(type) {
-	case state.String:
-		return &statepb.Value{
-			Type: &statepb.Value_StringValue{StringValue: v.Value},
-		}, nil
-	case state.Map:
-		entries := map[string]*statepb.Value{}
-		for k, v := range v.Entries {
-			converted, err := convertProtoValue(v)
-			if err != nil {
-				return nil, err
-			}
-			entries[k] = converted
-		}
-
-		return &statepb.Value{
-			Type: &statepb.Value_Map{
-				Map: &statepb.MapValue{
-					Entries: entries,
-				},
-			},
-		}, nil
-	case state.Identifier:
-		converted, err := convertProtoValue(v.Value)
-		if err != nil {
-			return nil, err
-		}
-
-		return &statepb.Value{
-			Type: &statepb.Value_Identifier{
-				Identifier: &statepb.Identifier{
-					Type:  v.ResourceType,
-					Value: converted,
-				},
-			},
-		}, nil
-	default:
-		return nil, fmt.Errorf("reconciler: unknown type %T\n", val)
 	}
 }
 

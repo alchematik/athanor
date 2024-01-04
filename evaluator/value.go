@@ -155,7 +155,6 @@ func (e Evaluator) resourceValue(ctx context.Context, env state.Environment, v v
 }
 
 func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
-	// fmt.Printf(">>>>>>>>>>> %T, %v\n", val, val)
 	switch v := val.(type) {
 	case value.Provider:
 		return e.providerValue(v)
