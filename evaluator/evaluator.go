@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alchematik/athanor/build"
+	"github.com/alchematik/athanor/spec"
 	"github.com/alchematik/athanor/state"
 )
 
@@ -16,7 +16,7 @@ type ResourceAPI interface {
 	GetResource(context.Context, state.Resource) (state.Resource, error)
 }
 
-func (e Evaluator) Evaluate(ctx context.Context, b build.Build) (state.Type, error) {
+func (e Evaluator) Evaluate(ctx context.Context, b spec.Spec) (state.Type, error) {
 	indegrees := map[string]int{}
 	parentToChildren := map[string][]string{}
 	for child, parents := range b.DependencyMap {

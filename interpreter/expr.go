@@ -5,16 +5,15 @@ import (
 	"fmt"
 
 	"github.com/alchematik/athanor/ast"
-	"github.com/alchematik/athanor/build"
-	"github.com/alchematik/athanor/build/value"
+	"github.com/alchematik/athanor/spec"
 )
 
-func (in Interpreter) Expr(ctx context.Context, b build.Build, ex ast.Expr) (value.Type, []string, error) {
+func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.Value, []string, error) {
 	switch e := ex.(type) {
 	case ast.ExprString:
-		return value.String{Value: e.Value}, nil, nil
+		return spec.ValueString{Literal: e.Value}, nil, nil
 	case ast.ExprBool:
-		return value.Bool{Value: e.Value}, nil, nil
+		return spec.ValueBool{Literal: e.Value}, nil, nil
 	case ast.ExprMap:
 		return in.mapExpr(ctx, b, e)
 	case ast.ExprProvider:
@@ -32,14 +31,14 @@ func (in Interpreter) Expr(ctx context.Context, b build.Build, ex ast.Expr) (val
 	case ast.ExprGetProvider:
 		p, ok := b.Providers[e.Alias]
 		if !ok {
-			return value.Provider{}, nil, fmt.Errorf("provider with alias %q does not exist", e.Alias)
+			return spec.ValueProvider{}, nil, fmt.Errorf("provider with alias %q does not exist", e.Alias)
 		}
 
 		return p, nil, nil
 	case ast.ExprGetResource:
 		r, ok := b.Resources[e.Alias]
 		if !ok {
-			return value.Resource{}, nil, fmt.Errorf("resource with alias %q does not exist", e.Alias)
+			return spec.ValueResource{}, nil, fmt.Errorf("resource with alias %q does not exist", e.Alias)
 		}
 
 		return r, []string{e.Alias}, nil
@@ -48,51 +47,51 @@ func (in Interpreter) Expr(ctx context.Context, b build.Build, ex ast.Expr) (val
 	}
 }
 
-func (in Interpreter) provider(ctx context.Context, b build.Build, e ast.ExprProvider) (value.Provider, []string, error) {
+func (in Interpreter) provider(ctx context.Context, b spec.Spec, e ast.ExprProvider) (spec.ValueProvider, []string, error) {
 	val, children, err := in.Expr(ctx, b, e.Identifier)
 	if err != nil {
-		return value.Provider{}, nil, err
+		return spec.ValueProvider{}, nil, err
 	}
 
-	id, ok := val.(value.ProviderIdentifier)
+	id, ok := val.(spec.ValueProviderIdentifier)
 	if !ok {
-		return value.Provider{}, nil, fmt.Errorf("expected ProviderIdentifier type, got %T", val)
+		return spec.ValueProvider{}, nil, fmt.Errorf("expected ProviderIdentifier type, got %T", val)
 	}
 
-	return value.Provider{
+	return spec.ValueProvider{
 		Identifier: id,
 	}, children, nil
 }
 
-func (in Interpreter) resource(ctx context.Context, b build.Build, e ast.ExprResource) (value.Resource, []string, error) {
+func (in Interpreter) resource(ctx context.Context, b spec.Spec, e ast.ExprResource) (spec.ValueResource, []string, error) {
 	providerValue, providerChildren, err := in.Expr(ctx, b, e.Provider)
 	if err != nil {
-		return value.Resource{}, nil, err
+		return spec.ValueResource{}, nil, err
 	}
 
-	provider, ok := providerValue.(value.Provider)
+	provider, ok := providerValue.(spec.ValueProvider)
 	if !ok {
-		return value.Resource{}, nil, fmt.Errorf("expected Provider type, got %T", providerValue)
+		return spec.ValueResource{}, nil, fmt.Errorf("expected Provider type, got %T", providerValue)
 	}
 
 	idVal, idChildren, err := in.Expr(ctx, b, e.Identifier)
 	if err != nil {
-		return value.Resource{}, nil, err
+		return spec.ValueResource{}, nil, err
 	}
 
-	id, ok := idVal.(value.ResourceIdentifier)
+	id, ok := idVal.(spec.ValueResourceIdentifier)
 	if !ok {
-		return value.Resource{}, nil, fmt.Errorf("expected ResourceIdentifier, got %T", idVal)
+		return spec.ValueResource{}, nil, fmt.Errorf("expected ResourceIdentifier, got %T", idVal)
 	}
 
 	configVal, configChildren, err := in.Expr(ctx, b, e.Config)
 	if err != nil {
-		return value.Resource{}, nil, err
+		return spec.ValueResource{}, nil, err
 	}
 
 	existsVal, existsChildren, err := in.Expr(ctx, b, e.Exists)
 	if err != nil {
-		return value.Resource{}, nil, err
+		return spec.ValueResource{}, nil, err
 	}
 
 	children := append(providerChildren, idChildren...)
@@ -108,22 +107,22 @@ func (in Interpreter) resource(ctx context.Context, b build.Build, e ast.ExprRes
 		out = append(out, child)
 	}
 
-	return value.Resource{
+	return spec.ValueResource{
 		Provider:   provider,
 		Identifier: id,
 		Config:     configVal,
 		Exists:     existsVal,
-		Attrs: value.Unresolved{
+		Attrs: spec.ValueUnresolved{
 			Name: "attrs",
-			Object: value.ResourceRef{
+			Object: spec.ValueResourceRef{
 				Alias: id.Alias,
 			},
 		},
 	}, out, nil
 }
 
-func (in Interpreter) mapExpr(ctx context.Context, b build.Build, e ast.ExprMap) (value.Map, []string, error) {
-	m := value.Map{Entries: map[string]value.Type{}}
+func (in Interpreter) mapExpr(ctx context.Context, b spec.Spec, e ast.ExprMap) (spec.ValueMap, []string, error) {
+	m := spec.ValueMap{Entries: map[string]spec.Value{}}
 	var children []string
 	for k, v := range e.Entries {
 		var err error
@@ -131,7 +130,7 @@ func (in Interpreter) mapExpr(ctx context.Context, b build.Build, e ast.ExprMap)
 
 		m.Entries[k], valChildren, err = in.Expr(ctx, b, v)
 		if err != nil {
-			return value.Map{}, nil, err
+			return spec.ValueMap{}, nil, err
 		}
 
 		children = append(children, valChildren...)
@@ -140,80 +139,80 @@ func (in Interpreter) mapExpr(ctx context.Context, b build.Build, e ast.ExprMap)
 	return m, children, nil
 }
 
-func (in Interpreter) providerIdentifierExpr(ctx context.Context, b build.Build, e ast.ExprProviderIdentifier) (value.ProviderIdentifier, []string, error) {
+func (in Interpreter) providerIdentifierExpr(ctx context.Context, b spec.Spec, e ast.ExprProviderIdentifier) (spec.ValueProviderIdentifier, []string, error) {
 	name, nameChildren, err := in.Expr(ctx, b, e.Name)
 	if err != nil {
-		return value.ProviderIdentifier{}, nil, err
+		return spec.ValueProviderIdentifier{}, nil, err
 	}
 
-	nameStr, ok := name.(value.String)
+	nameStr, ok := name.(spec.ValueString)
 	if !ok {
-		return value.ProviderIdentifier{}, nil, fmt.Errorf("provider name must be a string")
+		return spec.ValueProviderIdentifier{}, nil, fmt.Errorf("provider name must be a string")
 	}
 
 	version, versionChildren, err := in.Expr(ctx, b, e.Version)
 	if err != nil {
-		return value.ProviderIdentifier{}, nil, err
+		return spec.ValueProviderIdentifier{}, nil, err
 	}
 
-	versionStr, ok := version.(value.String)
+	versionStr, ok := version.(spec.ValueString)
 	if !ok {
-		return value.ProviderIdentifier{}, nil, fmt.Errorf("provider version must be a string")
+		return spec.ValueProviderIdentifier{}, nil, fmt.Errorf("provider version must be a string")
 	}
 
 	children := append(nameChildren, versionChildren...)
 
 	if e.Alias == "" {
-		return value.ProviderIdentifier{}, nil, fmt.Errorf("must provide alias")
+		return spec.ValueProviderIdentifier{}, nil, fmt.Errorf("must provide alias")
 	}
 
-	return value.ProviderIdentifier{
+	return spec.ValueProviderIdentifier{
 		Alias:   e.Alias,
-		Name:    nameStr.Value,
-		Version: versionStr.Value,
+		Name:    nameStr.Literal,
+		Version: versionStr.Literal,
 	}, children, nil
 }
 
-func (in Interpreter) resourceIdentifierExpr(ctx context.Context, b build.Build, e ast.ExprResourceIdentifier) (value.ResourceIdentifier, []string, error) {
+func (in Interpreter) resourceIdentifierExpr(ctx context.Context, b spec.Spec, e ast.ExprResourceIdentifier) (spec.ValueResourceIdentifier, []string, error) {
 	val, children, err := in.Expr(ctx, b, e.Value)
 	if err != nil {
-		return value.ResourceIdentifier{}, nil, err
+		return spec.ValueResourceIdentifier{}, nil, err
 	}
 
 	if e.Alias == "" {
-		return value.ResourceIdentifier{}, nil, fmt.Errorf("must provide alias")
+		return spec.ValueResourceIdentifier{}, nil, fmt.Errorf("must provide alias")
 	}
 
 	if e.ResourceType == "" {
-		return value.ResourceIdentifier{}, nil, fmt.Errorf("must provide resource type")
+		return spec.ValueResourceIdentifier{}, nil, fmt.Errorf("must provide resource type")
 	}
 
-	return value.ResourceIdentifier{
+	return spec.ValueResourceIdentifier{
 		Alias:        e.Alias,
 		ResourceType: e.ResourceType,
-		Value:        val,
+		Literal:      val,
 	}, append(children, e.Alias), nil
 }
 
-func (in Interpreter) ioGetExpr(ctx context.Context, b build.Build, e ast.ExprIOGet) (value.Unresolved, []string, error) {
+func (in Interpreter) ioGetExpr(ctx context.Context, b spec.Spec, e ast.ExprIOGet) (spec.ValueUnresolved, []string, error) {
 	objVal, children, err := in.Expr(ctx, b, e.Object)
 	if err != nil {
-		return value.Unresolved{}, nil, err
+		return spec.ValueUnresolved{}, nil, err
 	}
 
-	unresolved, ok := objVal.(value.Unresolved)
+	unresolved, ok := objVal.(spec.ValueUnresolved)
 	if !ok {
-		return value.Unresolved{}, nil, fmt.Errorf("property %q does not belong to unresolved object; use get", e.Name)
+		return spec.ValueUnresolved{}, nil, fmt.Errorf("property %q does not belong to unresolved object; use get", e.Name)
 	}
 
-	return value.Unresolved{
+	return spec.ValueUnresolved{
 		Name:   e.Name,
 		Object: unresolved,
 	}, children, nil
 }
 
-func (in Interpreter) getExpr(ctx context.Context, b build.Build, e ast.ExprGet) (value.Type, []string, error) {
-	var m map[string]value.Type
+func (in Interpreter) getExpr(ctx context.Context, b spec.Spec, e ast.ExprGet) (spec.Value, []string, error) {
+	var m map[string]spec.Value
 
 	objVal, children, err := in.Expr(ctx, b, e.Object)
 	if err != nil {
@@ -221,15 +220,15 @@ func (in Interpreter) getExpr(ctx context.Context, b build.Build, e ast.ExprGet)
 	}
 
 	switch obj := objVal.(type) {
-	case value.Map:
+	case spec.ValueMap:
 		m = obj.Entries
-	case value.Resource:
-		m = map[string]value.Type{
+	case spec.ValueResource:
+		m = map[string]spec.Value{
 			"identifier": obj.Identifier,
 			"config":     obj.Config,
 			"attrs":      obj.Attrs,
 		}
-	case value.Unresolved:
+	case spec.ValueUnresolved:
 		return nil, nil, fmt.Errorf("property %q belongs to an unresolved object; use io_get", e.Name)
 	default:
 		return nil, nil, fmt.Errorf("cannot access property %q", e.Name)

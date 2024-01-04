@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alchematik/athanor/build/value"
+	"github.com/alchematik/athanor/spec"
 	"github.com/alchematik/athanor/state"
 )
 
-func (e Evaluator) providerValue(v value.Provider) (state.Provider, error) {
+func (e Evaluator) providerValue(v spec.ValueProvider) (state.Provider, error) {
 	if v.Identifier.Name == "" {
 		return state.Provider{}, fmt.Errorf("name is required for provider")
 	}
@@ -21,7 +21,7 @@ func (e Evaluator) providerValue(v value.Provider) (state.Provider, error) {
 	}, nil
 }
 
-func (e Evaluator) mapValue(ctx context.Context, env state.Environment, v value.Map) (state.Map, error) {
+func (e Evaluator) mapValue(ctx context.Context, env state.Environment, v spec.ValueMap) (state.Map, error) {
 	m := state.Map{
 		Entries: map[string]state.Type{},
 	}
@@ -38,7 +38,7 @@ func (e Evaluator) mapValue(ctx context.Context, env state.Environment, v value.
 	return m, nil
 }
 
-func (e Evaluator) resourceIdentifier(ctx context.Context, env state.Environment, v value.ResourceIdentifier) (state.Identifier, error) {
+func (e Evaluator) resourceIdentifier(ctx context.Context, env state.Environment, v spec.ValueResourceIdentifier) (state.Identifier, error) {
 	if v.Alias == "" {
 		return state.Identifier{}, fmt.Errorf("alias is required")
 	}
@@ -47,7 +47,7 @@ func (e Evaluator) resourceIdentifier(ctx context.Context, env state.Environment
 		return state.Identifier{}, fmt.Errorf("resource type is required")
 	}
 
-	val, err := e.Value(ctx, env, v.Value)
+	val, err := e.Value(ctx, env, v.Literal)
 	if err != nil {
 		return state.Identifier{}, err
 	}
@@ -59,7 +59,7 @@ func (e Evaluator) resourceIdentifier(ctx context.Context, env state.Environment
 	}, nil
 }
 
-func (e Evaluator) resourceRef(env state.Environment, v value.ResourceRef) (state.Resource, error) {
+func (e Evaluator) resourceRef(env state.Environment, v spec.ValueResourceRef) (state.Resource, error) {
 	r, ok := env.Resources[v.Alias]
 	if !ok {
 		return state.Resource{}, fmt.Errorf("evaluator: resource with alias %q does not exist", v.Alias)
@@ -68,7 +68,7 @@ func (e Evaluator) resourceRef(env state.Environment, v value.ResourceRef) (stat
 	return r, nil
 }
 
-func (e Evaluator) unresolvedValue(ctx context.Context, env state.Environment, v value.Unresolved) (state.Type, error) {
+func (e Evaluator) unresolvedValue(ctx context.Context, env state.Environment, v spec.ValueUnresolved) (state.Type, error) {
 	resolved, err := e.Value(ctx, env, v.Object)
 	if err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func (e Evaluator) unresolvedValue(ctx context.Context, env state.Environment, v
 	return field, nil
 }
 
-func (e Evaluator) resourceValue(ctx context.Context, env state.Environment, v value.Resource) (state.Resource, error) {
+func (e Evaluator) resourceValue(ctx context.Context, env state.Environment, v spec.ValueResource) (state.Resource, error) {
 	idState, err := e.Value(ctx, env, v.Identifier)
 	if err != nil {
 		return state.Resource{}, err
@@ -154,23 +154,23 @@ func (e Evaluator) resourceValue(ctx context.Context, env state.Environment, v v
 	return output, nil
 }
 
-func (e Evaluator) Value(ctx context.Context, env state.Environment, val value.Type) (state.Type, error) {
+func (e Evaluator) Value(ctx context.Context, env state.Environment, val spec.Value) (state.Type, error) {
 	switch v := val.(type) {
-	case value.Provider:
+	case spec.ValueProvider:
 		return e.providerValue(v)
-	case value.Resource:
+	case spec.ValueResource:
 		return e.resourceValue(ctx, env, v)
-	case value.String:
-		return state.String{Value: v.Value}, nil
-	case value.Bool:
-		return state.Bool{Value: v.Value}, nil
-	case value.Map:
+	case spec.ValueString:
+		return state.String{Value: v.Literal}, nil
+	case spec.ValueBool:
+		return state.Bool{Value: v.Literal}, nil
+	case spec.ValueMap:
 		return e.mapValue(ctx, env, v)
-	case value.ResourceIdentifier:
+	case spec.ValueResourceIdentifier:
 		return e.resourceIdentifier(ctx, env, v)
-	case value.ResourceRef:
+	case spec.ValueResourceRef:
 		return e.resourceRef(env, v)
-	case value.Unresolved:
+	case spec.ValueUnresolved:
 		return e.unresolvedValue(ctx, env, v)
 	default:
 		return nil, fmt.Errorf("unrecognized value type: %T", val)

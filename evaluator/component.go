@@ -4,20 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alchematik/athanor/build/component"
+	"github.com/alchematik/athanor/spec"
 	"github.com/alchematik/athanor/state"
 )
 
-func (e Evaluator) Component(ctx context.Context, env state.Environment, comp component.Type) error {
+func (e Evaluator) Component(ctx context.Context, env state.Environment, comp spec.Component) error {
 	switch c := comp.(type) {
-	case component.Resource:
+	case spec.ComponentResource:
 		return e.resource(ctx, env, c)
 	default:
 		return fmt.Errorf("unknown component type: %T", comp)
 	}
 }
 
-func (e Evaluator) resource(ctx context.Context, env state.Environment, comp component.Resource) error {
+func (e Evaluator) resource(ctx context.Context, env state.Environment, comp spec.ComponentResource) error {
 	val, err := e.Value(ctx, env, comp.Value)
 	if err != nil {
 		return err

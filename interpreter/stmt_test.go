@@ -16,15 +16,15 @@ import (
 
 func TestInterpreter_Stmt_Provider(t *testing.T) {
 	testCases := map[string]struct {
-		env         build.Build
-		expectedEnv build.Build
+		env         build.Spec
+		expectedEnv build.Spec
 		stmt        stmt.Type
 		isError     bool
 	}{
 		"new provider": {
-			env: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			env: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			stmt: stmt.Provider{
@@ -36,24 +36,24 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: build.Build{
-				Providers: map[string]value.Provider{
+			expectedEnv: build.Spec{
+				Providers: map[string]value.ValueProvider{
 					"my-provider": {
-						Identifier: value.ProviderIdentifier{
+						Identifier: value.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
 						},
 					},
 				},
-				Resources:     map[string]value.Resource{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 		},
 		"value not provider": {
-			env: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			env: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			stmt: stmt.Provider{
@@ -63,17 +63,17 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					Version: expr.String{Value: "v0.0.1"},
 				},
 			},
-			expectedEnv: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			expectedEnv: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			isError: true,
 		},
 		"invalid Provider": {
-			env: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			env: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			stmt: stmt.Provider{
@@ -85,9 +85,9 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			expectedEnv: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			isError: true,
@@ -111,17 +111,17 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 
 func TestInterpreter_Stmt_Resource(t *testing.T) {
 	testCases := map[string]struct {
-		env         build.Build
-		expectedEnv build.Build
+		env         build.Spec
+		expectedEnv build.Spec
 		stmt        stmt.Type
 		isError     bool
 	}{
 		"new resource": {
-			env: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			env: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
-				Components:    map[string]component.Type{},
+				Components:    map[string]component.Component{},
 			},
 			stmt: stmt.Resource{
 				Expr: expr.Resource{
@@ -141,35 +141,35 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					Config: expr.String{Value: "bar"},
 				},
 			},
-			expectedEnv: build.Build{
-				Providers: map[string]value.Provider{
+			expectedEnv: build.Spec{
+				Providers: map[string]value.ValueProvider{
 					"my-provider": {
-						Identifier: value.ProviderIdentifier{
+						Identifier: value.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
 						},
 					},
 				},
-				Resources: map[string]value.Resource{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Exists: value.Bool{Value: true},
-						Provider: value.Provider{
-							Identifier: value.ProviderIdentifier{
+						Exists: value.ValueBool{Literal: true},
+						Provider: value.ValueProvider{
+							Identifier: value.ValueProviderIdentifier{
 								Alias:   "my-provider",
 								Name:    "gcp",
 								Version: "v0.0.1",
 							},
 						},
-						Identifier: value.ResourceIdentifier{
+						Identifier: value.ValueResourceIdentifier{
 							Alias:        "my-resource",
 							ResourceType: "bucket",
-							Value:        value.String{Value: "foo"},
+							Literal:      value.ValueString{Literal: "foo"},
 						},
-						Config: value.String{Value: "bar"},
-						Attrs: value.Unresolved{
+						Config: value.ValueString{Literal: "bar"},
+						Attrs: value.ValueUnresolved{
 							Name: "attrs",
-							Object: value.ResourceRef{
+							Object: value.ValueResourceRef{
 								Alias: "my-resource",
 							},
 						},
@@ -178,26 +178,26 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 				DependencyMap: map[string][]string{
 					"my-resource": nil,
 				},
-				Components: map[string]component.Type{
-					"my-resource": component.Resource{
-						Value: value.Resource{
-							Exists: value.Bool{Value: true},
-							Provider: value.Provider{
-								Identifier: value.ProviderIdentifier{
+				Components: map[string]component.Component{
+					"my-resource": component.ComponentResource{
+						Value: value.ValueResource{
+							Exists: value.ValueBool{Literal: true},
+							Provider: value.ValueProvider{
+								Identifier: value.ValueProviderIdentifier{
 									Alias:   "my-provider",
 									Name:    "gcp",
 									Version: "v0.0.1",
 								},
 							},
-							Identifier: value.ResourceIdentifier{
+							Identifier: value.ValueResourceIdentifier{
 								Alias:        "my-resource",
 								ResourceType: "bucket",
-								Value:        value.String{Value: "foo"},
+								Literal:      value.ValueString{Literal: "foo"},
 							},
-							Config: value.String{Value: "bar"},
-							Attrs: value.Unresolved{
+							Config: value.ValueString{Literal: "bar"},
+							Attrs: value.ValueUnresolved{
 								Name: "attrs",
-								Object: value.ResourceRef{
+								Object: value.ValueResourceRef{
 									Alias: "my-resource",
 								},
 							},
@@ -207,9 +207,9 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 			},
 		},
 		"value not Resource": {
-			env: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			env: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			stmt: stmt.Resource{
@@ -221,17 +221,17 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					},
 				},
 			},
-			expectedEnv: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			expectedEnv: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			isError: true,
 		},
 		"invalid Resource": {
-			env: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			env: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			stmt: stmt.Resource{
@@ -251,9 +251,9 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 					Config: expr.String{Value: "bar"},
 				},
 			},
-			expectedEnv: build.Build{
-				Providers:     map[string]value.Provider{},
-				Resources:     map[string]value.Resource{},
+			expectedEnv: build.Spec{
+				Providers:     map[string]value.ValueProvider{},
+				Resources:     map[string]value.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			isError: true,

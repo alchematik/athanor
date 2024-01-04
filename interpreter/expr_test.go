@@ -14,37 +14,37 @@ import (
 
 func TestInterpreter_Expr_Map(t *testing.T) {
 	testCases := map[string]struct {
-		build    build.Build
+		build    build.Spec
 		expr     expr.Type
-		out      value.Type
+		out      value.Value
 		children []string
 		isError  bool
 	}{
 		"one entry": {
-			build: build.Build{},
+			build: build.Spec{},
 			expr: expr.Map{
 				Entries: map[string]expr.Type{
 					"foo": expr.String{Value: "bar"},
 				},
 			},
-			out: value.Map{
-				Entries: map[string]value.Type{
-					"foo": value.String{Value: "bar"},
+			out: value.ValueMap{
+				Entries: map[string]value.Value{
+					"foo": value.ValueString{Literal: "bar"},
 				},
 			},
 		},
 		"several entries": {
-			build: build.Build{},
+			build: build.Spec{},
 			expr: expr.Map{
 				Entries: map[string]expr.Type{
 					"foo": expr.String{Value: "bar"},
 					"bam": expr.String{Value: "baz"},
 				},
 			},
-			out: value.Map{
-				Entries: map[string]value.Type{
-					"foo": value.String{Value: "bar"},
-					"bam": value.String{Value: "baz"},
+			out: value.ValueMap{
+				Entries: map[string]value.Value{
+					"foo": value.ValueString{Literal: "bar"},
+					"bam": value.ValueString{Literal: "baz"},
 				},
 			},
 		},
@@ -66,14 +66,14 @@ func TestInterpreter_Expr_Map(t *testing.T) {
 
 func TestInterpreter_Expr_Get(t *testing.T) {
 	testCases := map[string]struct {
-		build    build.Build
+		build    build.Spec
 		expr     expr.Type
-		out      value.Type
+		out      value.Value
 		children []string
 		isError  bool
 	}{
 		"map, string value entry present": {
-			build: build.Build{},
+			build: build.Spec{},
 			expr: expr.Get{
 				Name: "foo",
 				Object: expr.Map{
@@ -82,10 +82,10 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 					},
 				},
 			},
-			out: value.String{Value: "bar"},
+			out: value.ValueString{Literal: "bar"},
 		},
 		"map, entry missing": {
-			build: build.Build{},
+			build: build.Spec{},
 			expr: expr.Get{
 				Name: "foo",
 				Object: expr.Map{
@@ -95,13 +95,13 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 			isError: true,
 		},
 		"resource, identifier": {
-			build: build.Build{
-				Resources: map[string]value.Resource{
+			build: build.Spec{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Identifier: value.ResourceIdentifier{
+						Identifier: value.ValueResourceIdentifier{
 							Alias:        "my-resource",
 							ResourceType: "bucket",
-							Value:        value.String{Value: "id"},
+							Literal:      value.ValueString{Literal: "id"},
 						},
 					},
 				},
@@ -112,18 +112,18 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 					Alias: "my-resource",
 				},
 			},
-			out: value.ResourceIdentifier{
+			out: value.ValueResourceIdentifier{
 				Alias:        "my-resource",
 				ResourceType: "bucket",
-				Value:        value.String{Value: "id"},
+				Literal:      value.ValueString{Literal: "id"},
 			},
 			children: []string{"my-resource"},
 		},
 		"resource, config": {
-			build: build.Build{
-				Resources: map[string]value.Resource{
+			build: build.Spec{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Config: value.String{Value: "config-val"},
+						Config: value.ValueString{Literal: "config-val"},
 					},
 				},
 			},
@@ -133,16 +133,16 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 					Alias: "my-resource",
 				},
 			},
-			out:      value.String{Value: "config-val"},
+			out:      value.ValueString{Literal: "config-val"},
 			children: []string{"my-resource"},
 		},
 		"resource, attrs, unresolved": {
-			build: build.Build{
-				Resources: map[string]value.Resource{
+			build: build.Spec{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Attrs: value.Unresolved{
+						Attrs: value.ValueUnresolved{
 							Name: "attrs",
-							Object: value.ResourceRef{
+							Object: value.ValueResourceRef{
 								Alias: "my-resource",
 							},
 						},
@@ -155,19 +155,19 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 					Alias: "my-resource",
 				},
 			},
-			out: value.Unresolved{
+			out: value.ValueUnresolved{
 				Name: "attrs",
-				Object: value.ResourceRef{
+				Object: value.ValueResourceRef{
 					Alias: "my-resource",
 				},
 			},
 			children: []string{"my-resource"},
 		},
 		"resource, attrs": {
-			build: build.Build{
-				Resources: map[string]value.Resource{
+			build: build.Spec{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Attrs: value.String{Value: "foo"},
+						Attrs: value.ValueString{Literal: "foo"},
 					},
 				},
 			},
@@ -177,16 +177,16 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 					Alias: "my-resource",
 				},
 			},
-			out:      value.String{Value: "foo"},
+			out:      value.ValueString{Literal: "foo"},
 			children: []string{"my-resource"},
 		},
 		"unresolved": {
-			build: build.Build{
-				Resources: map[string]value.Resource{
+			build: build.Spec{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Attrs: value.Unresolved{
+						Attrs: value.ValueUnresolved{
 							Name: "attrs",
-							Object: value.ResourceRef{
+							Object: value.ValueResourceRef{
 								Alias: "my-resource",
 							},
 						},
@@ -229,19 +229,19 @@ func TestInterpreter_Expr_Get(t *testing.T) {
 
 func TestInterpreter_Expr_IOGet(t *testing.T) {
 	testCases := map[string]struct {
-		build    build.Build
+		build    build.Spec
 		expr     expr.Type
-		out      value.Type
+		out      value.Value
 		children []string
 		isError  bool
 	}{
 		"unresolved": {
-			build: build.Build{
-				Resources: map[string]value.Resource{
+			build: build.Spec{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Attrs: value.Unresolved{
+						Attrs: value.ValueUnresolved{
 							Name: "attrs",
-							Object: value.ResourceRef{
+							Object: value.ValueResourceRef{
 								Alias: "my-resource",
 							},
 						},
@@ -257,11 +257,11 @@ func TestInterpreter_Expr_IOGet(t *testing.T) {
 					},
 				},
 			},
-			out: value.Unresolved{
+			out: value.ValueUnresolved{
 				Name: "foo",
-				Object: value.Unresolved{
+				Object: value.ValueUnresolved{
 					Name: "attrs",
-					Object: value.ResourceRef{
+					Object: value.ValueResourceRef{
 						Alias: "my-resource",
 					},
 				},
@@ -277,7 +277,7 @@ func TestInterpreter_Expr_IOGet(t *testing.T) {
 					},
 				},
 			},
-			out:     value.Unresolved{},
+			out:     value.ValueUnresolved{},
 			isError: true,
 		},
 	}
@@ -298,25 +298,25 @@ func TestInterpreter_Expr_IOGet(t *testing.T) {
 
 func TestInterpreter_Expr_String(t *testing.T) {
 	testCases := map[string]struct {
-		build    build.Build
+		build    build.Spec
 		expr     expr.Type
-		out      value.Type
+		out      value.Value
 		children []string
 		isError  bool
 	}{
 		"valid": {
-			build: build.Build{},
+			build: build.Spec{},
 			expr:  expr.String{Value: "hello world"},
-			out:   value.String{Value: "hello world"},
+			out:   value.ValueString{Literal: "hello world"},
 		},
 		// IOGet
 		"io get: unresolved": {
-			build: build.Build{
-				Resources: map[string]value.Resource{
+			build: build.Spec{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Attrs: value.Unresolved{
+						Attrs: value.ValueUnresolved{
 							Name: "attrs",
-							Object: value.ResourceRef{
+							Object: value.ValueResourceRef{
 								Alias: "my-resource",
 							},
 						},
@@ -332,11 +332,11 @@ func TestInterpreter_Expr_String(t *testing.T) {
 					},
 				},
 			},
-			out: value.Unresolved{
+			out: value.ValueUnresolved{
 				Name: "foo",
-				Object: value.Unresolved{
+				Object: value.ValueUnresolved{
 					Name: "attrs",
-					Object: value.ResourceRef{
+					Object: value.ValueResourceRef{
 						Alias: "my-resource",
 					},
 				},
@@ -352,7 +352,7 @@ func TestInterpreter_Expr_String(t *testing.T) {
 					},
 				},
 			},
-			out:     value.Unresolved{},
+			out:     value.ValueUnresolved{},
 			isError: true,
 		},
 	}
@@ -373,9 +373,9 @@ func TestInterpreter_Expr_String(t *testing.T) {
 
 func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 	testCases := map[string]struct {
-		build    build.Build
+		build    build.Spec
 		expr     expr.Type
-		out      value.Type
+		out      value.Value
 		children []string
 		isError  bool
 	}{
@@ -385,7 +385,7 @@ func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 				Name:    expr.String{Value: "gcp"},
 				Version: expr.String{Value: "v0.0.1"},
 			},
-			out: value.ProviderIdentifier{
+			out: value.ValueProviderIdentifier{
 				Alias:   "my-provider",
 				Name:    "gcp",
 				Version: "v0.0.1",
@@ -404,7 +404,7 @@ func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 				},
 				Version: expr.String{Value: "v0.0.1"},
 			},
-			out: value.ProviderIdentifier{
+			out: value.ValueProviderIdentifier{
 				Alias:   "my-provider",
 				Name:    "gcp",
 				Version: "v0.0.1",
@@ -423,7 +423,7 @@ func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 					},
 				},
 			},
-			out: value.ProviderIdentifier{
+			out: value.ValueProviderIdentifier{
 				Alias:   "my-provider",
 				Name:    "gcp",
 				Version: "v0.0.1",
@@ -435,7 +435,7 @@ func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 				Name:    expr.String{Value: "gcp"},
 				Version: expr.String{Value: "v0.0.1"},
 			},
-			out:     value.ProviderIdentifier{},
+			out:     value.ValueProviderIdentifier{},
 			isError: true,
 		},
 		"provider identifier: name is not string": {
@@ -448,7 +448,7 @@ func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 				},
 				Version: expr.String{Value: "v0.0.1"},
 			},
-			out:     value.ProviderIdentifier{},
+			out:     value.ValueProviderIdentifier{},
 			isError: true,
 		},
 		"provider identifier: version is not string": {
@@ -461,7 +461,7 @@ func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 					},
 				},
 			},
-			out:     value.ProviderIdentifier{},
+			out:     value.ValueProviderIdentifier{},
 			isError: true,
 		},
 	}
@@ -481,9 +481,9 @@ func TestInterpreter_Expr_ProviderIdentifier(t *testing.T) {
 
 func TestInterpreter_Expr_ResourceIdentifier(t *testing.T) {
 	testCases := map[string]struct {
-		build    build.Build
+		build    build.Spec
 		expr     expr.Type
-		out      value.Type
+		out      value.Value
 		children []string
 		isError  bool
 	}{
@@ -493,10 +493,10 @@ func TestInterpreter_Expr_ResourceIdentifier(t *testing.T) {
 				ResourceType: "bucket",
 				Value:        expr.String{Value: "foo"},
 			},
-			out: value.ResourceIdentifier{
+			out: value.ValueResourceIdentifier{
 				Alias:        "my-resource",
 				ResourceType: "bucket",
-				Value:        value.String{Value: "foo"},
+				Literal:      value.ValueString{Literal: "foo"},
 			},
 			children: []string{"my-resource"},
 		},
@@ -506,7 +506,7 @@ func TestInterpreter_Expr_ResourceIdentifier(t *testing.T) {
 				ResourceType: "bucket",
 				Value:        expr.String{Value: "foo"},
 			},
-			out:     value.ResourceIdentifier{},
+			out:     value.ValueResourceIdentifier{},
 			isError: true,
 		},
 		"missing resource type": {
@@ -515,7 +515,7 @@ func TestInterpreter_Expr_ResourceIdentifier(t *testing.T) {
 				ResourceType: "",
 				Value:        expr.String{Value: "foo"},
 			},
-			out:     value.ResourceIdentifier{},
+			out:     value.ValueResourceIdentifier{},
 			isError: true,
 		},
 		"missing value": {
@@ -524,7 +524,7 @@ func TestInterpreter_Expr_ResourceIdentifier(t *testing.T) {
 				ResourceType: "",
 				Value:        nil,
 			},
-			out:     value.ResourceIdentifier{},
+			out:     value.ValueResourceIdentifier{},
 			isError: true,
 		},
 	}
@@ -544,17 +544,17 @@ func TestInterpreter_Expr_ResourceIdentifier(t *testing.T) {
 
 func TestInterpreter_Expr_GetProvider(t *testing.T) {
 	testCases := map[string]struct {
-		build    build.Build
+		build    build.Spec
 		expr     expr.Type
-		out      value.Type
+		out      value.Value
 		children []string
 		isError  bool
 	}{
 		"present": {
-			build: build.Build{
-				Providers: map[string]value.Provider{
+			build: build.Spec{
+				Providers: map[string]value.ValueProvider{
 					"my-provider": {
-						Identifier: value.ProviderIdentifier{
+						Identifier: value.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
@@ -565,8 +565,8 @@ func TestInterpreter_Expr_GetProvider(t *testing.T) {
 			expr: expr.GetProvider{
 				Alias: "my-provider",
 			},
-			out: value.Provider{
-				Identifier: value.ProviderIdentifier{
+			out: value.ValueProvider{
+				Identifier: value.ValueProviderIdentifier{
 					Alias:   "my-provider",
 					Name:    "gcp",
 					Version: "v0.0.1",
@@ -574,13 +574,13 @@ func TestInterpreter_Expr_GetProvider(t *testing.T) {
 			},
 		},
 		"not present": {
-			build: build.Build{
-				Providers: map[string]value.Provider{},
+			build: build.Spec{
+				Providers: map[string]value.ValueProvider{},
 			},
 			expr: expr.GetProvider{
 				Alias: "my-provider",
 			},
-			out: value.Provider{},
+			out: value.ValueProvider{},
 		},
 	}
 	for name, tc := range testCases {
@@ -599,20 +599,20 @@ func TestInterpreter_Expr_GetProvider(t *testing.T) {
 
 func TestInterpreter_Expr_GetResource(t *testing.T) {
 	testCases := map[string]struct {
-		build    build.Build
+		build    build.Spec
 		expr     expr.Type
-		out      value.Type
+		out      value.Value
 		children []string
 		isError  bool
 	}{
 		"present": {
-			build: build.Build{
-				Resources: map[string]value.Resource{
+			build: build.Spec{
+				Resources: map[string]value.ValueResource{
 					"my-resource": {
-						Identifier: value.ResourceIdentifier{
+						Identifier: value.ValueResourceIdentifier{
 							Alias:        "my-resource",
 							ResourceType: "bucket",
-							Value:        value.String{Value: "foo"},
+							Literal:      value.ValueString{Literal: "foo"},
 						},
 					},
 				},
@@ -620,11 +620,11 @@ func TestInterpreter_Expr_GetResource(t *testing.T) {
 			expr: expr.GetResource{
 				Alias: "my-resource",
 			},
-			out: value.Resource{
-				Identifier: value.ResourceIdentifier{
+			out: value.ValueResource{
+				Identifier: value.ValueResourceIdentifier{
 					Alias:        "my-resource",
 					ResourceType: "bucket",
-					Value:        value.String{Value: "foo"},
+					Literal:      value.ValueString{Literal: "foo"},
 				},
 			},
 			children: []string{"my-resource"},
@@ -633,7 +633,7 @@ func TestInterpreter_Expr_GetResource(t *testing.T) {
 			expr: expr.GetResource{
 				Alias: "my-resource",
 			},
-			out: value.Resource{},
+			out: value.ValueResource{},
 		},
 	}
 	for name, tc := range testCases {

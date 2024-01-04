@@ -6,12 +6,10 @@ import (
 	"slices"
 
 	"github.com/alchematik/athanor/ast"
-	"github.com/alchematik/athanor/build"
-	"github.com/alchematik/athanor/build/component"
-	"github.com/alchematik/athanor/build/value"
+	"github.com/alchematik/athanor/spec"
 )
 
-func (in Interpreter) Stmt(ctx context.Context, b build.Build, st ast.Stmt) error {
+func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error {
 	switch s := st.(type) {
 	case ast.StmtProvider:
 		return in.providerStmt(ctx, b, s)
@@ -22,13 +20,13 @@ func (in Interpreter) Stmt(ctx context.Context, b build.Build, st ast.Stmt) erro
 	}
 }
 
-func (in Interpreter) providerStmt(ctx context.Context, b build.Build, s ast.StmtProvider) error {
+func (in Interpreter) providerStmt(ctx context.Context, b spec.Spec, s ast.StmtProvider) error {
 	val, _, err := in.Expr(ctx, b, s.Expr)
 	if err != nil {
 		return err
 	}
 
-	provider, ok := val.(value.Provider)
+	provider, ok := val.(spec.ValueProvider)
 	if !ok {
 		return fmt.Errorf("expected Provider type, got %T", val)
 	}
@@ -38,13 +36,13 @@ func (in Interpreter) providerStmt(ctx context.Context, b build.Build, s ast.Stm
 	return nil
 }
 
-func (in Interpreter) resourceStmt(ctx context.Context, b build.Build, s ast.StmtResource) error {
+func (in Interpreter) resourceStmt(ctx context.Context, b spec.Spec, s ast.StmtResource) error {
 	val, children, err := in.Expr(ctx, b, s.Expr)
 	if err != nil {
 		return err
 	}
 
-	resource, ok := val.(value.Resource)
+	resource, ok := val.(spec.ValueResource)
 	if !ok {
 		return fmt.Errorf("expected Resource type, got %T", val)
 	}
@@ -53,7 +51,7 @@ func (in Interpreter) resourceStmt(ctx context.Context, b build.Build, s ast.Stm
 	b.DependencyMap[alias] = slices.Compact(append(b.DependencyMap[alias], children...))
 	b.Resources[alias] = resource
 	b.Providers[resource.Provider.Identifier.Alias] = resource.Provider
-	b.Components[alias] = component.Resource{Value: resource}
+	b.Components[alias] = spec.ComponentResource{Value: resource}
 
 	return nil
 }
