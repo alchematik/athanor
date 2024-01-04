@@ -84,58 +84,14 @@ const (
 )
 
 func Diff(from, to state.Type) (Type, error) {
-	switch f := from.(type) {
-	case state.Environment:
-		switch t := to.(type) {
-		case state.Environment:
-			return EnvironmentDiff(f, t)
-		case state.Nil:
-			return EnvironmentDiff(f, state.Environment{})
-		default:
-			return nil, fmt.Errorf("invalid type for environment diff: %T", to)
-		}
-	case state.String:
-		switch t := to.(type) {
-		case state.String:
-			return stringDiff(f, t)
-		case state.Unknown:
-			return Unknown{}, nil
-		case state.Nil:
-			return stringDiff(f, state.String{})
-		default:
-			return nil, fmt.Errorf("invalid type for string diff: %T", to)
-		}
-	case state.Bool:
-		switch t := to.(type) {
-		case state.Bool:
-			return boolDiff(f, t)
-		case state.Unknown:
-			return Unknown{}, nil
-		case state.Nil:
-			return boolDiff(f, state.Bool{})
-		default:
-			return nil, fmt.Errorf("invalid type for bool diff: %T", to)
-		}
-	case state.Map:
-		switch t := to.(type) {
-		case state.Map:
-			return mapDiff(f, t)
-		case state.Nil:
-			return mapDiff(f, state.Map{Entries: map[string]state.Type{}})
-		default:
-			return nil, fmt.Errorf("invalid type for map diff: %T", to)
-		}
-	case state.Resource:
-		switch t := to.(type) {
-		case state.Resource:
-			return ResourceDiff(f, t)
-		case state.Nil:
-			// TODO: Resource state.
-			return ResourceDiff(f, state.Resource{})
-		default:
-			return nil, fmt.Errorf("invalid type for resource diff: %T", to)
-		}
-	case state.Nil:
+	_, fromIsUnknown := from.(state.Unknown)
+	_, toIsUnknown := to.(state.Unknown)
+	if fromIsUnknown || toIsUnknown {
+		return Unknown{}, nil
+	}
+
+	_, fromIsEmpty := from.(state.Nil)
+	if fromIsEmpty {
 		switch t := to.(type) {
 		case state.String:
 			return stringDiff(state.String{}, t)
@@ -144,14 +100,70 @@ func Diff(from, to state.Type) (Type, error) {
 		case state.Map:
 			return mapDiff(state.Map{}, t)
 		case state.Resource:
-			return ResourceDiff(state.Resource{}, t)
-		case state.Unknown:
-			return Unknown{}, nil
+			return resourceDiff(state.Resource{}, t)
 		default:
 			return nil, fmt.Errorf("invalid type for nil diff: %T", to)
 		}
-	case state.Unknown:
-		return Unknown{}, nil
+	}
+
+	_, toIsEmpty := to.(state.Nil)
+
+	switch f := from.(type) {
+	case state.Environment:
+		if toIsEmpty {
+			return EnvironmentDiff(f, state.Environment{})
+		}
+
+		t, ok := to.(state.Environment)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for environment diff: %T", to)
+		}
+
+		return EnvironmentDiff(f, t)
+	case state.String:
+		if toIsEmpty {
+			return stringDiff(f, state.String{})
+		}
+
+		t, ok := to.(state.String)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for string diff: %T", to)
+		}
+
+		return stringDiff(f, t)
+	case state.Bool:
+		if toIsEmpty {
+			return boolDiff(f, state.Bool{})
+		}
+
+		t, ok := to.(state.Bool)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for bool diff: %T", to)
+		}
+
+		return boolDiff(f, t)
+	case state.Map:
+		if toIsEmpty {
+			return mapDiff(f, state.Map{Entries: map[string]state.Type{}})
+		}
+
+		t, ok := to.(state.Map)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for map diff: %T", to)
+		}
+
+		return mapDiff(f, t)
+	case state.Resource:
+		if toIsEmpty {
+			return resourceDiff(f, state.Resource{})
+		}
+
+		t, ok := to.(state.Resource)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for resource diff: %T", to)
+		}
+
+		return resourceDiff(f, t)
 	default:
 		return nil, fmt.Errorf("unsupported type for diff: %T", from)
 	}
@@ -247,7 +259,7 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 	}, nil
 }
 
-func ResourceDiff(from, to state.Resource) (Resource, error) {
+func resourceDiff(from, to state.Resource) (Resource, error) {
 	config, err := Diff(from.Config, to.Config)
 	if err != nil {
 		return Resource{}, err

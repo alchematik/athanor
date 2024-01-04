@@ -17,20 +17,29 @@ func TestResourceDiff(t *testing.T) {
 		"noop": {
 			from: state.Resource{
 				Config: state.String{Value: "config"},
+				Exists: state.Bool{Value: true},
 			},
 			to: state.Resource{
 				Config: state.String{Value: "config"},
+				Exists: state.Bool{Value: true},
 			},
 			out: diff.Resource{
 				From: state.Resource{
 					Config: state.String{Value: "config"},
+					Exists: state.Bool{Value: true},
 				},
 				To: state.Resource{
 					Config: state.String{Value: "config"},
+					Exists: state.Bool{Value: true},
 				},
 				ConfigDiff: diff.String{
 					From:          state.String{Value: "config"},
 					To:            state.String{Value: "config"},
+					DiffOperation: diff.OperationNoop,
+				},
+				ExistsDiff: diff.Bool{
+					From:          state.Bool{Value: true},
+					To:            state.Bool{Value: true},
 					DiffOperation: diff.OperationNoop,
 				},
 				DiffOperation: diff.OperationNoop,
@@ -44,6 +53,7 @@ func TestResourceDiff(t *testing.T) {
 						"foo": state.String{Value: "before"},
 					},
 				},
+				Exists: state.Bool{Value: true},
 			},
 			to: state.Resource{
 				Config: state.Map{
@@ -52,6 +62,7 @@ func TestResourceDiff(t *testing.T) {
 						"bar": state.String{Value: "baz"},
 					},
 				},
+				Exists: state.Bool{Value: true},
 			},
 			out: diff.Resource{
 				From: state.Resource{
@@ -60,6 +71,7 @@ func TestResourceDiff(t *testing.T) {
 							"foo": state.String{Value: "before"},
 						},
 					},
+					Exists: state.Bool{Value: true},
 				},
 				To: state.Resource{
 					Config: state.Map{
@@ -68,8 +80,14 @@ func TestResourceDiff(t *testing.T) {
 							"bar": state.String{Value: "baz"},
 						},
 					},
+					Exists: state.Bool{Value: true},
 				},
 				DiffOperation: diff.OperationUpdate,
+				ExistsDiff: diff.Bool{
+					From:          state.Bool{Value: true},
+					To:            state.Bool{Value: true},
+					DiffOperation: diff.OperationNoop,
+				},
 				ConfigDiff: diff.Map{
 					From: state.Map{
 						Entries: map[string]state.Type{
