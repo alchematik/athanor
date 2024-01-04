@@ -65,12 +65,17 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 
 		fmt.Printf("resolved >>>>>>> %+v\n", resolvedResource)
 
-		updatedDiff, err := diff.ResourceDiff(resourceDiff.From, resolvedResource)
+		updatedDiff, err := diff.Diff(resourceDiff.From, resolvedResource)
 		if err != nil {
 			return state.Environment{}, err
 		}
 
-		val, err := r.ReconcileResource(ctx, reconciledEnv, updatedDiff)
+		resourceDiff, ok = updatedDiff.(diff.Resource)
+		if !ok {
+			return state.Environment{}, fmt.Errorf("expected resource diff, got %T", updatedDiff)
+		}
+
+		val, err := r.ReconcileResource(ctx, reconciledEnv, resourceDiff)
 		if err != nil {
 			return state.Environment{}, err
 		}

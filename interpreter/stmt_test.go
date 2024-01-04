@@ -125,6 +125,7 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 			},
 			stmt: stmt.Resource{
 				Expr: expr.Resource{
+					Exists: expr.Bool{Value: true},
 					Identifier: expr.ResourceIdentifier{
 						Alias:        "my-resource",
 						ResourceType: "bucket",
@@ -152,6 +153,7 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 				},
 				Resources: map[string]value.Resource{
 					"my-resource": {
+						Exists: value.Bool{Value: true},
 						Provider: value.Provider{
 							Identifier: value.ProviderIdentifier{
 								Alias:   "my-provider",
@@ -179,6 +181,7 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 				Components: map[string]component.Type{
 					"my-resource": component.Resource{
 						Value: value.Resource{
+							Exists: value.Bool{Value: true},
 							Provider: value.Provider{
 								Identifier: value.ProviderIdentifier{
 									Alias:   "my-provider",

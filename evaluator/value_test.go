@@ -286,6 +286,7 @@ func TestEvaluator_Value_Unresolved(t *testing.T) {
 						Value:        value.String{Value: "foo"},
 					},
 					Config: value.String{Value: "bar"},
+					Exists: value.Bool{Value: true},
 				},
 			},
 			output: state.Identifier{
@@ -298,6 +299,7 @@ func TestEvaluator_Value_Unresolved(t *testing.T) {
 			input: value.Unresolved{
 				Name: "config",
 				Object: value.Resource{
+					Exists: value.Bool{Value: true},
 					Provider: value.Provider{
 						Identifier: value.ProviderIdentifier{
 							Alias:   "my-provider",
@@ -319,6 +321,7 @@ func TestEvaluator_Value_Unresolved(t *testing.T) {
 			input: value.Unresolved{
 				Name: "attrs",
 				Object: value.Resource{
+					Exists: value.Bool{Value: true},
 					Provider: value.Provider{
 						Identifier: value.ProviderIdentifier{
 							Alias:   "my-provider",
@@ -390,6 +393,7 @@ func TestEvaluator_Value_Resource(t *testing.T) {
 	}{
 		"valid resource": {
 			input: value.Resource{
+				Exists: value.Bool{Value: true},
 				Provider: value.Provider{
 					Identifier: value.ProviderIdentifier{
 						Alias:   "my-provider",
@@ -411,6 +415,7 @@ func TestEvaluator_Value_Resource(t *testing.T) {
 				},
 			},
 			output: state.Resource{
+				Exists: state.Bool{Value: true},
 				Provider: state.Provider{
 					Name:    "gcp",
 					Version: "v0.0.1",
