@@ -53,7 +53,6 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 			return state.Environment{}, fmt.Errorf("expected resource diff, got %T", d.Diffs[alias])
 		}
 
-		fmt.Printf("RESOLVING: %v\n", alias)
 		resolved, err := resolve(reconciledEnv, resourceDiff.To)
 		if err != nil {
 			return state.Environment{}, err
@@ -63,8 +62,6 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 		if !ok {
 			return state.Environment{}, fmt.Errorf("expected resource, got %T", resolved)
 		}
-
-		fmt.Printf("resolved >>>>>>> %+v\n", resolvedResource)
 
 		updatedDiff, err := diff.Diff(resourceDiff.From, resolvedResource)
 		if err != nil {
@@ -144,7 +141,6 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 }
 
 func resolve(env state.Environment, res state.Type) (state.Type, error) {
-	fmt.Printf("resolve: %T, %+v\n", res, res)
 	switch r := res.(type) {
 	case state.String:
 		return r, nil
@@ -168,9 +164,6 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 			return nil, fmt.Errorf("resolve: no resource with alias %q found", r.Alias)
 		}
 
-		fmt.Printf("found resource\n")
-		// fmt.Printf("found resource >>>>>>>>>>> %v, %+v\n", r.Alias, res)
-
 		return res, nil
 	case state.Resource:
 		config, err := resolve(env, r.Config)
@@ -191,12 +184,9 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 			return nil, err
 		}
 
-		// fmt.Printf("RESOLVED >>>>>>> %T, %T, %v\n", r.Object, resolved, resolved)
-
 		var m map[string]state.Type
 		switch obj := resolved.(type) {
 		case state.Resource:
-			fmt.Printf("resolved unknown: getting %v on %T %v\n", r.Name, obj.Attrs, obj.Attrs)
 			m = map[string]state.Type{
 				"identifier": obj.Identifier,
 				"config":     obj.Config,

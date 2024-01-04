@@ -5,24 +5,24 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/alchematik/athanor/blueprint/stmt"
+	"github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/build"
 	"github.com/alchematik/athanor/build/component"
 	"github.com/alchematik/athanor/build/value"
 )
 
-func (in Interpreter) Stmt(ctx context.Context, b build.Build, st stmt.Type) error {
+func (in Interpreter) Stmt(ctx context.Context, b build.Build, st ast.Stmt) error {
 	switch s := st.(type) {
-	case stmt.Provider:
+	case ast.StmtProvider:
 		return in.providerStmt(ctx, b, s)
-	case stmt.Resource:
+	case ast.StmtResource:
 		return in.resourceStmt(ctx, b, s)
 	default:
 		return fmt.Errorf("unknown stmt %T", st)
 	}
 }
 
-func (in Interpreter) providerStmt(ctx context.Context, b build.Build, s stmt.Provider) error {
+func (in Interpreter) providerStmt(ctx context.Context, b build.Build, s ast.StmtProvider) error {
 	val, _, err := in.Expr(ctx, b, s.Expr)
 	if err != nil {
 		return err
@@ -38,7 +38,7 @@ func (in Interpreter) providerStmt(ctx context.Context, b build.Build, s stmt.Pr
 	return nil
 }
 
-func (in Interpreter) resourceStmt(ctx context.Context, b build.Build, s stmt.Resource) error {
+func (in Interpreter) resourceStmt(ctx context.Context, b build.Build, s ast.StmtResource) error {
 	val, children, err := in.Expr(ctx, b, s.Expr)
 	if err != nil {
 		return err

@@ -20,9 +20,7 @@ import (
 	"github.com/alchematik/athanor/internal/parser"
 
 	api "github.com/alchematik/athanor/api/resource"
-	"github.com/alchematik/athanor/blueprint"
-	"github.com/alchematik/athanor/blueprint/expr"
-	"github.com/alchematik/athanor/blueprint/stmt"
+	"github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/diff"
 	"github.com/alchematik/athanor/evaluator"
 	"github.com/alchematik/athanor/interpreter"
@@ -71,8 +69,8 @@ var blockTypes = []hcl.BlockHeaderSchema{
 	},
 }
 
-func convertBlueprint(bp *consumerpb.Blueprint) (blueprint.Blueprint, error) {
-	var out blueprint.Blueprint
+func convertBlueprint(bp *consumerpb.Blueprint) (ast.Blueprint, error) {
+	var out ast.Blueprint
 	for _, s := range bp.Stmts {
 		st, err := convertStmt(s)
 		if err != nil {
@@ -85,7 +83,7 @@ func convertBlueprint(bp *consumerpb.Blueprint) (blueprint.Blueprint, error) {
 	return out, nil
 }
 
-func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
+func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 	switch s := st.GetType().(type) {
 	case *consumerpb.Stmt_Provider:
 		ex, err := convertExpr(s.Provider.GetExpr())
@@ -93,7 +91,7 @@ func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 			return nil, err
 		}
 
-		return stmt.Provider{
+		return ast.StmtProvider{
 			Expr: ex,
 		}, nil
 	case *consumerpb.Stmt_Resource:
@@ -102,23 +100,55 @@ func convertStmt(st *consumerpb.Stmt) (stmt.Type, error) {
 			return nil, err
 		}
 
-		return stmt.Resource{
+		return ast.StmtResource{
 			Expr: ex,
+		}, nil
+	case *consumerpb.Stmt_Blueprint:
+		ex, err := convertExpr(s.Blueprint.GetBlueprint())
+		if err != nil {
+			return nil, err
+		}
+
+		return ast.StmtBlueprint{
+			Alias: s.Blueprint.GetAlias(),
+			Expr:  ex,
+		}, nil
+	case *consumerpb.Stmt_Build:
+		ex, err := convertExpr(s.Build.GetBlueprint())
+		if err != nil {
+			return nil, err
+		}
+
+		return ast.StmtBlueprint{
+			Alias: s.Build.GetAlias(),
+			Expr:  ex,
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid stmt: %T", st.GetType())
 	}
 }
 
-func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
+func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 	switch e := ex.GetType().(type) {
+	case *consumerpb.Expr_Blueprint:
+		stmts := make([]ast.Stmt, len(e.Blueprint.GetStmts()))
+		for i, s := range e.Blueprint.GetStmts() {
+			converted, err := convertStmt(s)
+			if err != nil {
+				return nil, err
+			}
+
+			stmts[i] = converted
+		}
+
+		return ast.ExprBlueprint{Stmts: stmts}, nil
 	case *consumerpb.Expr_Provider:
 		id, err := convertExpr(e.Provider.GetIdentifier())
 		if err != nil {
 			return nil, err
 		}
 
-		return expr.Provider{
+		return ast.ExprProvider{
 			Identifier: id,
 		}, nil
 	case *consumerpb.Expr_Resource:
@@ -142,7 +172,7 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 			return nil, err
 		}
 
-		return expr.Resource{
+		return ast.ExprResource{
 			Provider:   provider,
 			Identifier: id,
 			Config:     config,
@@ -159,7 +189,7 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 			return nil, err
 		}
 
-		return expr.ProviderIdentifier{
+		return ast.ExprProviderIdentifier{
 			Alias:   e.ProviderIdentifier.GetAlias(),
 			Name:    name,
 			Version: version,
@@ -167,20 +197,20 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 	case *consumerpb.Expr_ResourceIdentifier:
 		val, err := convertExpr(e.ResourceIdentifier.GetValue())
 		if err != nil {
-			return expr.ResourceIdentifier{}, err
+			return ast.ExprResourceIdentifier{}, err
 		}
 
-		return expr.ResourceIdentifier{
+		return ast.ExprResourceIdentifier{
 			Alias:        e.ResourceIdentifier.GetAlias(),
 			ResourceType: e.ResourceIdentifier.GetType(),
 			Value:        val,
 		}, nil
 	case *consumerpb.Expr_StringLiteral:
-		return expr.String{Value: e.StringLiteral}, nil
+		return ast.ExprString{Value: e.StringLiteral}, nil
 	case *consumerpb.Expr_BoolLiteral:
-		return expr.Bool{Value: e.BoolLiteral}, nil
+		return ast.ExprBool{Value: e.BoolLiteral}, nil
 	case *consumerpb.Expr_Map:
-		m := expr.Map{Entries: map[string]expr.Type{}}
+		m := ast.ExprMap{Entries: map[string]ast.Expr{}}
 		for k, v := range e.Map.GetEntries() {
 			var err error
 			m.Entries[k], err = convertExpr(v)
@@ -196,7 +226,7 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 			return nil, err
 		}
 
-		g := expr.Get{
+		g := ast.ExprGet{
 			Name:   e.Get.GetName(),
 			Object: obj,
 		}
@@ -208,20 +238,20 @@ func convertExpr(ex *consumerpb.Expr) (expr.Type, error) {
 			return nil, err
 		}
 
-		g := expr.IOGet{
+		g := ast.ExprIOGet{
 			Name:   e.IoGet.GetName(),
 			Object: obj,
 		}
 
 		return g, nil
 	case *consumerpb.Expr_Nil:
-		return expr.Nil{}, nil
+		return ast.ExprNil{}, nil
 	case *consumerpb.Expr_GetProvider_:
-		return expr.GetProvider{
+		return ast.ExprGetProvider{
 			Alias: e.GetProvider_.GetAlias(),
 		}, nil
 	case *consumerpb.Expr_GetResource_:
-		return expr.GetResource{
+		return ast.ExprGetResource{
 			Alias: e.GetResource_.GetAlias(),
 		}, nil
 	default:

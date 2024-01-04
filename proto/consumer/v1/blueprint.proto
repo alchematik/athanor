@@ -10,6 +10,8 @@ message Stmt {
   oneof type {
     ProviderStmt provider = 1;
     ResourceStmt resource = 2;
+    BlueprintStmt blueprint = 3;
+    BuildStmt build = 4;
   }
 }
 
@@ -19,6 +21,16 @@ message ProviderStmt {
 
 message ResourceStmt {
   Expr expr = 1;
+}
+
+message BlueprintStmt {
+  string alias = 1;
+  Expr blueprint = 2;
+}
+
+message BuildStmt {
+  string alias = 1;
+  Expr blueprint = 2;
 }
 
 message Expr {
@@ -38,7 +50,12 @@ message Expr {
     IOGetExpr io_get = 13;
     ProviderIdentifierExpr provider_identifier = 14;
     ResourceIdentifierExpr resource_identifier = 15;
+    BlueprintExpr blueprint = 16;
   }
+}
+
+message BlueprintExpr {
+  repeated Stmt stmts = 1;
 }
 
 message ListExpr {

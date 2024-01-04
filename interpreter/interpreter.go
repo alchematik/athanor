@@ -3,7 +3,7 @@ package interpreter
 import (
 	"context"
 
-	"github.com/alchematik/athanor/blueprint"
+	"github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/build"
 	"github.com/alchematik/athanor/build/component"
 	"github.com/alchematik/athanor/build/value"
@@ -11,7 +11,7 @@ import (
 
 type Interpreter struct{}
 
-func (in Interpreter) Interpret(ctx context.Context, bp blueprint.Blueprint) (build.Build, error) {
+func (in Interpreter) Interpret(ctx context.Context, bp ast.Blueprint) (build.Build, error) {
 	b := build.Build{
 		Providers:     map[string]value.Provider{},
 		Resources:     map[string]value.Resource{},
