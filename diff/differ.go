@@ -2,7 +2,6 @@ package diff
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/alchematik/athanor/state"
 )
@@ -88,6 +87,8 @@ func Diff(from, to state.Type) (Type, error) {
 		switch t := to.(type) {
 		case state.String:
 			return StringDiff(f, t)
+		case state.Unknown:
+			return Unknown{}, nil
 		case state.Nil:
 			return StringDiff(f, state.String{})
 		default:
@@ -125,6 +126,8 @@ func Diff(from, to state.Type) (Type, error) {
 		default:
 			return nil, fmt.Errorf("invalid type for nil diff: %T", to)
 		}
+	case state.Unknown:
+		return Unknown{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported type for diff: %T", from)
 	}
@@ -149,9 +152,6 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 		}
 	case len(from.Resources) > 0 && len(to.Resources) == 0:
 		op = OperationDelete
-
-		// Invert the dep map.
-		// depMap = invertDepMap(to.DependencyMap)
 
 		for k, v := range to.Resources {
 			d, err := Diff(v, state.Nil{})
@@ -222,7 +222,6 @@ func EnvironmentDiff(from, to state.Environment) (Environment, error) {
 }
 
 func ResourceDiff(from, to state.Resource) (Resource, error) {
-	// fmt.Printf("DIFFING RESOURCE: %v\n", to.ResourceType)
 	config, err := Diff(from.Config, to.Config)
 	if err != nil {
 		return Resource{}, err
@@ -340,21 +339,4 @@ func MapDiff(from, to state.Map) (Map, error) {
 		Diffs:         diffs,
 		DiffOperation: op,
 	}, nil
-}
-
-func invertDepMap(m map[string][]string) map[string][]string {
-	inverted := map[string][]string{}
-
-	for child, parents := range m {
-		for _, parent := range parents {
-			inverted[parent] = append(inverted[parent], child)
-		}
-	}
-
-	for k, v := range inverted {
-		slices.Sort(v)
-		inverted[k] = slices.Compact(v)
-	}
-
-	return inverted
 }

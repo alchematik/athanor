@@ -11,55 +11,61 @@ import (
 func TestStringDiff(t *testing.T) {
 	testCases := []struct {
 		description string
-		from        state.String
-		to          state.String
-		out         diff.Diff
+		from        state.Type
+		to          state.Type
+		out         diff.Type
 	}{
 		{
 			description: "noop",
 			from:        state.String{Value: "test"},
 			to:          state.String{Value: "test"},
-			out: diff.Diff{
-				From:      state.String{Value: "test"},
-				To:        state.String{Value: "test"},
-				Operation: diff.OperationNoop,
+			out: diff.String{
+				From:          state.String{Value: "test"},
+				To:            state.String{Value: "test"},
+				DiffOperation: diff.OperationNoop,
 			},
 		},
 		{
 			description: "create",
 			from:        state.String{Value: ""},
 			to:          state.String{Value: "test"},
-			out: diff.Diff{
-				From:      state.String{Value: ""},
-				To:        state.String{Value: "test"},
-				Operation: diff.OperationCreate,
+			out: diff.String{
+				From:          state.String{Value: ""},
+				To:            state.String{Value: "test"},
+				DiffOperation: diff.OperationCreate,
 			},
 		},
 		{
 			description: "delete",
 			from:        state.String{Value: "test"},
 			to:          state.String{Value: ""},
-			out: diff.Diff{
-				From:      state.String{Value: "test"},
-				To:        state.String{Value: ""},
-				Operation: diff.OperationDelete,
+			out: diff.String{
+				From:          state.String{Value: "test"},
+				To:            state.String{Value: ""},
+				DiffOperation: diff.OperationDelete,
 			},
 		},
 		{
 			description: "update",
 			from:        state.String{Value: "test"},
 			to:          state.String{Value: "test test"},
-			out: diff.Diff{
-				From:      state.String{Value: "test"},
-				To:        state.String{Value: "test test"},
-				Operation: diff.OperationUpdate,
+			out: diff.String{
+				From:          state.String{Value: "test"},
+				To:            state.String{Value: "test test"},
+				DiffOperation: diff.OperationUpdate,
 			},
+		},
+		{
+			description: "unknown",
+			from:        state.Unknown{},
+			to:          state.String{Value: "foo"},
+			out:         diff.Unknown{},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			out, err := diff.String(tc.from, tc.to)
+			out, err := diff.Diff(tc.from, tc.to)
 			require.NoError(t, err)
 			require.Equal(t, tc.out, out)
 		})
@@ -69,7 +75,6 @@ func TestStringDiff(t *testing.T) {
 func TestMap(t *testing.T) {
 	one := state.String{Value: "one"}
 	two := state.String{Value: "two"}
-	// three := state.String{Value: "three"}
 	four := state.String{Value: "four"}
 	m1 := state.Map{
 		Entries: map[string]state.Type{
@@ -88,30 +93,28 @@ func TestMap(t *testing.T) {
 	}
 	testCases := []struct {
 		description string
-		from        state.Map
-		to          state.Map
-		out         diff.Diff
+		from        state.Type
+		to          state.Type
+		out         diff.Type
 	}{
 		{
 			description: "noop",
 			from:        m1,
 			to:          m1,
-			out: diff.Diff{
-				Operation: diff.OperationNoop,
-				From:      m1,
-				To:        m1,
-				Diffs: []diff.Diff{
-					{
-						Name:      "one",
-						Operation: diff.OperationNoop,
-						From:      state.String{Value: "two"},
-						To:        state.String{Value: "two"},
+			out: diff.Map{
+				DiffOperation: diff.OperationNoop,
+				From:          m1,
+				To:            m1,
+				Diffs: map[string]diff.Type{
+					"one": diff.String{
+						DiffOperation: diff.OperationNoop,
+						From:          state.String{Value: "two"},
+						To:            state.String{Value: "two"},
 					},
-					{
-						Name:      "three",
-						Operation: diff.OperationNoop,
-						From:      state.String{Value: "four"},
-						To:        state.String{Value: "four"},
+					"three": diff.String{
+						DiffOperation: diff.OperationNoop,
+						From:          state.String{Value: "four"},
+						To:            state.String{Value: "four"},
 					},
 				},
 			},
@@ -120,22 +123,20 @@ func TestMap(t *testing.T) {
 			description: "create",
 			from:        empty,
 			to:          m1,
-			out: diff.Diff{
-				Operation: diff.OperationCreate,
-				From:      empty,
-				To:        m1,
-				Diffs: []diff.Diff{
-					{
-						Name:      "one",
-						Operation: diff.OperationCreate,
-						From:      state.Nil{},
-						To:        state.String{Value: "two"},
+			out: diff.Map{
+				DiffOperation: diff.OperationCreate,
+				From:          empty,
+				To:            m1,
+				Diffs: map[string]diff.Type{
+					"one": diff.String{
+						DiffOperation: diff.OperationCreate,
+						From:          state.String{},
+						To:            state.String{Value: "two"},
 					},
-					{
-						Name:      "three",
-						Operation: diff.OperationCreate,
-						From:      state.Nil{},
-						To:        state.String{Value: "four"},
+					"three": diff.String{
+						DiffOperation: diff.OperationCreate,
+						From:          state.String{},
+						To:            state.String{Value: "four"},
 					},
 				},
 			},
@@ -144,22 +145,20 @@ func TestMap(t *testing.T) {
 			description: "delete",
 			from:        m1,
 			to:          empty,
-			out: diff.Diff{
-				Operation: diff.OperationDelete,
-				From:      m1,
-				To:        empty,
-				Diffs: []diff.Diff{
-					{
-						Name:      "one",
-						Operation: diff.OperationDelete,
-						From:      state.String{Value: "two"},
-						To:        state.Nil{},
+			out: diff.Map{
+				DiffOperation: diff.OperationDelete,
+				From:          m1,
+				To:            empty,
+				Diffs: map[string]diff.Type{
+					"one": diff.String{
+						DiffOperation: diff.OperationDelete,
+						From:          state.String{Value: "two"},
+						To:            state.String{},
 					},
-					{
-						Name:      "three",
-						Operation: diff.OperationDelete,
-						From:      state.String{Value: "four"},
-						To:        state.Nil{},
+					"three": diff.String{
+						DiffOperation: diff.OperationDelete,
+						From:          state.String{Value: "four"},
+						To:            state.String{},
 					},
 				},
 			},
@@ -168,36 +167,72 @@ func TestMap(t *testing.T) {
 			description: "update",
 			from:        m1,
 			to:          m2,
-			out: diff.Diff{
-				Operation: diff.OperationUpdate,
-				From:      m1,
-				To:        m2,
-				Diffs: []diff.Diff{
-					{
-						Name:      "one",
-						Operation: diff.OperationUpdate,
-						From:      state.String{Value: "two"},
-						To:        state.String{Value: "one"},
+			out: diff.Map{
+				DiffOperation: diff.OperationUpdate,
+				From:          m1,
+				To:            m2,
+				Diffs: map[string]diff.Type{
+					"one": diff.String{
+						DiffOperation: diff.OperationUpdate,
+						From:          state.String{Value: "two"},
+						To:            state.String{Value: "one"},
 					},
-					{
-						Name:      "three",
-						Operation: diff.OperationDelete,
-						From:      state.String{Value: "four"},
-						To:        state.Nil{},
+					"three": diff.String{
+						DiffOperation: diff.OperationDelete,
+						From:          state.String{Value: "four"},
+						To:            state.String{},
 					},
-					{
-						Name:      "two",
-						Operation: diff.OperationCreate,
-						From:      state.Nil{},
-						To:        state.String{Value: "two"},
+					"two": diff.String{
+						DiffOperation: diff.OperationCreate,
+						From:          state.String{},
+						To:            state.String{Value: "two"},
 					},
 				},
 			},
 		},
+		{
+			description: "has unknown",
+			from: state.Map{
+				Entries: map[string]state.Type{
+					"unknown": state.Unknown{},
+				},
+			},
+			to: state.Map{
+				Entries: map[string]state.Type{
+					"unknown": state.String{Value: "foo"},
+				},
+			},
+			out: diff.Map{
+				DiffOperation: diff.OperationUnknown,
+				From: state.Map{
+					Entries: map[string]state.Type{
+						"unknown": state.Unknown{},
+					},
+				},
+				To: state.Map{
+					Entries: map[string]state.Type{
+						"unknown": state.String{Value: "foo"},
+					},
+				},
+				Diffs: map[string]diff.Type{
+					"unknown": diff.Unknown{},
+				},
+			},
+		},
+		{
+			description: "is unknown",
+			from:        state.Unknown{},
+			to: state.Map{
+				Entries: map[string]state.Type{
+					"foo": state.String{Value: "bar"},
+				},
+			},
+			out: diff.Unknown{},
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.description, func(t *testing.T) {
-			out, err := diff.Map(tc.from, tc.to)
+			out, err := diff.Diff(tc.from, tc.to)
 			require.NoError(t, err)
 			require.Equal(t, tc.out, out)
 		})

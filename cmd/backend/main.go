@@ -58,7 +58,8 @@ func (s *Server) GetResource(ctx context.Context, req *backendpb.GetResourceRequ
 				Type: &statepb.Value_Map{
 					Map: &statepb.MapValue{
 						Entries: map[string]*statepb.Value{
-							"contents": &statepb.Value{Type: &statepb.Value_StringValue{StringValue: "blablablablabla"}},
+							"contents":   {Type: &statepb.Value_StringValue{StringValue: "blablablablabla"}},
+							"some_field": {Type: &statepb.Value_StringValue{StringValue: "hehe"}},
 						},
 					},
 				},
