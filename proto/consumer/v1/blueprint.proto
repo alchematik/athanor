@@ -23,11 +23,6 @@ message ResourceStmt {
   Expr expr = 1;
 }
 
-// message BlueprintStmt {
-//   string alias = 1;
-//   Expr blueprint = 2;
-// }
-
 message BuildStmt {
   string alias = 1;
   map<string, Expr> inputs = 2;
