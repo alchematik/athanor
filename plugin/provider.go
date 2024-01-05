@@ -9,6 +9,7 @@ import (
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	"github.com/alchematik/athanor/state"
 
+	"github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 )
@@ -31,6 +32,7 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 		},
 		Cmd:              exec.Command("sh", "-c", pluginPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+		Logger:           hclog.NewNullLogger(),
 	})
 
 	dispensor, err := client.Client()
