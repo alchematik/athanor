@@ -16,12 +16,12 @@ type StmtResource struct {
 	Expr Expr
 }
 
-type StmtBlueprint struct {
-	Stmt
-
-	Alias string
-	Expr  Expr
-}
+// type StmtBlueprint struct {
+// 	Stmt
+//
+// 	Alias string
+// 	Expr  Expr
+// }
 
 type StmtBuild struct {
 	Stmt

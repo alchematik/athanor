@@ -16,7 +16,8 @@ func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error 
 	case ast.StmtResource:
 		return in.resourceStmt(ctx, b, s)
 	// case ast.StmtBlueprint:
-	// case ast.StmtBuild:
+	case ast.StmtBuild:
+		return in.buildStmt(ctx, b, s)
 	default:
 		return fmt.Errorf("unknown stmt %T", st)
 	}

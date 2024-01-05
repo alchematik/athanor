@@ -60,12 +60,17 @@ func (e Evaluator) resourceIdentifier(ctx context.Context, env state.Environment
 }
 
 func (e Evaluator) resourceRef(env state.Environment, v spec.ValueResourceRef) (state.Resource, error) {
-	r, ok := env.Resources[v.Alias]
+	r, ok := env.States[v.Alias]
 	if !ok {
 		return state.Resource{}, fmt.Errorf("evaluator: resource with alias %q does not exist", v.Alias)
 	}
 
-	return r, nil
+	res, ok := r.(state.Resource)
+	if !ok {
+		return state.Resource{}, fmt.Errorf("expected Resource type, got %T", r)
+	}
+
+	return res, nil
 }
 
 func (e Evaluator) unresolvedValue(ctx context.Context, env state.Environment, v spec.ValueUnresolved) (state.Type, error) {

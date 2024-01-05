@@ -168,6 +168,7 @@ func (a API) UpdateResource(ctx context.Context, r state.Resource, mask []Field)
 	}
 
 	return state.Resource{
+		Provider:   r.Provider,
 		Identifier: r.Identifier,
 		Config:     responseConfig,
 		Attrs:      responseAttrs,

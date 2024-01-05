@@ -39,7 +39,7 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 	}
 
 	reconciledEnv := state.Environment{
-		Resources:     map[string]state.Resource{},
+		States:        map[string]state.Type{},
 		DependencyMap: d.Dependencies,
 	}
 
@@ -48,37 +48,42 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 		var alias string
 		alias, queue = queue[0], queue[1:]
 
-		resourceDiff, ok := d.Diffs[alias].(diff.Resource)
-		if !ok {
-			return state.Environment{}, fmt.Errorf("expected resource diff, got %T", d.Diffs[alias])
+		var reconciled state.Type
+		switch current := d.Diffs[alias].(type) {
+		case diff.Resource:
+			resolved, err := resolve(reconciledEnv, current.To)
+			if err != nil {
+				return state.Environment{}, err
+			}
+
+			resolvedResource, ok := resolved.(state.Resource)
+			if !ok {
+				return state.Environment{}, fmt.Errorf("expected resource, got %T", resolved)
+			}
+
+			updatedDiff, err := diff.Diff(current.From, resolvedResource)
+			if err != nil {
+				return state.Environment{}, err
+			}
+
+			resourceDiff, ok := updatedDiff.(diff.Resource)
+			if !ok {
+				return state.Environment{}, fmt.Errorf("expected resource diff, got %T", updatedDiff)
+			}
+
+			reconciled, err = r.ReconcileResource(ctx, reconciledEnv, resourceDiff)
+			if err != nil {
+				return state.Environment{}, err
+			}
+		case diff.Environment:
+			var err error
+			reconciled, err = r.ReconcileEnvironment(ctx, current)
+			if err != nil {
+				return state.Environment{}, err
+			}
 		}
 
-		resolved, err := resolve(reconciledEnv, resourceDiff.To)
-		if err != nil {
-			return state.Environment{}, err
-		}
-
-		resolvedResource, ok := resolved.(state.Resource)
-		if !ok {
-			return state.Environment{}, fmt.Errorf("expected resource, got %T", resolved)
-		}
-
-		updatedDiff, err := diff.Diff(resourceDiff.From, resolvedResource)
-		if err != nil {
-			return state.Environment{}, err
-		}
-
-		resourceDiff, ok = updatedDiff.(diff.Resource)
-		if !ok {
-			return state.Environment{}, fmt.Errorf("expected resource diff, got %T", updatedDiff)
-		}
-
-		val, err := r.ReconcileResource(ctx, reconciledEnv, resourceDiff)
-		if err != nil {
-			return state.Environment{}, err
-		}
-
-		reconciledEnv.Resources[alias] = val
+		reconciledEnv.States[alias] = reconciled
 
 		for _, child := range parentToChildren[alias] {
 			indegrees[child]--
@@ -159,7 +164,7 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 
 		return m, nil
 	case state.ResourceRef:
-		res, ok := env.Resources[r.Alias]
+		res, ok := env.States[r.Alias]
 		if !ok {
 			return nil, fmt.Errorf("resolve: no resource with alias %q found", r.Alias)
 		}

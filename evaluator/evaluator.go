@@ -16,7 +16,7 @@ type ResourceAPI interface {
 	GetResource(context.Context, state.Resource) (state.Resource, error)
 }
 
-func (e Evaluator) Evaluate(ctx context.Context, b spec.Spec) (state.Type, error) {
+func (e Evaluator) Evaluate(ctx context.Context, b spec.Spec) (state.Environment, error) {
 	indegrees := map[string]int{}
 	parentToChildren := map[string][]string{}
 	for child, parents := range b.DependencyMap {
@@ -38,7 +38,7 @@ func (e Evaluator) Evaluate(ctx context.Context, b spec.Spec) (state.Type, error
 
 	env := state.Environment{
 		DependencyMap: b.DependencyMap,
-		Resources:     map[string]state.Resource{},
+		States:        map[string]state.Type{},
 	}
 
 	// TODO: parallelize.
@@ -49,8 +49,8 @@ func (e Evaluator) Evaluate(ctx context.Context, b spec.Spec) (state.Type, error
 		fmt.Printf("evaluating: %q\n", alias)
 
 		comp := b.Components[alias]
-		if err := e.Component(ctx, env, comp); err != nil {
-			return nil, err
+		if err := e.Component(ctx, env, alias, comp); err != nil {
+			return state.Environment{}, err
 		}
 
 		for _, childAlias := range parentToChildren[alias] {

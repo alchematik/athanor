@@ -119,9 +119,20 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 			return nil, err
 		}
 
-		return ast.StmtBlueprint{
-			Alias: s.Build.GetAlias(),
-			Expr:  ex,
+		inputs := map[string]ast.Expr{}
+		for name, inputExpr := range s.Build.GetInputs() {
+			input, err := convertExpr(inputExpr)
+			if err != nil {
+				return nil, err
+			}
+
+			inputs[name] = input
+		}
+
+		return ast.StmtBuild{
+			Alias:     s.Build.GetAlias(),
+			Blueprint: ex,
+			Inputs:    inputs,
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid stmt: %T", st.GetType())

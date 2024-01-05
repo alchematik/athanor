@@ -175,10 +175,10 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 	var depMap map[string][]string
 
 	switch {
-	case len(from.Resources) == 0 && len(to.Resources) > 0:
+	case len(from.States) == 0 && len(to.States) > 0:
 		op = OperationCreate
 		depMap = to.DependencyMap
-		for k, v := range to.Resources {
+		for k, v := range to.States {
 			d, err := Diff(state.Nil{}, v)
 			if err != nil {
 				return Environment{}, err
@@ -186,10 +186,10 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 
 			diffs[k] = d
 		}
-	case len(from.Resources) > 0 && len(to.Resources) == 0:
+	case len(from.States) > 0 && len(to.States) == 0:
 		op = OperationDelete
 
-		for k, v := range to.Resources {
+		for k, v := range to.States {
 			d, err := Diff(v, state.Nil{})
 			if err != nil {
 				return Environment{}, err
@@ -200,12 +200,14 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 	default:
 		depMap = map[string][]string{}
 
-		for k, v := range to.Resources {
+		for k, v := range to.States {
 			var fromVal state.Type
-			fromVal, ok := from.Resources[k]
+			fromVal, ok := from.States[k]
 			if !ok {
 				fromVal = state.Nil{}
 			}
+
+			fmt.Printf("DIFFING %v >>>>>>>>>>>>>>>>>>>>> \n", k)
 
 			d, err := Diff(fromVal, v)
 			if err != nil {
@@ -213,7 +215,7 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 			}
 
 			switch d.Operation() {
-			case OperationCreate, OperationUpdate, OperationUnknown:
+			case OperationCreate, OperationUpdate, OperationUnknown, OperationNoop:
 				depMap[k] = to.DependencyMap[k]
 			case OperationDelete:
 				// This is meant to makes sure that children are deleted before parents.

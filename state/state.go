@@ -7,7 +7,7 @@ type Type interface {
 type Environment struct {
 	Type
 
-	Resources     map[string]Resource
+	States        map[string]Type
 	DependencyMap map[string][]string
 }
 

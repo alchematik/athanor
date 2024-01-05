@@ -145,6 +145,75 @@
           }
         }
       }
+    },
+    {
+      "build": {
+        "alias": "sub-build",
+        "inputs": {
+        },
+        "blueprint": {
+          "blueprint": {
+            "stmts": [
+              {
+                "resource": {
+                  "expr": {
+                    "resource": {
+                      "exists": {
+                        "bool_literal": true
+                      },
+                      "provider": {
+                        "provider": {
+                          "identifier": {
+                            "provider_identifier": {
+                              "alias": "other-gcp",
+                              "name": {
+                                "string_literal": "gcp"
+                              },
+                              "version": {
+                                "string_literal": "v0.0.1"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "identifier": {
+                        "resource_identifier": {
+                          "alias": "my-other-bucket",
+                          "type": "bucket",
+                          "value": {
+                            "map": {
+                              "entries": {
+                                "account": {
+                                  "string_literal": "12345"
+                                },
+                                "region": {
+                                  "string_literal": "us-east-1"
+                                },
+                                "name": {
+                                  "string_literal": "my-other-bucket"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "config": {
+                        "map": {
+                          "entries": {
+                            "expiration": {
+                              "string_literal": "12h"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
     }
   ]
 }
