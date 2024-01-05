@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package alchematik.athanor.consumer.v1;
+package alchematik.athanor.blueprint.v1;
 
 message Blueprint {
   repeated Stmt stmts = 1;

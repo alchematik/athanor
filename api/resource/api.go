@@ -4,8 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
-	statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
+	providerpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	"github.com/alchematik/athanor/plugin"
 	"github.com/alchematik/athanor/state"
 
@@ -33,7 +32,7 @@ func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource,
 		return state.Resource{}, err
 	}
 
-	request := &backendpb.GetResourceRequest{
+	request := &providerpb.GetResourceRequest{
 		Identifier: id.GetIdentifier(),
 	}
 	response, err := client.GetResource(ctx, request)
@@ -81,7 +80,7 @@ func (a API) CreateResource(ctx context.Context, r state.Resource) (state.Resour
 		return state.Resource{}, err
 	}
 
-	request := &backendpb.CreateResourceRequest{
+	request := &providerpb.CreateResourceRequest{
 		Identifier: id.GetIdentifier(),
 		Config:     config,
 	}
@@ -120,7 +119,7 @@ func (a API) DeleteResource(ctx context.Context, r state.Resource) error {
 		return err
 	}
 
-	request := &backendpb.DeleteResourceRequest{
+	request := &providerpb.DeleteResourceRequest{
 		Identifier: id.GetIdentifier(),
 	}
 	_, err = client.DeleteResource(ctx, request)
@@ -147,7 +146,7 @@ func (a API) UpdateResource(ctx context.Context, r state.Resource, mask []Field)
 		return state.Resource{}, err
 	}
 
-	request := &backendpb.UpdateResourceRequest{
+	request := &providerpb.UpdateResourceRequest{
 		Identifier: id.GetIdentifier(),
 		Config:     config,
 		Mask:       toProtoMask(mask),
@@ -176,10 +175,10 @@ func (a API) UpdateResource(ctx context.Context, r state.Resource, mask []Field)
 	}, nil
 }
 
-func toProtoMask(mask []Field) []*backendpb.Field {
-	var protoMask []*backendpb.Field
+func toProtoMask(mask []Field) []*providerpb.Field {
+	var protoMask []*providerpb.Field
 	for _, f := range mask {
-		p := &backendpb.Field{
+		p := &providerpb.Field{
 			Name:      f.Name,
 			SubFields: toProtoMask(f.SubFields),
 		}
@@ -189,9 +188,9 @@ func toProtoMask(mask []Field) []*backendpb.Field {
 	return protoMask
 }
 
-func fromProto(val *statepb.Value) (state.Type, error) {
+func fromProto(val *providerpb.Value) (state.Type, error) {
 	switch v := val.GetType().(type) {
-	case *statepb.Value_Map:
+	case *providerpb.Value_Map:
 		entries := map[string]state.Type{}
 		for k, element := range v.Map.GetEntries() {
 			converted, err := fromProto(element)
@@ -202,21 +201,21 @@ func fromProto(val *statepb.Value) (state.Type, error) {
 		}
 
 		return state.Map{Entries: entries}, nil
-	case *statepb.Value_StringValue:
+	case *providerpb.Value_StringValue:
 		return state.String{Value: v.StringValue}, nil
 	default:
 		return nil, fmt.Errorf("unsupported type %T", val.GetType())
 	}
 }
 
-func toProto(val state.Type) (*statepb.Value, error) {
+func toProto(val state.Type) (*providerpb.Value, error) {
 	switch v := val.(type) {
 	case state.String:
-		return &statepb.Value{
-			Type: &statepb.Value_StringValue{StringValue: v.Value},
+		return &providerpb.Value{
+			Type: &providerpb.Value_StringValue{StringValue: v.Value},
 		}, nil
 	case state.Map:
-		entries := map[string]*statepb.Value{}
+		entries := map[string]*providerpb.Value{}
 		for k, v := range v.Entries {
 			converted, err := toProto(v)
 			if err != nil {
@@ -225,9 +224,9 @@ func toProto(val state.Type) (*statepb.Value, error) {
 			entries[k] = converted
 		}
 
-		return &statepb.Value{
-			Type: &statepb.Value_Map{
-				Map: &statepb.MapValue{
+		return &providerpb.Value{
+			Type: &providerpb.Value_Map{
+				Map: &providerpb.MapValue{
 					Entries: entries,
 				},
 			},
@@ -238,9 +237,9 @@ func toProto(val state.Type) (*statepb.Value, error) {
 			return nil, err
 		}
 
-		return &statepb.Value{
-			Type: &statepb.Value_Identifier{
-				Identifier: &statepb.Identifier{
+		return &providerpb.Value{
+			Type: &providerpb.Value_Identifier{
+				Identifier: &providerpb.Identifier{
 					Type:  v.ResourceType,
 					Value: converted,
 				},

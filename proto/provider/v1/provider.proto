@@ -2,9 +2,6 @@ syntax = "proto3";
 
 package alchematik.athanor.provider.v1;
 
-import "google/protobuf/struct.proto";
-import "proto/state/v1/state.proto";
-
 service Provider {
   rpc CreateResource(CreateResourceRequest) returns (CreateResourceResponse);
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse);
@@ -13,39 +10,75 @@ service Provider {
 }
 
 message GetResourceRequest {
-  alchematik.athanor.state.v1.Identifier identifier = 1;
+  Identifier identifier = 1;
 }
 
 message GetResourceResponse {
-  alchematik.athanor.state.v1.Resource resource = 1;
+  Resource resource = 1;
 }
 
 message CreateResourceRequest {
-  alchematik.athanor.state.v1.Identifier identifier = 1;
-  alchematik.athanor.state.v1.Value config = 2;
+  Identifier identifier = 1;
+  Value config = 2;
 }
 
 message CreateResourceResponse {
-  alchematik.athanor.state.v1.Resource resource = 1;
+  Resource resource = 1;
 }
 
 message DeleteResourceRequest {
-  alchematik.athanor.state.v1.Identifier identifier = 1;
+  Identifier identifier = 1;
 }
 
 message DeleteResourceResponse {}
 
 message UpdateResourceRequest {
-  alchematik.athanor.state.v1.Identifier identifier = 1;
-  alchematik.athanor.state.v1.Value config = 2;
+  Identifier identifier = 1;
+  Value config = 2;
   repeated Field mask = 3;
 }
 
 message UpdateResourceResponse {
-  alchematik.athanor.state.v1.Resource resource = 1;
+  Resource resource = 1;
 }
 
 message Field {
   string name = 1;
   repeated Field sub_fields = 2;
+}
+
+message State {
+  oneof type {
+    Resource resource = 1;
+  }
+}
+
+message Resource {
+  Identifier identifier = 1;
+  Value config = 2;
+  Value attrs = 3;
+}
+
+message Value {
+  oneof type {
+    string string_value = 1;
+    uint32 int_value = 2;
+    float float_value = 3;
+    ListValue list = 4;
+    MapValue map = 5;
+    Identifier identifier = 6;
+  }
+}
+
+message ListValue {
+  repeated Value elements = 1;
+}
+
+message MapValue {
+  map<string, Value> entries = 1;
+}
+
+message Identifier {
+  string type = 1;
+  Value value = 2;
 }
