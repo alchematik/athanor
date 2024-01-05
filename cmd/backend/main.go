@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/alchematik/athanor/backend"
-	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/backend/v1"
+	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
 
 	"github.com/hashicorp/go-plugin"

@@ -2,26 +2,26 @@ syntax = "proto3";
 
 package alchematik.athanor.translator.v1;
 
-import "proto/consumer/v1/blueprint.proto";
-import "proto/provider/v1/blueprint.proto";
-
-service Translator {
-  rpc ReadProviderBlueprint(ReadProviderBlueprintRequest) returns (ReadProviderBlueprintResponse);
-  rpc ReadConsumerBlueprint(ReadConsumerBlueprintRequest) returns (ReadConsumerBlueprintResponse);
-}
-
-message ReadProviderBlueprintRequest {
-  string path = 1;
-}
-
-message ReadProviderBlueprintResponse {
-  // alchematik.athanor.provider.v1.BuildStmt blueprint = 1;
-}
-
-message ReadConsumerBlueprintRequest {
-  string path = 1;
-}
-
-message ReadConsumerBlueprintResponse {
-  alchematik.athanor.consumer.v1.BuildStmt blueprint = 1;
-}
+// import "proto/consumer/v1/blueprint.proto";
+// import "proto/provider/v1/blueprint.proto";
+// 
+// service Translator {
+//   rpc ReadProviderBlueprint(ReadProviderBlueprintRequest) returns (ReadProviderBlueprintResponse);
+//   rpc ReadConsumerBlueprint(ReadConsumerBlueprintRequest) returns (ReadConsumerBlueprintResponse);
+// }
+// 
+// message ReadProviderBlueprintRequest {
+//   string path = 1;
+// }
+// 
+// message ReadProviderBlueprintResponse {
+//   // alchematik.athanor.provider.v1.BuildStmt blueprint = 1;
+// }
+// 
+// message ReadConsumerBlueprintRequest {
+//   string path = 1;
+// }
+// 
+// message ReadConsumerBlueprintResponse {
+//   alchematik.athanor.consumer.v1.BuildStmt blueprint = 1;
+// }

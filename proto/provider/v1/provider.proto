@@ -1,11 +1,11 @@
 syntax = "proto3";
 
-package alchematik.athanor.backend.v1;
+package alchematik.athanor.provider.v1;
 
 import "google/protobuf/struct.proto";
 import "proto/state/v1/state.proto";
 
-service Backend {
+service Provider {
   rpc CreateResource(CreateResourceRequest) returns (CreateResourceResponse);
   rpc DeleteResource(DeleteResourceRequest) returns (DeleteResourceResponse);
   rpc GetResource(GetResourceRequest) returns (GetResourceResponse);
