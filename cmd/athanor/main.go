@@ -70,14 +70,14 @@ var blockTypes = []hcl.BlockHeaderSchema{
 }
 
 func convertBlueprint(bp *consumerpb.Blueprint) (ast.Blueprint, error) {
-	var out ast.Blueprint
-	for _, s := range bp.Stmts {
-		st, err := convertStmt(s)
+	out := ast.Blueprint{}
+	for _, stmt := range bp.GetStmts() {
+		converted, err := convertStmt(stmt)
 		if err != nil {
-			return out, err
+			return ast.Blueprint{}, err
 		}
 
-		out.Stmts = append(out.Stmts, st)
+		out.Stmts = append(out.Stmts, converted)
 	}
 
 	return out, nil
@@ -103,16 +103,16 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 		return ast.StmtResource{
 			Expr: ex,
 		}, nil
-	case *consumerpb.Stmt_Blueprint:
-		ex, err := convertExpr(s.Blueprint.GetBlueprint())
-		if err != nil {
-			return nil, err
-		}
-
-		return ast.StmtBlueprint{
-			Alias: s.Blueprint.GetAlias(),
-			Expr:  ex,
-		}, nil
+	// case *consumerpb.Stmt_Blueprint:
+	// 	ex, err := convertExpr(s.Blueprint.GetBlueprint())
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	//
+	// 	return ast.StmtBlueprint{
+	// 		Alias: s.Blueprint.GetAlias(),
+	// 		Expr:  ex,
+	// 	}, nil
 	case *consumerpb.Stmt_Build:
 		ex, err := convertExpr(s.Build.GetBlueprint())
 		if err != nil {

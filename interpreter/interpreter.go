@@ -9,18 +9,19 @@ import (
 
 type Interpreter struct{}
 
-func (in Interpreter) Interpret(ctx context.Context, bp ast.Blueprint) (spec.Spec, error) {
-	b := spec.Spec{
+func (in Interpreter) Interpret(ctx context.Context, blueprint ast.Blueprint) (spec.Spec, error) {
+	s := spec.Spec{
 		Providers:     map[string]spec.ValueProvider{},
 		Resources:     map[string]spec.ValueResource{},
 		DependencyMap: map[string][]string{},
 		Components:    map[string]spec.Component{},
 	}
-	for _, st := range bp.Stmts {
-		if err := in.Stmt(ctx, b, st); err != nil {
+
+	for _, st := range blueprint.Stmts {
+		if err := in.Stmt(ctx, s, st); err != nil {
 			return spec.Spec{}, err
 		}
 	}
 
-	return b, nil
+	return s, nil
 }

@@ -10,7 +10,7 @@ message Stmt {
   oneof type {
     ProviderStmt provider = 1;
     ResourceStmt resource = 2;
-    BlueprintStmt blueprint = 3;
+    // BlueprintStmt blueprint = 3;
     BuildStmt build = 4;
   }
 }
@@ -23,14 +23,15 @@ message ResourceStmt {
   Expr expr = 1;
 }
 
-message BlueprintStmt {
-  string alias = 1;
-  Expr blueprint = 2;
-}
+// message BlueprintStmt {
+//   string alias = 1;
+//   Expr blueprint = 2;
+// }
 
 message BuildStmt {
   string alias = 1;
-  Expr blueprint = 2;
+  map<string, Expr> inputs = 2;
+  Expr blueprint = 3;
 }
 
 message Expr {

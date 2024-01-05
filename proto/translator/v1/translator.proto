@@ -15,7 +15,7 @@ message ReadProviderBlueprintRequest {
 }
 
 message ReadProviderBlueprintResponse {
-  alchematik.athanor.provider.v1.Blueprint blueprint = 1;
+  // alchematik.athanor.provider.v1.BuildStmt blueprint = 1;
 }
 
 message ReadConsumerBlueprintRequest {
@@ -23,5 +23,5 @@ message ReadConsumerBlueprintRequest {
 }
 
 message ReadConsumerBlueprintResponse {
-  alchematik.athanor.consumer.v1.Blueprint blueprint = 1;
+  alchematik.athanor.consumer.v1.BuildStmt blueprint = 1;
 }

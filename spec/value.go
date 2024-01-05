@@ -4,6 +4,18 @@ type Value interface {
 	isValueType()
 }
 
+type ValueBuild struct {
+	Value
+
+	Component []Component
+}
+
+type ValueBlueprint struct {
+	Value
+
+	Components []Component
+}
+
 type ValueProvider struct {
 	Value
 

@@ -9,3 +9,9 @@ type ComponentResource struct {
 
 	Value ValueResource
 }
+
+type ComponentBuild struct {
+	Component
+
+	Spec Spec
+}

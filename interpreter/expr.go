@@ -14,6 +14,8 @@ func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.
 		return spec.ValueString{Literal: e.Value}, nil, nil
 	case ast.ExprBool:
 		return spec.ValueBool{Literal: e.Value}, nil, nil
+	case ast.ExprBlueprint:
+		return in.blueprintExpr(ctx, b, e)
 	case ast.ExprMap:
 		return in.mapExpr(ctx, b, e)
 	case ast.ExprProvider:
@@ -45,6 +47,16 @@ func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.
 	default:
 		return nil, nil, fmt.Errorf("unknown expr %T", ex)
 	}
+}
+
+func (in Interpreter) blueprintExpr(ctx context.Context, s spec.Spec, e ast.ExprBlueprint) (spec.Value, []string, error) {
+	for _, stmt := range e.Stmts {
+		if err := in.Stmt(ctx, s, stmt); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return nil, nil, nil
 }
 
 func (in Interpreter) provider(ctx context.Context, b spec.Spec, e ast.ExprProvider) (spec.ValueProvider, []string, error) {

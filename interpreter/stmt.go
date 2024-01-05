@@ -15,9 +15,52 @@ func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error 
 		return in.providerStmt(ctx, b, s)
 	case ast.StmtResource:
 		return in.resourceStmt(ctx, b, s)
+	// case ast.StmtBlueprint:
+	// case ast.StmtBuild:
 	default:
 		return fmt.Errorf("unknown stmt %T", st)
 	}
+}
+
+// func (in Interpreter) blueprintStmt(ctx context.Context, b spec.Spec, s ast.StmtBlueprint) error {
+// 	val, children, err := in.Expr(ctx, b, s.Expr)
+// 	if err != nil {
+// 		return err
+// 	}
+//
+//
+// }
+
+func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtBuild) error {
+	subSpec := spec.Spec{
+		Inputs:        map[string]spec.Value{},
+		Providers:     map[string]spec.ValueProvider{},
+		Resources:     map[string]spec.ValueResource{},
+		DependencyMap: map[string][]string{},
+		Components:    map[string]spec.Component{},
+	}
+
+	var children []string
+	for name, expr := range stmt.Inputs {
+		v, c, err := in.Expr(ctx, s, expr)
+		if err != nil {
+			return err
+		}
+
+		children = append(children, c...)
+		subSpec.Inputs[name] = v
+	}
+
+	// TODO: May need to handle children here if allowing inside scope to access outside scope.
+	_, _, err := in.Expr(ctx, subSpec, stmt.Blueprint)
+	if err != nil {
+		return err
+	}
+
+	s.DependencyMap[stmt.Alias] = append(s.DependencyMap[stmt.Alias], children...)
+	s.Components[stmt.Alias] = spec.ComponentBuild{Spec: subSpec}
+
+	return nil
 }
 
 func (in Interpreter) providerStmt(ctx context.Context, b spec.Spec, s ast.StmtProvider) error {

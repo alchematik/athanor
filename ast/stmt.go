@@ -26,6 +26,7 @@ type StmtBlueprint struct {
 type StmtBuild struct {
 	Stmt
 
-	Alias string
-	Expr  Expr
+	Alias     string
+	Inputs    map[string]Expr
+	Blueprint Expr
 }
