@@ -1,15 +1,16 @@
 package plugin
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"path/filepath"
 
-	"github.com/alchematik/athanor/backend"
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	"github.com/alchematik/athanor/state"
 
 	plugin "github.com/hashicorp/go-plugin"
+	"google.golang.org/grpc"
 )
 
 type Provider struct {
@@ -20,9 +21,13 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 	pluginPath := filepath.Join(p.Dir, provider.Name, provider.Version, "provider")
 
 	client := plugin.NewClient(&plugin.ClientConfig{
-		HandshakeConfig: backend.HandshakeConfig,
+		HandshakeConfig: plugin.HandshakeConfig{
+			ProtocolVersion:  1,
+			MagicCookieKey:   "COOKIE",
+			MagicCookieValue: "hi",
+		},
 		Plugins: map[string]plugin.Plugin{
-			"backend": &backend.Plugin{},
+			"backend": &Plugin{},
 		},
 		Cmd:              exec.Command("sh", "-c", pluginPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
@@ -44,4 +49,19 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 	}
 
 	return plug, nil
+}
+
+type Plugin struct {
+	plugin.Plugin
+
+	BackendServer backendpb.ProviderServer
+}
+
+func (p *Plugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
+	backendpb.RegisterProviderServer(s, p.BackendServer)
+	return nil
+}
+
+func (p *Plugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, conn *grpc.ClientConn) (any, error) {
+	return backendpb.NewProviderClient(conn), nil
 }

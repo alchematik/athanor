@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 
-	"github.com/alchematik/athanor/backend"
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	statepb "github.com/alchematik/athanor/internal/gen/go/proto/state/v1"
 
 	"github.com/hashicorp/go-plugin"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -207,12 +207,31 @@ func (s *Server) DeleteResource(ctx context.Context, req *backendpb.DeleteResour
 
 func main() {
 	plugin.Serve(&plugin.ServeConfig{
-		HandshakeConfig: backend.HandshakeConfig,
+		HandshakeConfig: plugin.HandshakeConfig{
+			ProtocolVersion:  1,
+			MagicCookieKey:   "COOKIE",
+			MagicCookieValue: "hi",
+		},
 		Plugins: map[string]plugin.Plugin{
-			"backend": &backend.Plugin{
+			"backend": &Plugin{
 				BackendServer: &Server{},
 			},
 		},
 		GRPCServer: plugin.DefaultGRPCServer,
 	})
+}
+
+type Plugin struct {
+	plugin.Plugin
+
+	BackendServer backendpb.ProviderServer
+}
+
+func (p *Plugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
+	backendpb.RegisterProviderServer(s, p.BackendServer)
+	return nil
+}
+
+func (p *Plugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, conn *grpc.ClientConn) (any, error) {
+	return backendpb.NewProviderClient(conn), nil
 }
