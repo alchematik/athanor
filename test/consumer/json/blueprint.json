@@ -5,10 +5,10 @@
         "expr": {
           "provider": {
             "identifier": {
-              "provider_identifier": {
+              "providerIdentifier": {
                 "alias": "gcp",
                 "name": {
-                  "string_literal": "gcp"
+                  "stringLiteral": "gcp"
                 },
                 "version": {
                   "string_literal": "v0.0.1"
@@ -70,7 +70,7 @@
         "expr": {
           "resource": {
             "exists": {
-              "bool_literal": true
+              "boolLiteral": true
             },
             "provider": {
               "get_provider": {

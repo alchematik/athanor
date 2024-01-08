@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package alchematik.athanor.provider.v1;
+
+message Schema {
+  string name = 1;
+  string version = 2;
+  repeated ResourceSchema resources = 3;
+}
+
+message ResourceSchema {
+  string type = 1;
+  repeated FieldSchema identifier = 2;
+  repeated FieldSchema config = 3;
+}
+
+message FieldSchema {
+  string name = 1;
+}

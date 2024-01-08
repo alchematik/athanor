@@ -4,12 +4,38 @@ package alchematik.athanor.translator.v1;
 
 // import "proto/consumer/v1/blueprint.proto";
 // import "proto/provider/v1/blueprint.proto";
-// 
-// service Translator {
-//   rpc ReadProviderBlueprint(ReadProviderBlueprintRequest) returns (ReadProviderBlueprintResponse);
-//   rpc ReadConsumerBlueprint(ReadConsumerBlueprintRequest) returns (ReadConsumerBlueprintResponse);
-// }
-// 
+
+service Translator {
+  rpc TranslateProviderSchema(TranslateProviderSchemaRequest) returns (TranslateProviderSchemaResponse);
+  rpc GenerateProviderSDK(GenerateProviderSDKRequest) returns (GenerateProvierSDKResponse);
+  rpc GenerateConsumerSDK(GenerateConsumerSDKRequest) returns (GenerateConsumerSDKResponse);
+}
+
+message TranslateProviderSchemaRequest {
+  string output_path = 1;
+  string input_path = 2;
+}
+
+message TranslateProviderSchemaResponse {
+
+}
+
+message GenerateProviderSDKRequest {
+
+}
+
+message GenerateProvierSDKResponse {
+
+}
+
+message GenerateConsumerSDKRequest {
+
+}
+
+message GenerateConsumerSDKResponse {
+
+}
+
 // message ReadProviderBlueprintRequest {
 //   string path = 1;
 // }
