@@ -1,7 +1,8 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
+	"os"
 
 	"github.com/alchematik/athanor/sdk/go/provider/schema"
 )
@@ -92,6 +93,23 @@ func main() {
 	}
 
 	p := s.ToProto()
-	fmt.Printf("proto: %v\n", p)
 
+	outputPath := os.Args[1]
+
+	f, err := os.OpenFile(outputPath, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+	if err != nil {
+
+		os.Exit(1)
+	}
+
+	data, err := json.Marshal(p)
+	if err != nil {
+		os.Exit(1)
+	}
+
+	if _, err := f.Write(data); err != nil {
+		os.Exit(1)
+	}
+
+	os.Exit(0)
 }

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"os"
+	"os/exec"
 
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 
@@ -47,13 +47,7 @@ type Server struct {
 }
 
 func (s *Server) TranslateProviderSchema(ctx context.Context, req *translatorpb.TranslateProviderSchemaRequest) (*translatorpb.TranslateProviderSchemaResponse, error) {
-	f, err := os.OpenFile(req.GetInputPath(), os.O_APPEND|os.O_WRONLY, os.ModeAppend)
-	if err != nil {
-		return &translatorpb.TranslateProviderSchemaResponse{}, status.Error(codes.Internal, err.Error())
-	}
-
-	_, err = f.Write([]byte("hi from plugin!"))
-	if err != nil {
+	if err := exec.Command("go", "run", req.GetInputPath(), req.GetOutputPath()).Run(); err != nil {
 		return &translatorpb.TranslateProviderSchemaResponse{}, status.Error(codes.Internal, err.Error())
 	}
 

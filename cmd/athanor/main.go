@@ -268,7 +268,8 @@ func main() {
 							// defer os.Remove(tempFile.Name())
 
 							_, err = client.TranslateProviderSchema(ctx.Context, &translatorpb.TranslateProviderSchemaRequest{
-								InputPath: tempFile.Name(),
+								OutputPath: tempFile.Name(),
+								InputPath:  c.InputPath,
 							})
 							if err != nil {
 								return err
