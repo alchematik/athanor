@@ -11,6 +11,7 @@ import (
 	"github.com/alchematik/athanor/diff"
 	"github.com/alchematik/athanor/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
+	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/interpreter"
 	plug "github.com/alchematik/athanor/plugin"
 	"github.com/alchematik/athanor/reconcile"
@@ -223,6 +224,61 @@ func main() {
 	app := cli.App{
 		Name: "athanor",
 		Commands: []*cli.Command{
+			{
+				Name: "provider",
+				Subcommands: []*cli.Command{
+					{
+						Name: "generate",
+						Action: func(ctx *cli.Context) error {
+							p := ctx.Args().First()
+							f, err := os.ReadFile(p)
+							if err != nil {
+								return err
+							}
+
+							type Config struct {
+								InputPath  string `json:"input_path"`
+								Translator struct {
+									Name    string `json:"name"`
+									Version string `json:"version"`
+								} `json:"translator"`
+							}
+
+							var c Config
+							if err := json.Unmarshal(f, &c); err != nil {
+								return err
+							}
+
+							translatorPlugManager := plug.Translator{
+								Dir: ".translators",
+							}
+
+							client, err := translatorPlugManager.Client(c.Translator.Name, c.Translator.Version)
+							if err != nil {
+								return err
+							}
+
+							tempFile, err := os.CreateTemp("", "")
+							if err != nil {
+								return err
+							}
+
+							fmt.Printf("FILE >> %v\n", tempFile.Name())
+
+							// defer os.Remove(tempFile.Name())
+
+							_, err = client.TranslateProviderSchema(ctx.Context, &translatorpb.TranslateProviderSchemaRequest{
+								InputPath: tempFile.Name(),
+							})
+							if err != nil {
+								return err
+							}
+
+							return nil
+						},
+					},
+				},
+			},
 			{
 				Name: "state",
 				Subcommands: []*cli.Command{

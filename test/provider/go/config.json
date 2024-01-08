@@ -1,0 +1,7 @@
+{
+  "input_path": "./test/provider/go",
+  "translator": {
+    "name": "go",
+    "version": "v0.0.1"
+  }
+}

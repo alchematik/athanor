@@ -28,7 +28,7 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 			MagicCookieValue: "hi",
 		},
 		Plugins: map[string]plugin.Plugin{
-			"backend": &Plugin{},
+			"backend": &ProviderPlugin{},
 		},
 		Cmd:              exec.Command("sh", "-c", pluginPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
@@ -53,17 +53,17 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 	return plug, nil
 }
 
-type Plugin struct {
+type ProviderPlugin struct {
 	plugin.Plugin
 
 	BackendServer backendpb.ProviderServer
 }
 
-func (p *Plugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
+func (p *ProviderPlugin) GRPCServer(_ *plugin.GRPCBroker, s *grpc.Server) error {
 	backendpb.RegisterProviderServer(s, p.BackendServer)
 	return nil
 }
 
-func (p *Plugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, conn *grpc.ClientConn) (any, error) {
+func (p *ProviderPlugin) GRPCClient(_ context.Context, _ *plugin.GRPCBroker, conn *grpc.ClientConn) (any, error) {
 	return backendpb.NewProviderClient(conn), nil
 }

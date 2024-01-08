@@ -10,10 +10,20 @@ message Schema {
 
 message ResourceSchema {
   string type = 1;
-  repeated FieldSchema identifier = 2;
-  repeated FieldSchema config = 3;
+  FieldSchema identifier = 2;
+  FieldSchema config = 3;
+  FieldSchema attrs = 4;
 }
 
 message FieldSchema {
   string name = 1;
+  FieldType type = 2;
+  repeated FieldSchema fields = 3;
+}
+
+enum FieldType {
+  EMPTY = 0;
+  STRING = 1;
+  IDENTIFIER = 2;
+  STRUCT = 3;
 }
