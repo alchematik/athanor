@@ -33,7 +33,7 @@ func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource,
 	}
 
 	request := &providerpb.GetResourceRequest{
-		Identifier: id.GetIdentifier(),
+		Identifier: id,
 	}
 	response, err := client.GetResource(ctx, request)
 	exists := state.Bool{Value: true}
@@ -81,7 +81,7 @@ func (a API) CreateResource(ctx context.Context, r state.Resource) (state.Resour
 	}
 
 	request := &providerpb.CreateResourceRequest{
-		Identifier: id.GetIdentifier(),
+		Identifier: id,
 		Config:     config,
 	}
 	response, err := client.CreateResource(ctx, request)
@@ -120,7 +120,7 @@ func (a API) DeleteResource(ctx context.Context, r state.Resource) error {
 	}
 
 	request := &providerpb.DeleteResourceRequest{
-		Identifier: id.GetIdentifier(),
+		Identifier: id,
 	}
 	_, err = client.DeleteResource(ctx, request)
 	if err != nil {
@@ -147,7 +147,7 @@ func (a API) UpdateResource(ctx context.Context, r state.Resource, mask []Field)
 	}
 
 	request := &providerpb.UpdateResourceRequest{
-		Identifier: id.GetIdentifier(),
+		Identifier: id,
 		Config:     config,
 		Mask:       toProtoMask(mask),
 	}

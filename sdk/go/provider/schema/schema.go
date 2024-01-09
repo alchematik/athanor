@@ -5,10 +5,9 @@ import (
 )
 
 const (
-	FieldTypeEmpty      FieldType = ""
-	FieldTypeString     FieldType = "string"
-	FieldTypeIdentifier FieldType = "identifier"
-	FieldTypeStruct     FieldType = "struct"
+	FieldTypeEmpty  FieldType = ""
+	FieldTypeString FieldType = "string"
+	FieldTypeStruct FieldType = "struct"
 )
 
 type Schema struct {
@@ -47,9 +46,10 @@ func (r ResourceSchema) ToProto() *providerpb.ResourceSchema {
 }
 
 type FieldSchema struct {
-	Name   string
-	Type   FieldType
-	Fields []FieldSchema
+	Name         string
+	Type         FieldType
+	Fields       []FieldSchema
+	IsIdentifier bool
 }
 
 func (f FieldSchema) ToProto() *providerpb.FieldSchema {
@@ -59,9 +59,10 @@ func (f FieldSchema) ToProto() *providerpb.FieldSchema {
 	}
 
 	return &providerpb.FieldSchema{
-		Name:   f.Name,
-		Type:   f.Type.ToProto(),
-		Fields: fields,
+		Name:         f.Name,
+		Type:         f.Type.ToProto(),
+		Fields:       fields,
+		IsIdentifier: f.IsIdentifier,
 	}
 }
 
@@ -73,8 +74,6 @@ func (f FieldType) ToProto() providerpb.FieldType {
 		return providerpb.FieldType_EMPTY
 	case FieldTypeString:
 		return providerpb.FieldType_STRING
-	case FieldTypeIdentifier:
-		return providerpb.FieldType_IDENTIFIER
 	case FieldTypeStruct:
 		return providerpb.FieldType_STRUCT
 	default:

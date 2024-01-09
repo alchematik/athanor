@@ -19,11 +19,12 @@ message FieldSchema {
   string name = 1;
   FieldType type = 2;
   repeated FieldSchema fields = 3;
+  bool is_identifier = 4;
 }
 
 enum FieldType {
   EMPTY = 0;
   STRING = 1;
-  IDENTIFIER = 2;
-  STRUCT = 3;
+  STRUCT = 2;
 }
+

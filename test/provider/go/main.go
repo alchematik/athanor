@@ -12,8 +12,9 @@ func main() {
 	bucket := schema.ResourceSchema{
 		Type: "bucket",
 		Identifier: schema.FieldSchema{
-			// Name: "identifier",
-			Type: schema.FieldTypeIdentifier,
+			Name:         "identifier",
+			Type:         schema.FieldTypeStruct,
+			IsIdentifier: true,
 			Fields: []schema.FieldSchema{
 				{
 					Name: "account",
@@ -30,6 +31,7 @@ func main() {
 			},
 		},
 		Config: schema.FieldSchema{
+			Name: "config",
 			Type: schema.FieldTypeStruct,
 			Fields: []schema.FieldSchema{
 				{
@@ -39,6 +41,7 @@ func main() {
 			},
 		},
 		Attrs: schema.FieldSchema{
+			Name: "attrs",
 			Type: schema.FieldTypeStruct,
 			Fields: []schema.FieldSchema{
 				{
@@ -58,16 +61,19 @@ func main() {
 	bucketObject := schema.ResourceSchema{
 		Type: "bucket_object",
 		Identifier: schema.FieldSchema{
+			Name: "identifier",
 			Type: schema.FieldTypeStruct,
 			Fields: []schema.FieldSchema{
 				{
-					Name:   "bucket",
-					Type:   schema.FieldTypeIdentifier,
-					Fields: bucket.Identifier.Fields,
+					Name:         "bucket",
+					Type:         schema.FieldTypeStruct,
+					Fields:       bucket.Identifier.Fields,
+					IsIdentifier: true,
 				},
 			},
 		},
 		Config: schema.FieldSchema{
+			Name: "config",
 			Type: schema.FieldTypeStruct,
 			Fields: []schema.FieldSchema{
 				{
@@ -80,7 +86,10 @@ func main() {
 				},
 			},
 		},
-		Attrs: schema.FieldSchema{},
+		Attrs: schema.FieldSchema{
+			Name: "attrs",
+			Type: schema.FieldTypeStruct,
+		},
 	}
 
 	s := schema.Schema{

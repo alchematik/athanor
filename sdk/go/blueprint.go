@@ -231,7 +231,6 @@ func (g IOGetType) Get(name string) GetType {
 }
 
 func Build(bp Blueprint) error {
-
 	p := bp.toProto()
 
 	f, err := os.CreateTemp("", "")

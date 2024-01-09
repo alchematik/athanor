@@ -46,7 +46,7 @@ func (t Translator) Client(name, version string) (translatorpb.TranslatorClient,
 
 	plug, ok := rawPlug.(translatorpb.TranslatorClient)
 	if !ok {
-		return nil, fmt.Errorf("expected TranslatorClient, got T", rawPlug)
+		return nil, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
 	}
 
 	return plug, nil

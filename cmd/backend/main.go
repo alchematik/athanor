@@ -18,10 +18,10 @@ type Server struct {
 	ResourceHandlers map[string]ResourceHandler
 }
 
-func ParseBucketIdentifier(val *statepb.Identifier) BucketIdentifier {
-	account := val.GetValue().GetMap().GetEntries()["account"].GetStringValue()
-	region := val.GetValue().GetMap().GetEntries()["region"].GetStringValue()
-	name := val.GetValue().GetMap().GetEntries()["name"].GetStringValue()
+func ParseBucketIdentifier(val *statepb.Value) BucketIdentifier {
+	account := val.GetMap().GetEntries()["account"].GetStringValue()
+	region := val.GetMap().GetEntries()["region"].GetStringValue()
+	name := val.GetMap().GetEntries()["name"].GetStringValue()
 
 	return BucketIdentifier{
 		Account: sdk.String(account),
@@ -141,10 +141,10 @@ func (b BucketObjectAttrs) ToStateValue() sdk.StateValue {
 	return sdk.Map(map[string]sdk.Type{}).ToStateValue()
 }
 
-func ParseBucketObjectIdentifier(id *statepb.Identifier) BucketObjectIdentifier {
-	bucket := ParseBucketIdentifier(id.GetValue().GetMap().GetEntries()["bucket"].GetIdentifier())
+func ParseBucketObjectIdentifier(id *statepb.Value) BucketObjectIdentifier {
+	bucket := ParseBucketIdentifier(id.GetMap().GetEntries()["bucket"])
 
-	name := id.GetValue().GetMap().GetEntries()["name"].GetStringValue()
+	name := id.GetMap().GetEntries()["name"].GetStringValue()
 
 	return BucketObjectIdentifier{
 		Bucket: bucket,
@@ -185,8 +185,8 @@ type BucketObjectDeleter interface {
 }
 
 type ResourceHandler interface {
-	GetResource(context.Context, *statepb.Identifier) (*statepb.Resource, error)
-	CreateResource(context.Context, *statepb.Identifier, *statepb.Value) (*statepb.Resource, error)
+	GetResource(context.Context, *statepb.Value) (*statepb.Resource, error)
+	CreateResource(context.Context, *statepb.Value, *statepb.Value) (*statepb.Resource, error)
 }
 
 type BucketHandler struct {
@@ -199,7 +199,7 @@ type BucketObjectHandler struct {
 	BucketObjectCreator BucketObjectCreator
 }
 
-func (h BucketHandler) GetResource(ctx context.Context, id *statepb.Identifier) (*statepb.Resource, error) {
+func (h BucketHandler) GetResource(ctx context.Context, id *statepb.Value) (*statepb.Resource, error) {
 	if h.BucketGetter == nil {
 		return nil, fmt.Errorf("unimplemented")
 	}
@@ -213,7 +213,7 @@ func (h BucketHandler) GetResource(ctx context.Context, id *statepb.Identifier) 
 	return res.ToStateValue().ToStateValueProto(), nil
 }
 
-func (h BucketHandler) CreateResource(ctx context.Context, id *statepb.Identifier, config *statepb.Value) (*statepb.Resource, error) {
+func (h BucketHandler) CreateResource(ctx context.Context, id *statepb.Value, config *statepb.Value) (*statepb.Resource, error) {
 	if h.BucketCreator == nil {
 		return nil, fmt.Errorf("unimplemented")
 	}
@@ -229,7 +229,7 @@ func (h BucketHandler) CreateResource(ctx context.Context, id *statepb.Identifie
 	return res.ToStateValue().ToStateValueProto(), nil
 }
 
-func (h BucketObjectHandler) GetResource(ctx context.Context, id *statepb.Identifier) (*statepb.Resource, error) {
+func (h BucketObjectHandler) GetResource(ctx context.Context, id *statepb.Value) (*statepb.Resource, error) {
 	if h.BucketObjectGetter == nil {
 		return nil, fmt.Errorf("unimplemented")
 	}
@@ -243,7 +243,7 @@ func (h BucketObjectHandler) GetResource(ctx context.Context, id *statepb.Identi
 	return res.ToStateValue().ToStateValueProto(), nil
 }
 
-func (h BucketObjectHandler) CreateResource(ctx context.Context, id *statepb.Identifier, config *statepb.Value) (*statepb.Resource, error) {
+func (h BucketObjectHandler) CreateResource(ctx context.Context, id *statepb.Value, config *statepb.Value) (*statepb.Resource, error) {
 	if h.BucketObjectCreator == nil {
 		return nil, fmt.Errorf("unimplemented")
 	}
@@ -321,7 +321,7 @@ func (b BucketObject) CreateBucketObject(ctx context.Context, id BucketObjectIde
 }
 
 func (s *Server) GetResource(ctx context.Context, req *backendpb.GetResourceRequest) (*backendpb.GetResourceResponse, error) {
-	t := req.GetIdentifier().GetType()
+	t := req.GetIdentifier().GetIdentifier().GetType()
 	handler, ok := s.ResourceHandlers[t]
 	if !ok {
 		return &backendpb.GetResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
@@ -336,7 +336,7 @@ func (s *Server) GetResource(ctx context.Context, req *backendpb.GetResourceRequ
 }
 
 func (s *Server) CreateResource(ctx context.Context, req *backendpb.CreateResourceRequest) (*backendpb.CreateResourceResponse, error) {
-	t := req.GetIdentifier().GetType()
+	t := req.GetIdentifier().GetIdentifier().GetType()
 	handler, ok := s.ResourceHandlers[t]
 	if !ok {
 		return &backendpb.CreateResourceResponse{}, status.Error(codes.NotFound, "resource type not found")
@@ -352,7 +352,7 @@ func (s *Server) CreateResource(ctx context.Context, req *backendpb.CreateResour
 
 func (s *Server) UpdateResource(ctx context.Context, req *backendpb.UpdateResourceRequest) (*backendpb.UpdateResourceResponse, error) {
 	var r *statepb.Resource
-	switch req.GetIdentifier().GetType() {
+	switch req.GetIdentifier().GetIdentifier().GetType() {
 	case "bucket":
 		id := ParseBucketIdentifier(req.GetIdentifier())
 

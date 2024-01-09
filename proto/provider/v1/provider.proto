@@ -10,7 +10,7 @@ service Provider {
 }
 
 message GetResourceRequest {
-  Identifier identifier = 1;
+  Value identifier = 1;
 }
 
 message GetResourceResponse {
@@ -18,7 +18,7 @@ message GetResourceResponse {
 }
 
 message CreateResourceRequest {
-  Identifier identifier = 1;
+  Value identifier = 1;
   Value config = 2;
 }
 
@@ -27,13 +27,13 @@ message CreateResourceResponse {
 }
 
 message DeleteResourceRequest {
-  Identifier identifier = 1;
+  Value identifier = 1;
 }
 
 message DeleteResourceResponse {}
 
 message UpdateResourceRequest {
-  Identifier identifier = 1;
+  Value identifier = 1;
   Value config = 2;
   repeated Field mask = 3;
 }
@@ -54,7 +54,7 @@ message State {
 }
 
 message Resource {
-  Identifier identifier = 1;
+  Value identifier = 1;
   Value config = 2;
   Value attrs = 3;
 }

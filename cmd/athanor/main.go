@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	// "path/filepath"
 
 	api "github.com/alchematik/athanor/api/resource"
 	"github.com/alchematik/athanor/ast"
@@ -236,12 +237,22 @@ func main() {
 								return err
 							}
 
-							type Config struct {
-								InputPath  string `json:"input_path"`
+							type ClientSDK struct {
+								OutputPath string `json:"output_path"`
 								Translator struct {
 									Name    string `json:"name"`
 									Version string `json:"version"`
 								} `json:"translator"`
+							}
+
+							type Config struct {
+								InputPath  string `json:"input_path"`
+								OutputPath string `json:"output_path"`
+								Translator struct {
+									Name    string `json:"name"`
+									Version string `json:"version"`
+								} `json:"translator"`
+								ClientSDK []ClientSDK `json:"client_sdk"`
 							}
 
 							var c Config
@@ -274,6 +285,24 @@ func main() {
 							if err != nil {
 								return err
 							}
+
+							_, err = client.GenerateProviderSDK(ctx.Context, &translatorpb.GenerateProviderSDKRequest{
+								InputPath:  tempFile.Name(),
+								OutputPath: c.OutputPath,
+							})
+							if err != nil {
+								return err
+							}
+
+							// for _, clientSDK := range c.ClientSDK {
+							// 	trans, err := translatorPlugManager.Client(clientSDK.Translator.Name, clientSDK.Translator.Version)
+							// 	if err != nil {
+							// 		return err
+							// 	}
+							//
+							// 	trans.GenerateConsumerSDK()
+							//
+							// }
 
 							return nil
 						},

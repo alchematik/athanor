@@ -1,0 +1,6 @@
+type {{ toPascalCase .Name }} struct {
+{{ range .Type.Fields -}}
+  {{ toPascalCase .Name }} {{ toType . }}
+{{ end }}
+
+}

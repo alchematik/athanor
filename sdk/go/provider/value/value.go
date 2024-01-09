@@ -155,7 +155,7 @@ type ResourceStateValue struct {
 
 func (r ResourceStateValue) ToStateValueProto() *providerpb.Resource {
 	return &providerpb.Resource{
-		Identifier: r.Identifier.ToStateValueProto().GetIdentifier(),
+		Identifier: r.Identifier.ToStateValueProto(),
 		Config:     r.Config.ToStateValueProto(),
 		Attrs:      r.Attrs.ToStateValueProto(),
 	}
