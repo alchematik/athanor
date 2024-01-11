@@ -252,7 +252,8 @@ func main() {
 									Name    string `json:"name"`
 									Version string `json:"version"`
 								} `json:"translator"`
-								ClientSDK []ClientSDK `json:"client_sdk"`
+								ClientSDK      []ClientSDK `json:"client_sdk"`
+								TranslatorsDir string      `json:"translators_dir"`
 							}
 
 							var c Config
@@ -261,7 +262,7 @@ func main() {
 							}
 
 							translatorPlugManager := plug.Translator{
-								Dir: ".translators",
+								Dir: c.TranslatorsDir,
 							}
 
 							client, err := translatorPlugManager.Client(c.Translator.Name, c.Translator.Version)
@@ -274,9 +275,9 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("FILE >> %v\n", tempFile.Name())
+							// fmt.Printf("FILE >> %v\n", tempFile.Name())
 
-							// defer os.Remove(tempFile.Name())
+							defer os.Remove(tempFile.Name())
 
 							_, err = client.TranslateProviderSchema(ctx.Context, &translatorpb.TranslateProviderSchemaRequest{
 								OutputPath: tempFile.Name(),

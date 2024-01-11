@@ -28,7 +28,7 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 			MagicCookieValue: "hi",
 		},
 		Plugins: map[string]plugin.Plugin{
-			"backend": &ProviderPlugin{},
+			"provider": &ProviderPlugin{},
 		},
 		Cmd:              exec.Command("sh", "-c", pluginPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
@@ -40,7 +40,7 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 		return nil, err
 	}
 
-	rawPlug, err := dispensor.Dispense("backend")
+	rawPlug, err := dispensor.Dispense("provider")
 	if err != nil {
 		return nil, err
 	}

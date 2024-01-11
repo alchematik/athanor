@@ -12,7 +12,6 @@ type IdentifierType interface {
 	Type
 
 	ResourceType() string
-	Value() Type
 }
 
 func String(s string) StringType {
