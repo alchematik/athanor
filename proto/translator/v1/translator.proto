@@ -7,16 +7,26 @@ package alchematik.athanor.translator.v1;
 
 service Translator {
   rpc TranslateProviderSchema(TranslateProviderSchemaRequest) returns (TranslateProviderSchemaResponse);
+  rpc TranslateBlueprint(TranslateBlueprintRequest) returns (TranslateBlueprintResponse);
   rpc GenerateProviderSDK(GenerateProviderSDKRequest) returns (GenerateProvierSDKResponse);
   rpc GenerateConsumerSDK(GenerateConsumerSDKRequest) returns (GenerateConsumerSDKResponse);
 }
 
 message TranslateProviderSchemaRequest {
-  string output_path = 1;
-  string input_path = 2;
+  string input_path = 1;
+  string output_path = 2;
 }
 
 message TranslateProviderSchemaResponse {
+
+}
+
+message TranslateBlueprintRequest {
+  string input_path = 1;
+  string output_path = 2;
+}
+
+message TranslateBlueprintResponse {
 
 }
 

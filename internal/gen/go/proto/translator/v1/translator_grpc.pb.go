@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 
 const (
 	Translator_TranslateProviderSchema_FullMethodName = "/alchematik.athanor.translator.v1.Translator/TranslateProviderSchema"
+	Translator_TranslateBlueprint_FullMethodName      = "/alchematik.athanor.translator.v1.Translator/TranslateBlueprint"
 	Translator_GenerateProviderSDK_FullMethodName     = "/alchematik.athanor.translator.v1.Translator/GenerateProviderSDK"
 	Translator_GenerateConsumerSDK_FullMethodName     = "/alchematik.athanor.translator.v1.Translator/GenerateConsumerSDK"
 )
@@ -29,6 +30,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TranslatorClient interface {
 	TranslateProviderSchema(ctx context.Context, in *TranslateProviderSchemaRequest, opts ...grpc.CallOption) (*TranslateProviderSchemaResponse, error)
+	TranslateBlueprint(ctx context.Context, in *TranslateBlueprintRequest, opts ...grpc.CallOption) (*TranslateBlueprintResponse, error)
 	GenerateProviderSDK(ctx context.Context, in *GenerateProviderSDKRequest, opts ...grpc.CallOption) (*GenerateProvierSDKResponse, error)
 	GenerateConsumerSDK(ctx context.Context, in *GenerateConsumerSDKRequest, opts ...grpc.CallOption) (*GenerateConsumerSDKResponse, error)
 }
@@ -44,6 +46,15 @@ func NewTranslatorClient(cc grpc.ClientConnInterface) TranslatorClient {
 func (c *translatorClient) TranslateProviderSchema(ctx context.Context, in *TranslateProviderSchemaRequest, opts ...grpc.CallOption) (*TranslateProviderSchemaResponse, error) {
 	out := new(TranslateProviderSchemaResponse)
 	err := c.cc.Invoke(ctx, Translator_TranslateProviderSchema_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *translatorClient) TranslateBlueprint(ctx context.Context, in *TranslateBlueprintRequest, opts ...grpc.CallOption) (*TranslateBlueprintResponse, error) {
+	out := new(TranslateBlueprintResponse)
+	err := c.cc.Invoke(ctx, Translator_TranslateBlueprint_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -73,6 +84,7 @@ func (c *translatorClient) GenerateConsumerSDK(ctx context.Context, in *Generate
 // for forward compatibility
 type TranslatorServer interface {
 	TranslateProviderSchema(context.Context, *TranslateProviderSchemaRequest) (*TranslateProviderSchemaResponse, error)
+	TranslateBlueprint(context.Context, *TranslateBlueprintRequest) (*TranslateBlueprintResponse, error)
 	GenerateProviderSDK(context.Context, *GenerateProviderSDKRequest) (*GenerateProvierSDKResponse, error)
 	GenerateConsumerSDK(context.Context, *GenerateConsumerSDKRequest) (*GenerateConsumerSDKResponse, error)
 }
@@ -83,6 +95,9 @@ type UnimplementedTranslatorServer struct {
 
 func (UnimplementedTranslatorServer) TranslateProviderSchema(context.Context, *TranslateProviderSchemaRequest) (*TranslateProviderSchemaResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method TranslateProviderSchema not implemented")
+}
+func (UnimplementedTranslatorServer) TranslateBlueprint(context.Context, *TranslateBlueprintRequest) (*TranslateBlueprintResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method TranslateBlueprint not implemented")
 }
 func (UnimplementedTranslatorServer) GenerateProviderSDK(context.Context, *GenerateProviderSDKRequest) (*GenerateProvierSDKResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GenerateProviderSDK not implemented")
@@ -116,6 +131,24 @@ func _Translator_TranslateProviderSchema_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TranslatorServer).TranslateProviderSchema(ctx, req.(*TranslateProviderSchemaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _Translator_TranslateBlueprint_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TranslateBlueprintRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TranslatorServer).TranslateBlueprint(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Translator_TranslateBlueprint_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TranslatorServer).TranslateBlueprint(ctx, req.(*TranslateBlueprintRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -166,6 +199,10 @@ var Translator_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TranslateProviderSchema",
 			Handler:    _Translator_TranslateProviderSchema_Handler,
+		},
+		{
+			MethodName: "TranslateBlueprint",
+			Handler:    _Translator_TranslateBlueprint_Handler,
 		},
 		{
 			MethodName: "GenerateProviderSDK",

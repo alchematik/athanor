@@ -8,7 +8,7 @@ import (
 
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 
-	"github.com/hashicorp/go-hclog"
+	// "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 )
@@ -31,7 +31,7 @@ func (t Translator) Client(name, version string) (translatorpb.TranslatorClient,
 		},
 		Cmd:              exec.Command("sh", "-c", pluginPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		Logger:           hclog.NewNullLogger(),
+		// Logger:           hclog.NewNullLogger(),
 	})
 
 	dispensor, err := client.Client()

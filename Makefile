@@ -4,7 +4,7 @@ buf/generate:
 buf/push:
 	cd proto && buf push && cd -
 
-state/show:
+state/show: build/provider/gcp
 	go run ./cmd/athanor/main.go state show ./test/consumer/json/blueprint.json
 
 build/translator/go:

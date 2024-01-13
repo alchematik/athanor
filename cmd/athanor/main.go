@@ -275,8 +275,6 @@ func main() {
 								return err
 							}
 
-							// fmt.Printf("FILE >> %v\n", tempFile.Name())
-
 							defer os.Remove(tempFile.Name())
 
 							_, err = client.TranslateProviderSchema(ctx.Context, &translatorpb.TranslateProviderSchemaRequest{
@@ -295,15 +293,20 @@ func main() {
 								return err
 							}
 
-							// for _, clientSDK := range c.ClientSDK {
-							// 	trans, err := translatorPlugManager.Client(clientSDK.Translator.Name, clientSDK.Translator.Version)
-							// 	if err != nil {
-							// 		return err
-							// 	}
-							//
-							// 	trans.GenerateConsumerSDK()
-							//
-							// }
+							for _, clientSDK := range c.ClientSDK {
+								trans, err := translatorPlugManager.Client(clientSDK.Translator.Name, clientSDK.Translator.Version)
+								if err != nil {
+									return err
+								}
+
+								_, err = trans.GenerateConsumerSDK(ctx.Context, &translatorpb.GenerateConsumerSDKRequest{
+									InputPath:  tempFile.Name(),
+									OutputPath: clientSDK.OutputPath,
+								})
+								if err != nil {
+									return err
+								}
+							}
 
 							return nil
 						},
@@ -311,10 +314,10 @@ func main() {
 				},
 			},
 			{
-				Name: "state",
+				Name: "blueprint",
 				Subcommands: []*cli.Command{
 					{
-						Name: "show",
+						Name: "reconcile",
 						Action: func(ctx *cli.Context) error {
 							p := ctx.Args().First()
 							f, err := os.ReadFile(p)
@@ -322,8 +325,54 @@ func main() {
 								return err
 							}
 
+							type Config struct {
+								InputPath  string `json:"input_path"`
+								Translator struct {
+									Name    string `json:"name"`
+									Version string `json:"version"`
+								} `json:"translator"`
+								TranslatorsDir string `json:"translators_dir"`
+								ProvidersDir   string `json:"providers_dir"`
+							}
+
+							var c Config
+							if err := json.Unmarshal(f, &c); err != nil {
+								return err
+							}
+
+							translatorPlugManager := plug.Translator{
+								Dir: c.TranslatorsDir,
+							}
+
+							client, err := translatorPlugManager.Client(c.Translator.Name, c.Translator.Version)
+							if err != nil {
+								return err
+							}
+
+							tempFile, err := os.CreateTemp("", "")
+							if err != nil {
+								return err
+							}
+
+							// defer os.Remove(tempFile.Name())
+
+							fmt.Printf("TEMP FILE >>>>>>>>>>>>>>> %v\n", tempFile.Name())
+
+							_, err = client.TranslateBlueprint(ctx.Context, &translatorpb.TranslateBlueprintRequest{
+								InputPath:  c.InputPath,
+								OutputPath: tempFile.Name(),
+							})
+							if err != nil {
+								return err
+							}
+
+							blueprintData, err := os.ReadFile(tempFile.Name())
+							if err != nil {
+								return err
+							}
+
 							var blueprint consumerpb.Blueprint
-							if err := json.Unmarshal(f, &blueprint); err != nil {
+							if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
 								return err
 							}
 
@@ -366,7 +415,7 @@ func main() {
 							remoteEval := evaluator.Evaluator{
 								ResourceAPI: api.API{
 									ProviderPluginManager: plug.Provider{
-										Dir: ".backends",
+										Dir: c.ProvidersDir,
 									},
 								},
 								// ResourceEvaluator: evaluator.RemoteResourceEvaluator{
@@ -404,7 +453,7 @@ func main() {
 							reconciler := reconcile.Reconciler{
 								ResourceAPI: api.API{
 									ProviderPluginManager: plug.Provider{
-										Dir: ".backends",
+										Dir: c.ProvidersDir,
 									},
 								},
 							}
