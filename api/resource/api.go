@@ -41,7 +41,7 @@ func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource,
 		if status.Code(err) == codes.NotFound {
 			exists.Value = false
 		} else {
-			return state.Resource{}, err
+			return state.Resource{}, fmt.Errorf("get resource: %v", err)
 		}
 	}
 
@@ -203,6 +203,8 @@ func fromProto(val *providerpb.Value) (state.Type, error) {
 		return state.Map{Entries: entries}, nil
 	case *providerpb.Value_StringValue:
 		return state.String{Value: v.StringValue}, nil
+	case nil:
+		return state.Nil{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported type %T", val.GetType())
 	}
