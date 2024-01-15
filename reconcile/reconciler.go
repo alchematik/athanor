@@ -30,8 +30,6 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 		}
 	}
 
-	fmt.Printf("RECONCILING ENVIRONMENT >>>>>>>>>>>> %+v\n", indegrees)
-
 	var queue []string
 	for alias, degrees := range indegrees {
 		if degrees == 0 {
@@ -50,12 +48,9 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 		var alias string
 		alias, queue = queue[0], queue[1:]
 
-		fmt.Printf("ALIAS >>>>>>>>>>>>>>>>>> %v\n", alias)
-
 		var reconciled state.Type
 		switch current := d.Diffs[alias].(type) {
 		case diff.Resource:
-			fmt.Printf("RECONCILING RESOURCE >>>>>>>>>>>> %v\n", alias)
 			resolved, err := resolve(reconciledEnv, current.To)
 			if err != nil {
 				return state.Environment{}, err
