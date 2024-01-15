@@ -30,6 +30,8 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 		}
 	}
 
+	fmt.Printf("RECONCILING ENVIRONMENT >>>>>>>>>>>> %+v\n", indegrees)
+
 	var queue []string
 	for alias, degrees := range indegrees {
 		if degrees == 0 {
@@ -48,9 +50,12 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 		var alias string
 		alias, queue = queue[0], queue[1:]
 
+		fmt.Printf("ALIAS >>>>>>>>>>>>>>>>>> %v\n", alias)
+
 		var reconciled state.Type
 		switch current := d.Diffs[alias].(type) {
 		case diff.Resource:
+			fmt.Printf("RECONCILING RESOURCE >>>>>>>>>>>> %v\n", alias)
 			resolved, err := resolve(reconciledEnv, current.To)
 			if err != nil {
 				return state.Environment{}, err
@@ -124,9 +129,14 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 	case diff.Map:
 		var fields []api.Field
 		for k, v := range t.Diffs {
-			// Skip noops and deletes.
-			if v.Operation() == diff.OperationNoop || v.Operation() == diff.OperationDelete {
+			// Skip noops .
+			if v.Operation() == diff.OperationNoop {
 				continue
+			}
+
+			op := api.OperationUpdate
+			if v.Operation() == diff.OperationDelete {
+				op = api.OperationDelete
 			}
 
 			sub, err := diffToUpdateMask(v)
@@ -134,7 +144,7 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 				return nil, err
 			}
 
-			fields = append(fields, api.Field{Name: k, SubFields: sub})
+			fields = append(fields, api.Field{Name: k, SubFields: sub, Operation: op})
 		}
 
 		return fields, nil

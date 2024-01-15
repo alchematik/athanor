@@ -45,6 +45,13 @@ message UpdateResourceResponse {
 message Field {
   string name = 1;
   repeated Field sub_fields = 2;
+  Operation operation = 3;
+}
+
+enum Operation {
+  OPERATION_EMPTY = 0;
+  OPERATION_UPDATE = 1;
+  OPERATION_DELETE = 2;
 }
 
 message State {

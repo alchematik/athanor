@@ -14,8 +14,16 @@ import (
 
 type Field struct {
 	Name      string
+	Operation Operation
 	SubFields []Field
 }
+
+type Operation string
+
+const (
+	OperationUpdate Operation = "update"
+	OperationDelete Operation = "delete"
+)
 
 type API struct {
 	ProviderPluginManager plugin.Provider
@@ -123,11 +131,7 @@ func (a API) DeleteResource(ctx context.Context, r state.Resource) error {
 		Identifier: id,
 	}
 	_, err = client.DeleteResource(ctx, request)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (a API) UpdateResource(ctx context.Context, r state.Resource, mask []Field) (state.Resource, error) {
@@ -178,9 +182,14 @@ func (a API) UpdateResource(ctx context.Context, r state.Resource, mask []Field)
 func toProtoMask(mask []Field) []*providerpb.Field {
 	var protoMask []*providerpb.Field
 	for _, f := range mask {
+		op := providerpb.Operation_OPERATION_UPDATE
+		if f.Operation == OperationDelete {
+			op = providerpb.Operation_OPERATION_DELETE
+		}
 		p := &providerpb.Field{
 			Name:      f.Name,
 			SubFields: toProtoMask(f.SubFields),
+			Operation: op,
 		}
 		protoMask = append(protoMask, p)
 	}

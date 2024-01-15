@@ -207,8 +207,6 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 				fromVal = state.Nil{}
 			}
 
-			fmt.Printf("DIFFING %v >>>>>>>>>>>>>>>>>>>>> \n", k)
-
 			d, err := Diff(fromVal, v)
 			if err != nil {
 				return Environment{}, err
@@ -225,6 +223,7 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 				for _, child := range children {
 					depMap[child] = append(depMap[child], k)
 				}
+				depMap[k] = children
 			default:
 				return Environment{}, fmt.Errorf("unsupported operation for environment resource: %v", d.Operation())
 			}
