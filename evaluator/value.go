@@ -12,15 +12,15 @@ import (
 )
 
 func (e Evaluator) providerValue(v spec.ValueProvider) (state.Provider, error) {
-	if v.Identifier.Name == "" {
+	if v.Name == "" {
 		return state.Provider{}, fmt.Errorf("name is required for provider")
 	}
-	if v.Identifier.Version == "" {
+	if v.Version == "" {
 		return state.Provider{}, fmt.Errorf("version is required for provider")
 	}
 	return state.Provider{
-		Name:    v.Identifier.Name,
-		Version: v.Identifier.Version,
+		Name:    v.Name,
+		Version: v.Version,
 	}, nil
 }
 
@@ -101,6 +101,13 @@ func (e Evaluator) unresolvedValue(ctx context.Context, env state.Environment, v
 
 	var m map[string]state.Type
 	switch obj := resolved.(type) {
+	case state.Nil:
+		s, ok := env.States[v.Name]
+		if !ok {
+			return nil, fmt.Errorf("value with alias %q not found", v.Name)
+		}
+
+		return s, nil
 	case state.Resource:
 		m = map[string]state.Type{
 			"identifier": obj.Identifier,
@@ -162,8 +169,6 @@ func (e Evaluator) resourceValue(ctx context.Context, env state.Environment, v s
 		return state.Resource{}, fmt.Errorf("exists must be boolean")
 	}
 
-	// fmt.Printf("exists >>>>>>>>>>> %v\n", exists)
-
 	input := state.Resource{
 		Provider:   provider,
 		Identifier: id,
@@ -199,6 +204,8 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val spec.Va
 		return e.unresolvedValue(ctx, env, v)
 	case spec.ValueFile:
 		return e.fileValue(ctx, env, v)
+	case spec.ValueNil:
+		return state.Nil{}, nil
 	default:
 		return nil, fmt.Errorf("unrecognized value type: %T", val)
 	}

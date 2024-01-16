@@ -34,13 +34,6 @@ type ExprMap struct {
 	Entries map[string]Expr
 }
 
-type ExprGet struct {
-	Expr
-
-	Name   string
-	Object Expr
-}
-
 type ExprIOGet struct {
 	Expr
 
@@ -48,30 +41,11 @@ type ExprIOGet struct {
 	Object Expr
 }
 
-type ExprGetProvider struct {
-	Expr
-
-	Alias string
-}
-
-type ExprGetResource struct {
-	Expr
-
-	Alias string
-}
-
 type ExprProvider struct {
 	Expr
 
-	Identifier Expr
-}
-
-type ExprProviderIdentifier struct {
-	Expr
-
-	Alias   string
-	Name    Expr
-	Version Expr
+	Name    string
+	Version string
 }
 
 type ExprResource struct {

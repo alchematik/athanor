@@ -19,7 +19,8 @@ type ValueBlueprint struct {
 type ValueProvider struct {
 	Value
 
-	Identifier ValueProviderIdentifier
+	Name    string
+	Version string
 }
 
 type ValueResource struct {
@@ -30,14 +31,6 @@ type ValueResource struct {
 	Config     Value
 	Attrs      Value
 	Exists     Value
-}
-
-type ValueProviderIdentifier struct {
-	Value
-
-	Alias   string
-	Name    string
-	Version string
 }
 
 type ValueResourceIdentifier struct {
@@ -75,9 +68,8 @@ type ValueFile struct {
 type ValueUnresolved struct {
 	Value
 
-	Name       string
-	Object     Value
-	Unresolved bool
+	Name   string
+	Object Value
 }
 
 type ValueNil struct {

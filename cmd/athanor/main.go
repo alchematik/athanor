@@ -36,15 +36,6 @@ func convertBlueprint(bp *consumerpb.Blueprint) (ast.Blueprint, error) {
 
 func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 	switch s := st.GetType().(type) {
-	case *consumerpb.Stmt_Provider:
-		ex, err := convertExpr(s.Provider.GetExpr())
-		if err != nil {
-			return nil, err
-		}
-
-		return ast.StmtProvider{
-			Expr: ex,
-		}, nil
 	case *consumerpb.Stmt_Resource:
 		ex, err := convertExpr(s.Resource.GetExpr())
 		if err != nil {
@@ -54,16 +45,6 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 		return ast.StmtResource{
 			Expr: ex,
 		}, nil
-	// case *consumerpb.Stmt_Blueprint:
-	// 	ex, err := convertExpr(s.Blueprint.GetBlueprint())
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	//
-	// 	return ast.StmtBlueprint{
-	// 		Alias: s.Blueprint.GetAlias(),
-	// 		Expr:  ex,
-	// 	}, nil
 	case *consumerpb.Stmt_Build:
 		ex, err := convertExpr(s.Build.GetBlueprint())
 		if err != nil {
@@ -105,13 +86,9 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 
 		return ast.ExprBlueprint{Stmts: stmts}, nil
 	case *consumerpb.Expr_Provider:
-		id, err := convertExpr(e.Provider.GetIdentifier())
-		if err != nil {
-			return nil, err
-		}
-
 		return ast.ExprProvider{
-			Identifier: id,
+			Name:    e.Provider.GetName(),
+			Version: e.Provider.GetVersion(),
 		}, nil
 	case *consumerpb.Expr_Resource:
 		provider, err := convertExpr(e.Resource.GetProvider())
@@ -139,22 +116,6 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 			Identifier: id,
 			Config:     config,
 			Exists:     exists,
-		}, nil
-	case *consumerpb.Expr_ProviderIdentifier:
-		name, err := convertExpr(e.ProviderIdentifier.GetName())
-		if err != nil {
-			return nil, err
-		}
-
-		version, err := convertExpr(e.ProviderIdentifier.GetVersion())
-		if err != nil {
-			return nil, err
-		}
-
-		return ast.ExprProviderIdentifier{
-			Alias:   e.ProviderIdentifier.GetAlias(),
-			Name:    name,
-			Version: version,
 		}, nil
 	case *consumerpb.Expr_ResourceIdentifier:
 		val, err := convertExpr(e.ResourceIdentifier.GetValue())
@@ -184,18 +145,6 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 		}
 
 		return m, nil
-	case *consumerpb.Expr_Get:
-		obj, err := convertExpr(e.Get.GetObject())
-		if err != nil {
-			return nil, err
-		}
-
-		g := ast.ExprGet{
-			Name:   e.Get.GetName(),
-			Object: obj,
-		}
-
-		return g, nil
 	case *consumerpb.Expr_IoGet:
 		obj, err := convertExpr(e.IoGet.GetObject())
 		if err != nil {
@@ -210,14 +159,6 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 		return g, nil
 	case *consumerpb.Expr_Nil:
 		return ast.ExprNil{}, nil
-	case *consumerpb.Expr_GetProvider_:
-		return ast.ExprGetProvider{
-			Alias: e.GetProvider_.GetAlias(),
-		}, nil
-	case *consumerpb.Expr_GetResource_:
-		return ast.ExprGetResource{
-			Alias: e.GetResource_.GetAlias(),
-		}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", ex.GetType())
 	}

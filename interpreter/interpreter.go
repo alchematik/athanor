@@ -11,8 +11,6 @@ type Interpreter struct{}
 
 func (in Interpreter) Interpret(ctx context.Context, blueprint ast.Blueprint) (spec.Spec, error) {
 	s := spec.Spec{
-		Providers:     map[string]spec.ValueProvider{},
-		Resources:     map[string]spec.ValueResource{},
 		DependencyMap: map[string][]string{},
 		Components:    map[string]spec.Component{},
 	}

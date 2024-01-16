@@ -20,8 +20,6 @@ func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.
 		return in.mapExpr(ctx, b, e)
 	case ast.ExprProvider:
 		return in.provider(ctx, b, e)
-	case ast.ExprProviderIdentifier:
-		return in.providerIdentifierExpr(ctx, b, e)
 	case ast.ExprResource:
 		return in.resource(ctx, b, e)
 	case ast.ExprResourceIdentifier:
@@ -30,22 +28,8 @@ func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.
 		return in.fileExpr(ctx, e)
 	case ast.ExprIOGet:
 		return in.ioGetExpr(ctx, b, e)
-	case ast.ExprGet:
-		return in.getExpr(ctx, b, e)
-	case ast.ExprGetProvider:
-		p, ok := b.Providers[e.Alias]
-		if !ok {
-			return spec.ValueProvider{}, nil, fmt.Errorf("provider with alias %q does not exist", e.Alias)
-		}
-
-		return p, nil, nil
-	case ast.ExprGetResource:
-		r, ok := b.Resources[e.Alias]
-		if !ok {
-			return spec.ValueResource{}, nil, fmt.Errorf("resource with alias %q does not exist", e.Alias)
-		}
-
-		return r, []string{e.Alias}, nil
+	case ast.ExprNil:
+		return spec.ValueNil{}, nil, nil
 	default:
 		return nil, nil, fmt.Errorf("unknown expr %T", ex)
 	}
@@ -62,19 +46,10 @@ func (in Interpreter) blueprintExpr(ctx context.Context, s spec.Spec, e ast.Expr
 }
 
 func (in Interpreter) provider(ctx context.Context, b spec.Spec, e ast.ExprProvider) (spec.ValueProvider, []string, error) {
-	val, children, err := in.Expr(ctx, b, e.Identifier)
-	if err != nil {
-		return spec.ValueProvider{}, nil, err
-	}
-
-	id, ok := val.(spec.ValueProviderIdentifier)
-	if !ok {
-		return spec.ValueProvider{}, nil, fmt.Errorf("expected ProviderIdentifier type, got %T", val)
-	}
-
 	return spec.ValueProvider{
-		Identifier: id,
-	}, children, nil
+		Name:    e.Name,
+		Version: e.Version,
+	}, nil, nil
 }
 
 func (in Interpreter) resource(ctx context.Context, b spec.Spec, e ast.ExprResource) (spec.ValueResource, []string, error) {
@@ -153,40 +128,6 @@ func (in Interpreter) mapExpr(ctx context.Context, b spec.Spec, e ast.ExprMap) (
 	return m, children, nil
 }
 
-func (in Interpreter) providerIdentifierExpr(ctx context.Context, b spec.Spec, e ast.ExprProviderIdentifier) (spec.ValueProviderIdentifier, []string, error) {
-	name, nameChildren, err := in.Expr(ctx, b, e.Name)
-	if err != nil {
-		return spec.ValueProviderIdentifier{}, nil, err
-	}
-
-	nameStr, ok := name.(spec.ValueString)
-	if !ok {
-		return spec.ValueProviderIdentifier{}, nil, fmt.Errorf("provider name must be a string")
-	}
-
-	version, versionChildren, err := in.Expr(ctx, b, e.Version)
-	if err != nil {
-		return spec.ValueProviderIdentifier{}, nil, err
-	}
-
-	versionStr, ok := version.(spec.ValueString)
-	if !ok {
-		return spec.ValueProviderIdentifier{}, nil, fmt.Errorf("provider version must be a string")
-	}
-
-	children := append(nameChildren, versionChildren...)
-
-	if e.Alias == "" {
-		return spec.ValueProviderIdentifier{}, nil, fmt.Errorf("must provide alias")
-	}
-
-	return spec.ValueProviderIdentifier{
-		Alias:   e.Alias,
-		Name:    nameStr.Literal,
-		Version: versionStr.Literal,
-	}, children, nil
-}
-
 func (in Interpreter) resourceIdentifierExpr(ctx context.Context, b spec.Spec, e ast.ExprResourceIdentifier) (spec.ValueResourceIdentifier, []string, error) {
 	val, children, err := in.Expr(ctx, b, e.Value)
 	if err != nil {
@@ -214,14 +155,15 @@ func (in Interpreter) ioGetExpr(ctx context.Context, b spec.Spec, e ast.ExprIOGe
 		return spec.ValueUnresolved{}, nil, err
 	}
 
-	unresolved, ok := objVal.(spec.ValueUnresolved)
-	if !ok {
-		return spec.ValueUnresolved{}, nil, fmt.Errorf("property %q does not belong to unresolved object; use get", e.Name)
+	// The object being nil means we're accessing a property on the environment,
+	// like a resource.
+	if _, isNil := objVal.(spec.ValueNil); isNil {
+		children = append(children, e.Name)
 	}
 
 	return spec.ValueUnresolved{
 		Name:   e.Name,
-		Object: unresolved,
+		Object: objVal,
 	}, children, nil
 }
 
@@ -231,33 +173,33 @@ func (in Interpreter) fileExpr(ctx context.Context, f ast.ExprFile) (spec.ValueF
 	}, nil, nil
 }
 
-func (in Interpreter) getExpr(ctx context.Context, b spec.Spec, e ast.ExprGet) (spec.Value, []string, error) {
-	var m map[string]spec.Value
-
-	objVal, children, err := in.Expr(ctx, b, e.Object)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	switch obj := objVal.(type) {
-	case spec.ValueMap:
-		m = obj.Entries
-	case spec.ValueResource:
-		m = map[string]spec.Value{
-			"identifier": obj.Identifier,
-			"config":     obj.Config,
-			"attrs":      obj.Attrs,
-		}
-	case spec.ValueUnresolved:
-		return nil, nil, fmt.Errorf("property %q belongs to an unresolved object; use io_get", e.Name)
-	default:
-		return nil, nil, fmt.Errorf("cannot access property %q", e.Name)
-	}
-
-	val, ok := m[e.Name]
-	if !ok {
-		return nil, nil, fmt.Errorf("property %q not set", e.Name)
-	}
-
-	return val, children, nil
-}
+// func (in Interpreter) getExpr(ctx context.Context, b spec.Spec, e ast.ExprGet) (spec.Value, []string, error) {
+// 	var m map[string]spec.Value
+//
+// 	objVal, children, err := in.Expr(ctx, b, e.Object)
+// 	if err != nil {
+// 		return nil, nil, err
+// 	}
+//
+// 	switch obj := objVal.(type) {
+// 	case spec.ValueMap:
+// 		m = obj.Entries
+// 	case spec.ValueResource:
+// 		m = map[string]spec.Value{
+// 			"identifier": obj.Identifier,
+// 			"config":     obj.Config,
+// 			"attrs":      obj.Attrs,
+// 		}
+// 	case spec.ValueUnresolved:
+// 		return nil, nil, fmt.Errorf("property %q belongs to an unresolved object; use io_get", e.Name)
+// 	default:
+// 		return nil, nil, fmt.Errorf("cannot access property %q", e.Name)
+// 	}
+//
+// 	val, ok := m[e.Name]
+// 	if !ok {
+// 		return nil, nil, fmt.Errorf("property %q not set", e.Name)
+// 	}
+//
+// 	return val, children, nil
+// }

@@ -8,15 +8,9 @@ message Blueprint {
 
 message Stmt {
   oneof type {
-    ProviderStmt provider = 1;
-    ResourceStmt resource = 2;
-    // BlueprintStmt blueprint = 3;
-    BuildStmt build = 4;
+    ResourceStmt resource = 1;
+    BuildStmt build = 2;
   }
-}
-
-message ProviderStmt {
-  Expr expr = 1;
 }
 
 message ResourceStmt {
@@ -37,17 +31,13 @@ message Expr {
     bool bool_literal = 4;
     ListExpr list = 5;
     MapExpr map = 6;
-    GetExpr get = 7;
-    ProviderExpr provider = 8;
-    ResourceExpr resource = 9;
-    GetProviderExpr get_provider = 10;
-    GetResourceExpr get_resource = 11;
-    NilExpr nil = 12;
-    IOGetExpr io_get = 13;
-    ProviderIdentifierExpr provider_identifier = 14;
-    ResourceIdentifierExpr resource_identifier = 15;
-    BlueprintExpr blueprint = 16;
-    FileExpr file = 17;
+    ProviderExpr provider = 7;
+    ResourceExpr resource = 8;
+    NilExpr nil = 9;
+    IOGetExpr io_get = 10;
+    ResourceIdentifierExpr resource_identifier = 11;
+    BlueprintExpr blueprint = 12;
+    FileExpr file = 13;
   }
 }
 
@@ -67,19 +57,6 @@ message FileExpr {
   string path = 1;
 }
 
-message GetExpr {
-  string name = 1;
-  Expr object = 2;
-}
-
-message GetProviderExpr {
-  string alias = 1;
-}
-
-message GetResourceExpr {
-  string alias = 1;
-}
-
 message IOGetExpr {
   string name = 1;
   Expr object = 2;
@@ -88,13 +65,8 @@ message IOGetExpr {
 message NilExpr {}
 
 message ProviderExpr {
-  Expr identifier = 1;
-}
-
-message ProviderIdentifierExpr {
-  string alias = 1;
-  Expr name = 2;
-  Expr version = 3;
+  string name = 1;
+  string version = 2;
 }
 
 message ResourceExpr {
