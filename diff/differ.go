@@ -30,6 +30,16 @@ func (b Bool) Operation() Operation {
 	return b.DiffOperation
 }
 
+type File struct {
+	From          state.File
+	To            state.File
+	DiffOperation Operation
+}
+
+func (f File) Operation() Operation {
+	return f.DiffOperation
+}
+
 type Map struct {
 	From          state.Map
 	To            state.Map
@@ -101,6 +111,8 @@ func Diff(from, to state.Type) (Type, error) {
 			return mapDiff(state.Map{}, t)
 		case state.Resource:
 			return resourceDiff(state.Resource{}, t)
+		case state.File:
+			return fileDiff(state.File{}, t)
 		default:
 			return nil, fmt.Errorf("invalid type for nil diff: %T", to)
 		}
@@ -164,6 +176,17 @@ func Diff(from, to state.Type) (Type, error) {
 		}
 
 		return resourceDiff(f, t)
+	case state.File:
+		if toIsEmpty {
+			return fileDiff(f, state.File{})
+		}
+
+		t, ok := to.(state.File)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for file diff: %T", to)
+		}
+
+		return fileDiff(f, t)
 	default:
 		return nil, fmt.Errorf("unsupported type for diff: %T", from)
 	}
@@ -322,6 +345,25 @@ func boolDiff(from, to state.Bool) (Bool, error) {
 	}
 
 	return Bool{
+		From:          from,
+		To:            to,
+		DiffOperation: op,
+	}, nil
+}
+
+func fileDiff(from, to state.File) (File, error) {
+	var op Operation
+	switch {
+	case to.Checksum == from.Checksum:
+		op = OperationNoop
+	case to.Checksum != "" && from.Checksum == "":
+		op = OperationCreate
+	case to.Checksum == "" && from.Checksum != "":
+		op = OperationDelete
+	case to.Checksum != from.Checksum:
+		op = OperationUpdate
+	}
+	return File{
 		From:          from,
 		To:            to,
 		DiffOperation: op,

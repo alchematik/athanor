@@ -145,6 +145,8 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 		return fields, nil
 	case diff.String:
 		return nil, nil
+	case diff.File:
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unsupported type for mask %T\n", d)
 	}
@@ -153,6 +155,8 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 func resolve(env state.Environment, res state.Type) (state.Type, error) {
 	switch r := res.(type) {
 	case state.String:
+		return r, nil
+	case state.File:
 		return r, nil
 	case state.Map:
 		m := state.Map{

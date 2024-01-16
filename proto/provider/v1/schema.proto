@@ -27,5 +27,7 @@ enum FieldType {
   STRING = 1;
   STRUCT = 2;
   MAP = 3;
+  FILE = 4;
+  IDENTIFIER = 5;
 }
 

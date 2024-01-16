@@ -66,6 +66,12 @@ type ValueMap struct {
 	Entries map[string]Value
 }
 
+type ValueFile struct {
+	Value
+
+	Path string
+}
+
 type ValueUnresolved struct {
 	Value
 

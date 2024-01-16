@@ -75,6 +75,7 @@ message Value {
     ListValue list = 5;
     MapValue map = 6;
     Identifier identifier = 7;
+    FileValue file = 8;
   }
 }
 
@@ -84,6 +85,11 @@ message ListValue {
 
 message MapValue {
   map<string, Value> entries = 1;
+}
+
+message FileValue {
+  string path = 1;
+  string checksum = 2;
 }
 
 message Identifier {

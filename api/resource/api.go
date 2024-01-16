@@ -212,6 +212,11 @@ func fromProto(val *providerpb.Value) (state.Type, error) {
 		return state.Map{Entries: entries}, nil
 	case *providerpb.Value_StringValue:
 		return state.String{Value: v.StringValue}, nil
+	case *providerpb.Value_File:
+		return state.File{
+			Path:     v.File.Path,
+			Checksum: v.File.Checksum,
+		}, nil
 	case nil:
 		return state.Nil{}, nil
 	default:
@@ -256,8 +261,16 @@ func toProto(val state.Type) (*providerpb.Value, error) {
 				},
 			},
 		}, nil
+	case state.File:
+		return &providerpb.Value{
+			Type: &providerpb.Value_File{
+				File: &providerpb.FileValue{
+					Path:     v.Path,
+					Checksum: v.Checksum,
+				},
+			},
+		}, nil
 	default:
 		return nil, fmt.Errorf("convert proto: unknown type %T\n", val)
 	}
-
 }

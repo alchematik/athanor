@@ -26,6 +26,8 @@ func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.
 		return in.resource(ctx, b, e)
 	case ast.ExprResourceIdentifier:
 		return in.resourceIdentifierExpr(ctx, b, e)
+	case ast.ExprFile:
+		return in.fileExpr(ctx, e)
 	case ast.ExprIOGet:
 		return in.ioGetExpr(ctx, b, e)
 	case ast.ExprGet:
@@ -221,6 +223,12 @@ func (in Interpreter) ioGetExpr(ctx context.Context, b spec.Spec, e ast.ExprIOGe
 		Name:   e.Name,
 		Object: unresolved,
 	}, children, nil
+}
+
+func (in Interpreter) fileExpr(ctx context.Context, f ast.ExprFile) (spec.ValueFile, []string, error) {
+	return spec.ValueFile{
+		Path: f.Path,
+	}, nil, nil
 }
 
 func (in Interpreter) getExpr(ctx context.Context, b spec.Spec, e ast.ExprGet) (spec.Value, []string, error) {

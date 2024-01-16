@@ -2,7 +2,10 @@ package evaluator
 
 import (
 	"context"
+	"crypto/md5"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/alchematik/athanor/spec"
 	"github.com/alchematik/athanor/state"
@@ -36,6 +39,23 @@ func (e Evaluator) mapValue(ctx context.Context, env state.Environment, v spec.V
 	}
 
 	return m, nil
+}
+
+func (e Evaluator) fileValue(ctx context.Context, env state.Environment, f spec.ValueFile) (state.File, error) {
+	data, err := os.ReadFile(f.Path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return state.File{}, nil
+		}
+
+		return state.File{}, err
+	}
+
+	hash := md5.Sum(data)
+	return state.File{
+		Path:     f.Path,
+		Checksum: fmt.Sprintf("%x", hash),
+	}, nil
 }
 
 func (e Evaluator) resourceIdentifier(ctx context.Context, env state.Environment, v spec.ValueResourceIdentifier) (state.Identifier, error) {
@@ -177,6 +197,8 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val spec.Va
 		return e.resourceRef(env, v)
 	case spec.ValueUnresolved:
 		return e.unresolvedValue(ctx, env, v)
+	case spec.ValueFile:
+		return e.fileValue(ctx, env, v)
 	default:
 		return nil, fmt.Errorf("unrecognized value type: %T", val)
 	}

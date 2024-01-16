@@ -47,6 +47,7 @@ message Expr {
     ProviderIdentifierExpr provider_identifier = 14;
     ResourceIdentifierExpr resource_identifier = 15;
     BlueprintExpr blueprint = 16;
+    FileExpr file = 17;
   }
 }
 
@@ -60,6 +61,10 @@ message ListExpr {
 
 message MapExpr {
   map<string, Expr> entries = 1;
+}
+
+message FileExpr {
+  string path = 1;
 }
 
 message GetExpr {

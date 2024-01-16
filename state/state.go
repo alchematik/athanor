@@ -36,6 +36,13 @@ type Identifier struct {
 	Value        Type
 }
 
+type File struct {
+	Type
+
+	Path     string
+	Checksum string
+}
+
 type String struct {
 	Type
 

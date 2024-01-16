@@ -171,6 +171,8 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 		return ast.ExprString{Value: e.StringLiteral}, nil
 	case *consumerpb.Expr_BoolLiteral:
 		return ast.ExprBool{Value: e.BoolLiteral}, nil
+	case *consumerpb.Expr_File:
+		return ast.ExprFile{Path: e.File.Path}, nil
 	case *consumerpb.Expr_Map:
 		m := ast.ExprMap{Entries: map[string]ast.Expr{}}
 		for k, v := range e.Map.GetEntries() {
@@ -252,8 +254,9 @@ func main() {
 									Name    string `json:"name"`
 									Version string `json:"version"`
 								} `json:"translator"`
-								ClientSDK      []ClientSDK `json:"client_sdk"`
-								TranslatorsDir string      `json:"translators_dir"`
+								Args           map[string]string `json:"args"`
+								ClientSDK      []ClientSDK       `json:"client_sdk"`
+								TranslatorsDir string            `json:"translators_dir"`
 							}
 
 							var c Config
@@ -288,6 +291,7 @@ func main() {
 							_, err = client.GenerateProviderSDK(ctx.Context, &translatorpb.GenerateProviderSDKRequest{
 								InputPath:  tempFile.Name(),
 								OutputPath: c.OutputPath,
+								Args:       c.Args,
 							})
 							if err != nil {
 								return err

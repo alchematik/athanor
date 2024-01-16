@@ -22,6 +22,12 @@ type ExprBool struct {
 	Value bool
 }
 
+type ExprFile struct {
+	Expr
+
+	Path string
+}
+
 type ExprMap struct {
 	Expr
 
