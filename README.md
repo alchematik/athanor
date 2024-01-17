@@ -2,17 +2,12 @@
 
 Athanor is an Infrastructure as code (IaC) tool that I ([@khisakuni](https://github.com/khisakuni)) am hacking on.
 
-## Goals
-
 The goal of this project for now is primarily to serve as a personal project for learning.
 Long term, I would love it to become a useful tool that's delighful for people to use.
 
 
-## Project Status
-
 Athanor is still in the early stages of development! It is not meant for use outside of experimentation and development. 
-
-Features and improvements that I want to make can be found in the Roadmap.
+Features and improvements that I want to make can be found in the [Roadmap](#Roadmap).
 
 
 ## Documentation
