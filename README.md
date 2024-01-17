@@ -14,6 +14,12 @@ Features and improvements that I want to make can be found in the [Roadmap](#Roa
 
 Below is a table of contents for the documentation.
 
+* [Core Concepts](./docs/core_concepts)
+    * [Blueprints](./docs/core_concepts/blueprints.md)
+    * [Resources](./docs/core_concepts/resources.md)
+    * [Providers](./docs/core_concepts/providers.md)
+    * [Translators](./docs/core_concepts/translators.md)
+
 ## Roadmap
 
 ## License
