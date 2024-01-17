@@ -34,7 +34,7 @@ message Expr {
     ProviderExpr provider = 7;
     ResourceExpr resource = 8;
     NilExpr nil = 9;
-    IOGetExpr io_get = 10;
+    GetExpr get = 10;
     ResourceIdentifierExpr resource_identifier = 11;
     BlueprintExpr blueprint = 12;
     FileExpr file = 13;
@@ -57,7 +57,7 @@ message FileExpr {
   string path = 1;
 }
 
-message IOGetExpr {
+message GetExpr {
   string name = 1;
   Expr object = 2;
 }

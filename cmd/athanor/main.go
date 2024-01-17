@@ -145,14 +145,14 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 		}
 
 		return m, nil
-	case *consumerpb.Expr_IoGet:
-		obj, err := convertExpr(e.IoGet.GetObject())
+	case *consumerpb.Expr_Get:
+		obj, err := convertExpr(e.Get.GetObject())
 		if err != nil {
 			return nil, err
 		}
 
-		g := ast.ExprIOGet{
-			Name:   e.IoGet.GetName(),
+		g := ast.ExprGet{
+			Name:   e.Get.GetName(),
 			Object: obj,
 		}
 

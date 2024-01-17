@@ -34,7 +34,7 @@ type ExprMap struct {
 	Entries map[string]Expr
 }
 
-type ExprIOGet struct {
+type ExprGet struct {
 	Expr
 
 	Name   string

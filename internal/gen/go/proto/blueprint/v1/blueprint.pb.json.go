@@ -152,7 +152,7 @@ func (msg *FileExpr) UnmarshalJSON(b []byte) error {
 }
 
 // MarshalJSON implements json.Marshaler
-func (msg *IOGetExpr) MarshalJSON() ([]byte, error) {
+func (msg *GetExpr) MarshalJSON() ([]byte, error) {
 	return protojson.MarshalOptions{
 		UseEnumNumbers:  false,
 		EmitUnpopulated: false,
@@ -161,7 +161,7 @@ func (msg *IOGetExpr) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON implements json.Unmarshaler
-func (msg *IOGetExpr) UnmarshalJSON(b []byte) error {
+func (msg *GetExpr) UnmarshalJSON(b []byte) error {
 	return protojson.UnmarshalOptions{
 		DiscardUnknown: false,
 	}.Unmarshal(b, msg)
