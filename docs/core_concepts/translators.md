@@ -7,4 +7,6 @@ whether while creating resources with a blueprint or creating a new provider.
 
 ## Translating Blueprints
 
+Blueprints can be written in any programming language
+
 ## Translating Provider Schemas
