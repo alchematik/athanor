@@ -12,4 +12,16 @@ Athanor also generates SDKs for each target programming language configured.
 
 ## Generated provider SDK
 
+The generated provider source code should be used to implement the provider interface for each resource.
+Provider authors should implement CRUD operations for each resource. 
+The following is the interface that's expected for each resource:
+
+* Get -- fetches the resource using the provided identifier.
+* Create -- creates the resource using the provided identifier and config values.
+* Update -- updates the resource using the provided identifier, config values, and a mask of all the fields which need to be udpated.
+* Delete -- deletes the resource using the provided identifier.
+
 ## Generated client SDK
+
+Athanor generates client code for each supported target programming language.
+Blueprint authors can use the generated resource code to manage resources in blueprints. 
