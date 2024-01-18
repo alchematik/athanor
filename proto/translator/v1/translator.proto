@@ -2,9 +2,6 @@ syntax = "proto3";
 
 package alchematik.athanor.translator.v1;
 
-// import "proto/consumer/v1/blueprint.proto";
-// import "proto/provider/v1/blueprint.proto";
-
 service Translator {
   rpc TranslateProviderSchema(TranslateProviderSchemaRequest) returns (TranslateProviderSchemaResponse);
   rpc TranslateBlueprint(TranslateBlueprintRequest) returns (TranslateBlueprintResponse);

@@ -1,7 +1,7 @@
 # Providers
 
 A provider provides resources that can be configured by consumers. 
-Providers are plugins, and anyone can create a provider for anything as long as it conforms to the provider plugin interface.
+Providers are plugins, and anyone can create a provider as long as it conforms to the provider plugin interface.
 
 ## Schema
 
