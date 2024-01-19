@@ -20,10 +20,10 @@ Below is a table of contents for the documentation.
     * [Providers](./docs/core_concepts/providers.md)
     * [Translators](./docs/core_concepts/translators.md)
 * [How Athanor Works](./docs/how_athanor_works/)
-    * [Interpreter](./docs/how_athanor_works/interpreter.md)
-    * [Evaluator](./docs/how_athanor_works/evaluator.md)
-    * [Differ](./docs/how_athanor_works/differ.md)
-    * [Reconciler](./docs/how_athanor_works/reconciler.md)
+    * [Interpreter](./docs/how_athanor_works/README.md#interpreter)
+    * [Evaluator](./docs/how_athanor_works/README.md#evaluator)
+    * [Differ](./docs/how_athanor_works/README.md#differ)
+    * [Reconciler](./docs/how_athanor_works/README.md#reconciler)
 
 ## Roadmap
 
