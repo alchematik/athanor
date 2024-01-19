@@ -24,8 +24,8 @@ Below is a table of contents for the documentation.
     * [Evaluator](./docs/how_athanor_works/README.md#evaluator)
     * [Differ](./docs/how_athanor_works/README.md#differ)
     * [Reconciler](./docs/how_athanor_works/README.md#reconciler)
+* [Roadmap](./docs/roadmap.md)
 
-## Roadmap
 
 ## License
 
