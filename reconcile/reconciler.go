@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	api "github.com/alchematik/athanor/api/resource"
 	"github.com/alchematik/athanor/diff"
+	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/state"
 )
 
