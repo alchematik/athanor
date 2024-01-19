@@ -36,7 +36,7 @@ request body, and generate source code to support implementing the provider.
 
 ## Generating Consumer SDKs
 
-Translator plugins are able to generate source code to be used by provider consumers in the programming language that the translator supports
+Translator plugins are able to generate source code to be used by blueprint authors in the programming language that the translator supports
 given a representation of the provider schema. 
 Athanor will invoke the `GenerateConsumerSDK` RPC of the translator plugin.
 The translator plugin should read the provider schema representation located at the input path provided in the 
