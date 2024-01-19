@@ -1,18 +1,56 @@
 # Core Concepts
 
 Athanor is a tool that reconciles the state of the world with your desired state.
-You inform Athanor of what the desired state is by providing a _blueprint_.  
-A _blueprint_ is a configuration of one or more _resources_ and the states in which the _resources_ should exist in.
-A _resource_ is an object that's managed by a _provider_. For example, an AWS S3 bucket. 
-A _provider_ is a service that exposes an API to manage objects. For example, AWS.
-_Blueprints_ can be configured using any supported programming language. For example, Go.
-Athanor uses _translators_ to translate the configuration into a representation that can be evaluated.
+You inform Athanor of what the desired state is by providing a [_blueprint_](./blueprints.md).  
+Blueprints can be configured using any [supported programming language](../../README.md#translators). For example, Go.
+A blueprint has one or more [_resources_](./resources.md).
+A resource belongs to a [_provider_](./providers.md).
+Athanor uses [_translators_](./translators.md) to translate the blueprint into a representation that it understands.
+Athanor produces a [_diff_](./diffs.md) given a blueprint.
+Athanor [reconciles](./reconciliation.md) the diff, making the world match what's configured in the blueprint.
 
-The above is a brief description of the different parts of Athanor that work together to make the configuration
-you define in blueprints match reality. The links below cover each concept in greater detail.
+## Blueprints
 
-* [Blueprints](./blueprints.md)
-* [Resources](./resources.md)
-* [Providers](./providers.md)
-* [Translators](./translators.md)
+A blueprint is a configuration of one or more resources.
+You can also use other blueprints _within_ your blueprint, making the reuse of blueprints possible.
+
+[Learn more about blueprints](./blueprints.md).
+
+## Resources
+
+A resource is an object which has state and is managed by a [_provider_](./providers.md). For example, an AWS S3 bucket. 
+
+[Lean more about resources](./resources.md).
+
+## Providers
+
+A provider makes resources available for you to use in blueprints.
+For example, the [GCP proovider](https://github.com/alchematik/athanor-provider-gcp) makes cloud resources on [Google Cloud Platform](https://console.cloud.google.com/) available to be managed in blueprints.
+A provider is a plugin which Athanor uses to perform [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) operations on resources.
+
+[Learn more about providers](./providers.md).
+
+## Translators
+
+Translators are plugins that translate a configurations written in a programming language into a form that Athanor understands.
+Translators also generate source code in a programming language to help provider authors and consumers.
+
+[Learn more about translators](./translators.md).
+
+
+## Diffs
+
+Athanor produces a comparison where it shows you how the real-world state is different from 
+the desired state configured in a blueprint. This is called a diff.
+
+[Learn more about diffs](./diffs.md).
+
+## Reconciliation
+
+You've told Athanor what you'd like the world to look like by authoring a blueprint.
+Athanor finds out what the world currently looks like with the help of [provider plugins](./providers.md).
+Athanor works to reconcile the [diff](./diffs.md) by making the real-world state match the one you've defined
+in your blueprint. This process is called reconciling.
+
+[Learn more about reconciliation](./reconciliation.md).
 
