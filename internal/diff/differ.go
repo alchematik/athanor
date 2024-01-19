@@ -298,7 +298,8 @@ func resourceDiff(from, to state.Resource) (Resource, error) {
 	}
 
 	op := exists.Operation()
-	if op == OperationNoop {
+	if op == OperationNoop && to.Exists.Value {
+		// Consider the config diff operation if the resource exists,
 		op = config.Operation()
 	}
 
