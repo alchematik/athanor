@@ -1,12 +1,14 @@
 # Resources
 
 A resource is an object that's managed by a provider.
-A resource is comprised of five parts: its provider, its identifier, its configuration, its attributes, and the state of the resource.
+A resource is comprised of five parts: its provider, its identifier, its configuration, its attributes, and the existance of the resource.
 
 ## Provider
 
 The provider informs Athanor of which provider is should use when managing the resource.
 You must specify the name and version of the provider.
+
+## Existance
 
 ## Identifier
 

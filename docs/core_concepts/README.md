@@ -47,10 +47,8 @@ the desired state configured in a blueprint. This is called a diff.
 
 ## Reconciliation
 
-You've told Athanor what you'd like the world to look like by authoring a blueprint.
-Athanor finds out what the world currently looks like with the help of [provider plugins](./providers.md).
-Athanor works to reconcile the [diff](./diffs.md) by making the real-world state match the one you've defined
-in your blueprint. This process is called reconciling.
+The main purpose of Athanor is to make reality match the state configured in blueprints.
+The process of making reality match the blueprint is called reconciliation. 
 
 [Learn more about reconciliation](./reconciliation.md).
 
