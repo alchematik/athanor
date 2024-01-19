@@ -3,7 +3,7 @@ package diff_test
 import (
 	"testing"
 
-	"github.com/alchematik/athanor/diff"
+	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/state"
 	"github.com/stretchr/testify/require"
 )
