@@ -19,6 +19,11 @@ Below is a table of contents for the documentation.
     * [Resources](./docs/core_concepts/resources.md)
     * [Providers](./docs/core_concepts/providers.md)
     * [Translators](./docs/core_concepts/translators.md)
+* [How Athanor Works](./docs/how_athanor_works/)
+    * [Interpreter](./docs/how_athanor_works/interpreter.md)
+    * [Evaluator](./docs/how_athanor_works/evaluator.md)
+    * [Differ](./docs/how_athanor_works/differ.md)
+    * [Reconciler](./docs/how_athanor_works/reconciler.md)
 
 ## Roadmap
 
