@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	providerpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
-	"github.com/alchematik/athanor/plugin"
-	"github.com/alchematik/athanor/state"
+	"github.com/alchematik/athanor/internal/plugin"
+	"github.com/alchematik/athanor/internal/state"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

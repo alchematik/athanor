@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
-	"github.com/alchematik/athanor/state"
+	"github.com/alchematik/athanor/internal/state"
 
 	// "github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"

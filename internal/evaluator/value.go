@@ -7,8 +7,8 @@ import (
 	"hash/crc32"
 	"os"
 
+	"github.com/alchematik/athanor/internal/state"
 	"github.com/alchematik/athanor/spec"
-	"github.com/alchematik/athanor/state"
 )
 
 func (e Evaluator) providerValue(v spec.ValueProvider) (state.Provider, error) {

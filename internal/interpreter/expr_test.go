@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alchematik/athanor/blueprint/expr"
-	"github.com/alchematik/athanor/build"
-	"github.com/alchematik/athanor/build/value"
-	"github.com/alchematik/athanor/interpreter"
+	"github.com/alchematik/athanor/internal/blueprint/expr"
+	"github.com/alchematik/athanor/internal/build"
+	"github.com/alchematik/athanor/internal/build/value"
+	"github.com/alchematik/athanor/internal/interpreter"
 
 	"github.com/stretchr/testify/require"
 )

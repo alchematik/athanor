@@ -12,8 +12,8 @@ import (
 	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
-	"github.com/alchematik/athanor/interpreter"
-	plug "github.com/alchematik/athanor/plugin"
+	"github.com/alchematik/athanor/internal/interpreter"
+	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/reconcile"
 
 	"github.com/urfave/cli/v2"

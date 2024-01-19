@@ -3,7 +3,7 @@ package resource
 import (
 	"context"
 
-	"github.com/alchematik/athanor/state"
+	"github.com/alchematik/athanor/internal/state"
 )
 
 type Unresolved struct {

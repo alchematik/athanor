@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/alchematik/athanor/internal/diff"
-	"github.com/alchematik/athanor/state"
+	"github.com/alchematik/athanor/internal/state"
 	"github.com/stretchr/testify/require"
 )
 

@@ -3,7 +3,7 @@ package diff
 import (
 	"fmt"
 
-	"github.com/alchematik/athanor/state"
+	"github.com/alchematik/athanor/internal/state"
 )
 
 type Type interface {

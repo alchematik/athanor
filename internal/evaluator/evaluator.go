@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alchematik/athanor/internal/state"
 	"github.com/alchematik/athanor/spec"
-	"github.com/alchematik/athanor/state"
 )
 
 type Evaluator struct {

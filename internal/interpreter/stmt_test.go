@@ -4,12 +4,12 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alchematik/athanor/blueprint/expr"
-	"github.com/alchematik/athanor/blueprint/stmt"
-	"github.com/alchematik/athanor/build"
-	"github.com/alchematik/athanor/build/component"
-	"github.com/alchematik/athanor/build/value"
-	"github.com/alchematik/athanor/interpreter"
+	"github.com/alchematik/athanor/internal/blueprint/expr"
+	"github.com/alchematik/athanor/internal/blueprint/stmt"
+	"github.com/alchematik/athanor/internal/build"
+	"github.com/alchematik/athanor/internal/build/component"
+	"github.com/alchematik/athanor/internal/build/value"
+	"github.com/alchematik/athanor/internal/interpreter"
 
 	"github.com/stretchr/testify/require"
 )

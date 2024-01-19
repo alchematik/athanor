@@ -6,7 +6,7 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/diff"
-	"github.com/alchematik/athanor/state"
+	"github.com/alchematik/athanor/internal/state"
 )
 
 type Reconciler struct {
