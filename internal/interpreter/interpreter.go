@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/alchematik/athanor/internal/ast"
-	"github.com/alchematik/athanor/spec"
+	"github.com/alchematik/athanor/internal/spec"
 )
 
 type Interpreter struct{}

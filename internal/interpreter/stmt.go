@@ -6,7 +6,7 @@ import (
 	"slices"
 
 	"github.com/alchematik/athanor/internal/ast"
-	"github.com/alchematik/athanor/spec"
+	"github.com/alchematik/athanor/internal/spec"
 )
 
 func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error {

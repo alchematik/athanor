@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/alchematik/athanor/internal/spec"
 	"github.com/alchematik/athanor/internal/state"
-	"github.com/alchematik/athanor/spec"
 )
 
 func (e Evaluator) Component(ctx context.Context, env state.Environment, alias string, comp spec.Component) error {

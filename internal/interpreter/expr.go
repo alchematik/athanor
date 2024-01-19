@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/alchematik/athanor/internal/ast"
-	"github.com/alchematik/athanor/spec"
+	"github.com/alchematik/athanor/internal/spec"
 )
 
 func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.Value, []string, error) {
