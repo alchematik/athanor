@@ -23,4 +23,7 @@ Currently provider and translator plugins must be built on the host machine. Use
 be able to fetch pre-built plugin binaries from a remote registry or repository.
 
 
+## Generate Provider Documentation
+
+Provider authors should be able to generate documentation about the resources that belong to the provider.
 
