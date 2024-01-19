@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/alchematik/athanor/build/value"
-	"github.com/alchematik/athanor/evaluator"
 	api "github.com/alchematik/athanor/internal/api/resource"
+	"github.com/alchematik/athanor/internal/evaluator"
 	"github.com/alchematik/athanor/state"
 
 	"github.com/stretchr/testify/require"
