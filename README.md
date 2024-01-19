@@ -27,7 +27,8 @@ Below is a table of contents for the documentation.
     * [Differ](./docs/how_athanor_works/README.md#differ)
     * [Reconciler](./docs/how_athanor_works/README.md#reconciler)
 * [Roadmap](./docs/roadmap.md)
-* Tutorials &mdash; _coming soon!_
+* Tutorials &mdash; _coming soon!_ Tutorials will show you how to use Athanor using step-by-step instructions.
+* Examples &mdash; _coming soon!_ Examples will show you example blueprint and provider configurations.
 
 ## Providers
 
