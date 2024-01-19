@@ -21,12 +21,13 @@ Below is a table of contents for the documentation.
     * [Translators](./docs/core_concepts/translators.md)
     * [Diffs](./docs/core_concepts/diffs.md)
     * [Reconciliation](./docs/core_concepts/reconciliation.md)
-* [How Athanor Works](./docs/how_athanor_works/)
+* [Athanor under the hood](./docs/how_athanor_works/)
     * [Interpreter](./docs/how_athanor_works/README.md#interpreter)
     * [Evaluator](./docs/how_athanor_works/README.md#evaluator)
     * [Differ](./docs/how_athanor_works/README.md#differ)
     * [Reconciler](./docs/how_athanor_works/README.md#reconciler)
 * [Roadmap](./docs/roadmap.md)
+* Tutorials &mdash; _coming soon!_
 
 ## Providers
 
