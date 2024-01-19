@@ -7,24 +7,23 @@ Providers are plugins, and anyone can create a provider as long as it conforms t
 
 The resources that are available to consumers are defined in a schema.
 Provider authors can create a provider schema using one of the supported programming languages.
-Athanor uses the provider schema to generate source code for two audiences: the provider author, and consumers of the provider resources.
+Athanor uses the provider schema to generate source code for two audiences: the provider author and blueprint authors.
 Provider authors can use the generated source code to implement the provider plugin interface.
-Provider resource consumers can use the generated source code to configure resources in blueprints.
-Source code can be generated for any language supported by a translator ([learn more about translators]()).
+Blueprint authors can use the generated source code to configure resources in blueprints.
+Source code can be generated for any language supported by a [translator](./translators.md).
 
 ## Provider Plugin Interface 
 
 Athanor uses the [hashicorp/go-plugin](https://github.com/hashicorp/go-plugin) library to enable a pluggable architecture.
 This means that plugins can be written in any programming language supported by [gRPC](https://grpc.io/docs/languages/).
 While technically a provider plugin can be implemented by implementing the [provider gRPC service](../../proto/provider/v1/provider.proto),
-Athanor aims to make this process easier by generating provider source code bindings using translators.
-Using the source code generated using the provider schema and the translator for the preferred programming language, provider authors 
-should implement the [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) operations listed below for each resource.
+Athanor aims to make this process easier by generating source code that provider authors can use to implement the plugin interface.
+Provider authors will need to implement [CRUD](https://en.wikipedia.org/wiki/Create,_read,_update_and_delete) operations for each resource.
 
 ### Create
 
 Given the identifier and configuration for a resource, the provider plugin should create the resource.
-The plugin should return the created resource, including the read-only attributes of the resource.
+The plugin should return the created resource, including the [read-only attributes](./resources.md#attributes) of the resource.
 
 ### Get
 

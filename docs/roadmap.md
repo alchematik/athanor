@@ -1,6 +1,6 @@
 # Roadmap
 
-These page lists features and improvements that I'd like to make to Athanor.
+This page lists features and improvements that I'd like to make to Athanor.
 
 ## CLI
 

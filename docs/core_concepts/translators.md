@@ -18,7 +18,7 @@ located at the output path provided in the request body.
 
 ## Translating Provider Schemas
 
-Translator plugins are able to translate provider schemas ([learn more about provider schemas](./providers.md)).
+Translator plugins are able to translate [provider schemas](./providers.md#schema).
 Athanor will invoke the `TranslateProviderSchema` RPC of the translator plugin.
 The translator plugin should read the provider schema files located at the input path provided in the request
 body, translate them into the format which Athanor understands, and write the contents to a file 
