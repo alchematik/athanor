@@ -2,9 +2,9 @@ package evaluator
 
 import (
 	"context"
-	"crypto/md5"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"os"
 
 	"github.com/alchematik/athanor/spec"
@@ -51,10 +51,11 @@ func (e Evaluator) fileValue(ctx context.Context, env state.Environment, f spec.
 		return state.File{}, err
 	}
 
-	hash := md5.Sum(data)
+	checksum := crc32.Checksum(data, crc32.MakeTable(crc32.Castagnoli))
+
 	return state.File{
 		Path:     f.Path,
-		Checksum: fmt.Sprintf("%x", hash),
+		Checksum: fmt.Sprintf("%d", checksum),
 	}, nil
 }
 
