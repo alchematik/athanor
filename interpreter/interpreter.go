@@ -3,7 +3,7 @@ package interpreter
 import (
 	"context"
 
-	"github.com/alchematik/athanor/ast"
+	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/spec"
 )
 

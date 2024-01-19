@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/alchematik/athanor/ast"
+	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/spec"
 )
 

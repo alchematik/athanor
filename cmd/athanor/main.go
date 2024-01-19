@@ -5,12 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-	// "path/filepath"
 
-	"github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/diff"
 	"github.com/alchematik/athanor/evaluator"
 	api "github.com/alchematik/athanor/internal/api/resource"
+	"github.com/alchematik/athanor/internal/ast"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/interpreter"
