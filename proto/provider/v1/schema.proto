@@ -29,5 +29,6 @@ enum FieldType {
   MAP = 3;
   FILE = 4;
   IDENTIFIER = 5;
+  BOOL = 6;
 }
 

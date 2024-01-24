@@ -217,6 +217,10 @@ func fromProto(val *providerpb.Value) (state.Type, error) {
 			Path:     v.File.Path,
 			Checksum: v.File.Checksum,
 		}, nil
+	case *providerpb.Value_BoolValue:
+		return state.Bool{
+			Value: v.BoolValue,
+		}, nil
 	case nil:
 		return state.Nil{}, nil
 	default:
@@ -268,6 +272,12 @@ func toProto(val state.Type) (*providerpb.Value, error) {
 					Path:     v.Path,
 					Checksum: v.Checksum,
 				},
+			},
+		}, nil
+	case state.Bool:
+		return &providerpb.Value{
+			Type: &providerpb.Value_BoolValue{
+				BoolValue: v.Value,
 			},
 		}, nil
 	default:
