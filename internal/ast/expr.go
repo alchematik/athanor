@@ -34,6 +34,12 @@ type ExprMap struct {
 	Entries map[string]Expr
 }
 
+type ExprList struct {
+	Expr
+
+	Elements []Expr
+}
+
 type ExprGet struct {
 	Expr
 

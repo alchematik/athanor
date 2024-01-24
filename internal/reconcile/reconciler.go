@@ -172,6 +172,18 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 		}
 
 		return m, nil
+	case state.List:
+		l := state.List{Elements: make([]state.Type, len(r.Elements))}
+		for i, e := range r.Elements {
+			val, err := resolve(env, e)
+			if err != nil {
+				return nil, err
+			}
+
+			l.Elements[i] = val
+		}
+
+		return l, nil
 	case state.ResourceRef:
 		res, ok := env.States[r.Alias]
 		if !ok {
@@ -216,8 +228,6 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 		if !ok {
 			return nil, fmt.Errorf("property %q not set", r.Name)
 		}
-
-		// fmt.Printf("val: %v\n", val)
 
 		return val, nil
 	default:

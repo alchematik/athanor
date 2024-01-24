@@ -20,6 +20,7 @@ message FieldSchema {
   FieldType type = 2;
   repeated FieldSchema fields = 3;
   bool is_identifier = 4;
+  FieldType value_type = 5;
 }
 
 enum FieldType {
@@ -30,5 +31,6 @@ enum FieldType {
   FILE = 4;
   IDENTIFIER = 5;
   BOOL = 6;
+  LIST = 7;
 }
 

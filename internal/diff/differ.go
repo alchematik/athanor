@@ -51,6 +51,17 @@ func (m Map) Operation() Operation {
 	return m.DiffOperation
 }
 
+type List struct {
+	From          state.List
+	To            state.List
+	Diffs         []Type
+	DiffOperation Operation
+}
+
+func (l List) Operation() Operation {
+	return l.DiffOperation
+}
+
 type Resource struct {
 	From          state.Resource
 	To            state.Resource
@@ -113,6 +124,8 @@ func Diff(from, to state.Type) (Type, error) {
 			return resourceDiff(state.Resource{}, t)
 		case state.File:
 			return fileDiff(state.File{}, t)
+		case state.List:
+			return listDiff(state.List{}, t)
 		default:
 			return nil, fmt.Errorf("invalid type for nil diff: %T", to)
 		}
@@ -165,6 +178,17 @@ func Diff(from, to state.Type) (Type, error) {
 		}
 
 		return mapDiff(f, t)
+	case state.List:
+		if toIsEmpty {
+			return listDiff(f, state.List{})
+		}
+
+		t, ok := to.(state.List)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for list diff: %T", to)
+		}
+
+		return listDiff(f, t)
 	case state.Resource:
 		if toIsEmpty {
 			return resourceDiff(f, state.Resource{})
@@ -367,6 +391,96 @@ func fileDiff(from, to state.File) (File, error) {
 	return File{
 		From:          from,
 		To:            to,
+		DiffOperation: op,
+	}, nil
+}
+
+func listDiff(from, to state.List) (List, error) {
+	op := OperationNoop
+	diffs := []Type{}
+	switch {
+	case len(from.Elements) != 0 && len(to.Elements) == 0:
+		op = OperationDelete
+		for _, e := range from.Elements {
+			d, err := Diff(e, state.Nil{})
+			if err != nil {
+				return List{}, err
+			}
+
+			diffs = append(diffs, d)
+		}
+	case len(from.Elements) == 0 && len(to.Elements) != 0:
+		op = OperationCreate
+		for _, e := range to.Elements {
+			d, err := Diff(state.Nil{}, e)
+			if err != nil {
+				return List{}, err
+			}
+
+			diffs = append(diffs, d)
+		}
+	case len(from.Elements) > len(to.Elements):
+		op = OperationUpdate
+		i := 0
+		for i < len(to.Elements) {
+			d, err := Diff(from.Elements[i], to.Elements[i])
+			if err != nil {
+				return List{}, err
+			}
+
+			diffs = append(diffs, d)
+			i++
+		}
+		for i < len(from.Elements) {
+			d, err := Diff(from.Elements[i], state.Nil{})
+			if err != nil {
+				return List{}, err
+			}
+
+			diffs = append(diffs, d)
+			i++
+		}
+	case len(from.Elements) < len(to.Elements):
+		op = OperationUpdate
+
+		i := 0
+		for i < len(from.Elements) {
+			d, err := Diff(from.Elements[i], to.Elements[i])
+			if err != nil {
+				return List{}, err
+			}
+
+			diffs = append(diffs, d)
+			i++
+		}
+		for i < len(to.Elements) {
+			d, err := Diff(state.Nil{}, from.Elements[i])
+			if err != nil {
+				return List{}, err
+			}
+
+			diffs = append(diffs, d)
+			i++
+		}
+	default:
+		for i := range from.Elements {
+			d, err := Diff(from.Elements[i], to.Elements[i])
+			if err != nil {
+				return List{}, err
+			}
+
+			if d.Operation() != OperationNoop {
+				op = OperationUpdate
+			}
+
+			diffs = append(diffs, d)
+		}
+	}
+
+	return List{
+		From:          from,
+		To:            to,
+		Diffs:         diffs,
 		DiffOperation: op,
 	}, nil
 }

@@ -41,6 +41,22 @@ func (e Evaluator) mapValue(ctx context.Context, env state.Environment, v spec.V
 	return m, nil
 }
 
+func (e Evaluator) listValue(ctx context.Context, env state.Environment, v spec.ValueList) (state.List, error) {
+	l := state.List{
+		Elements: make([]state.Type, len(v.Elements)),
+	}
+	for i, val := range v.Elements {
+		resolved, err := e.Value(ctx, env, val)
+		if err != nil {
+			return state.List{}, err
+		}
+
+		l.Elements[i] = resolved
+	}
+
+	return l, nil
+}
+
 func (e Evaluator) fileValue(ctx context.Context, env state.Environment, f spec.ValueFile) (state.File, error) {
 	data, err := os.ReadFile(f.Path)
 	if err != nil {
@@ -197,6 +213,8 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val spec.Va
 		return state.Bool{Value: v.Literal}, nil
 	case spec.ValueMap:
 		return e.mapValue(ctx, env, v)
+	case spec.ValueList:
+		return e.listValue(ctx, env, v)
 	case spec.ValueResourceIdentifier:
 		return e.resourceIdentifier(ctx, env, v)
 	case spec.ValueResourceRef:

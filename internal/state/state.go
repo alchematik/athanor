@@ -61,6 +61,12 @@ type Map struct {
 	Entries map[string]Type
 }
 
+type List struct {
+	Type
+
+	Elements []Type
+}
+
 type Unknown struct {
 	Type
 

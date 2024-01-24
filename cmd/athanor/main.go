@@ -144,6 +144,19 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 		}
 
 		return m, nil
+	case *consumerpb.Expr_List:
+		l := make([]ast.Expr, len(e.List.Elements))
+		for i, val := range e.List.Elements {
+			converted, err := convertExpr(val)
+			if err != nil {
+				return nil, err
+			}
+			l[i] = converted
+		}
+
+		return ast.ExprList{
+			Elements: l,
+		}, nil
 	case *consumerpb.Expr_Get:
 		obj, err := convertExpr(e.Get.GetObject())
 		if err != nil {

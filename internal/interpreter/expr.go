@@ -28,6 +28,8 @@ func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.
 		return in.fileExpr(ctx, e)
 	case ast.ExprGet:
 		return in.getExpr(ctx, b, e)
+	case ast.ExprList:
+		return in.listExpr(ctx, b, e)
 	case ast.ExprNil:
 		return spec.ValueNil{}, nil, nil
 	default:
@@ -126,6 +128,22 @@ func (in Interpreter) mapExpr(ctx context.Context, b spec.Spec, e ast.ExprMap) (
 	}
 
 	return m, children, nil
+}
+
+func (in Interpreter) listExpr(ctx context.Context, b spec.Spec, e ast.ExprList) (spec.ValueList, []string, error) {
+	l := spec.ValueList{Elements: make([]spec.Value, len(e.Elements))}
+	var children []string
+	for i, v := range e.Elements {
+		val, valChildren, err := in.Expr(ctx, b, v)
+		if err != nil {
+			return spec.ValueList{}, nil, err
+		}
+
+		children = append(children, valChildren...)
+		l.Elements[i] = val
+	}
+
+	return l, children, nil
 }
 
 func (in Interpreter) resourceIdentifierExpr(ctx context.Context, b spec.Spec, e ast.ExprResourceIdentifier) (spec.ValueResourceIdentifier, []string, error) {

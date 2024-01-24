@@ -59,6 +59,12 @@ type ValueMap struct {
 	Entries map[string]Value
 }
 
+type ValueList struct {
+	Value
+
+	Elements []Value
+}
+
 type ValueFile struct {
 	Value
 
