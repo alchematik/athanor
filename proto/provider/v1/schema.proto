@@ -16,21 +16,39 @@ message ResourceSchema {
 }
 
 message FieldSchema {
-  string name = 1;
-  FieldType type = 2;
-  repeated FieldSchema fields = 3;
-  bool is_identifier = 4;
-  FieldType value_type = 5;
+  oneof type {
+    StringSchema string_schema = 1;
+    BoolSchema bool_schema = 2;
+    MapSchema map_schema = 3;
+    StructSchema struct_schema = 4;
+    FileSchema file_schema = 5;
+    IdentifierSchema identifier_schema = 6;
+    ListSchema list_schema = 7;
+  }
 }
 
-enum FieldType {
-  EMPTY = 0;
-  STRING = 1;
-  STRUCT = 2;
-  MAP = 3;
-  FILE = 4;
-  IDENTIFIER = 5;
-  BOOL = 6;
-  LIST = 7;
+message StringSchema {
+}
+
+message BoolSchema {
+}
+
+message MapSchema {
+  FieldSchema value = 1;
+}
+
+message StructSchema {
+  string name = 1;
+  map<string, FieldSchema> fields = 2;
+}
+
+message FileSchema {
+}
+
+message IdentifierSchema {
+}
+
+message ListSchema {
+  FieldSchema element = 1;
 }
 
