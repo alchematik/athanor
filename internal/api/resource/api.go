@@ -210,6 +210,18 @@ func fromProto(val *providerpb.Value) (state.Type, error) {
 		}
 
 		return state.Map{Entries: entries}, nil
+	case *providerpb.Value_List:
+		elements := make([]state.Type, len(v.List.Elements))
+		for i, e := range v.List.Elements {
+			val, err := fromProto(e)
+			if err != nil {
+				return nil, err
+			}
+
+			elements[i] = val
+		}
+
+		return state.List{Elements: elements}, nil
 	case *providerpb.Value_StringValue:
 		return state.String{Value: v.StringValue}, nil
 	case *providerpb.Value_File:
@@ -248,6 +260,23 @@ func toProto(val state.Type) (*providerpb.Value, error) {
 			Type: &providerpb.Value_Map{
 				Map: &providerpb.MapValue{
 					Entries: entries,
+				},
+			},
+		}, nil
+	case state.List:
+		elements := make([]*providerpb.Value, len(v.Elements))
+		for i, e := range v.Elements {
+			var err error
+			elements[i], err = toProto(e)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		return &providerpb.Value{
+			Type: &providerpb.Value_List{
+				List: &providerpb.ListValue{
+					Elements: elements,
 				},
 			},
 		}, nil
