@@ -9,17 +9,29 @@ import (
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	"github.com/alchematik/athanor/internal/state"
 
-	// "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 	plugin "github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 )
 
 type Provider struct {
-	Dir string
+	Dir    string
+	Logger hclog.Logger
+
+	clients map[string]backendpb.ProviderClient
 }
 
-func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, error) {
+func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, error) {
 	pluginPath := filepath.Join(p.Dir, provider.Name, provider.Version, "provider")
+
+	if p.clients == nil {
+		p.clients = map[string]backendpb.ProviderClient{}
+	}
+
+	c, ok := p.clients[pluginPath]
+	if ok {
+		return c, nil
+	}
 
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: plugin.HandshakeConfig{
@@ -32,7 +44,7 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 		},
 		Cmd:              exec.Command("sh", "-c", pluginPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		// Logger:           hclog.NewNullLogger(),
+		Logger:           p.Logger,
 	})
 
 	dispensor, err := client.Client()
@@ -49,6 +61,8 @@ func (p Provider) Client(provider state.Provider) (backendpb.ProviderClient, err
 	if !ok {
 		return nil, fmt.Errorf("expected BackendClient, got %T", rawPlug)
 	}
+
+	p.clients[pluginPath] = plug
 
 	return plug, nil
 }

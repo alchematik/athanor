@@ -26,7 +26,7 @@ const (
 )
 
 type API struct {
-	ProviderPluginManager plugin.Provider
+	ProviderPluginManager *plugin.Provider
 }
 
 func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource, error) {

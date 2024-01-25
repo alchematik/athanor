@@ -371,7 +371,7 @@ func main() {
 
 							remoteEval := evaluator.Evaluator{
 								ResourceAPI: api.API{
-									ProviderPluginManager: plug.Provider{
+									ProviderPluginManager: &plug.Provider{
 										Dir: c.ProvidersDir,
 									},
 								},
@@ -409,7 +409,7 @@ func main() {
 
 							reconciler := reconcile.Reconciler{
 								ResourceAPI: api.API{
-									ProviderPluginManager: plug.Provider{
+									ProviderPluginManager: &plug.Provider{
 										Dir: c.ProvidersDir,
 									},
 								},
