@@ -147,6 +147,27 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 		return nil, nil
 	case diff.File:
 		return nil, nil
+	case diff.List:
+		var fields []api.Field
+		for _, d := range t.Diffs {
+			if d.Operation() == diff.OperationNoop {
+				continue
+			}
+
+			op := api.OperationUpdate
+			if d.Operation() == diff.OperationDelete {
+				op = api.OperationDelete
+			}
+
+			m, err := diffToUpdateMask(d)
+			if err != nil {
+				return nil, err
+			}
+
+			fields = append(fields, api.Field{SubFields: m, Operation: op})
+		}
+
+		return fields, nil
 	default:
 		return nil, fmt.Errorf("unsupported type for mask %T\n", d)
 	}
