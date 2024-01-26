@@ -83,3 +83,9 @@ type ResourceRef struct {
 
 	Alias string
 }
+
+type Immutable struct {
+	Type
+
+	Value Type
+}

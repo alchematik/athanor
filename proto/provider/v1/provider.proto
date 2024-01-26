@@ -76,6 +76,7 @@ message Value {
     MapValue map = 6;
     Identifier identifier = 7;
     FileValue file = 8;
+    Immutable immutable = 9;
   }
 }
 
@@ -95,4 +96,8 @@ message FileValue {
 message Identifier {
   string type = 1;
   Value value = 2;
+}
+
+message Immutable {
+  Value value = 1;
 }

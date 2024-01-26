@@ -147,6 +147,8 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 		return nil, nil
 	case diff.File:
 		return nil, nil
+	case diff.Immutable:
+		return nil, nil
 	case diff.List:
 		var fields []api.Field
 		for _, d := range t.Diffs {
@@ -225,6 +227,8 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 			Attrs:      r.Attrs,
 			Exists:     r.Exists,
 		}, nil
+	case state.Immutable:
+		return resolve(env, r.Value)
 	case state.Unknown:
 		resolved, err := resolve(env, r.Object)
 		if err != nil {

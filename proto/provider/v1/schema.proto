@@ -24,6 +24,7 @@ message FieldSchema {
     FileSchema file_schema = 5;
     IdentifierSchema identifier_schema = 6;
     ListSchema list_schema = 7;
+    ImmutableSchema immutable_schema = 8;
   }
 }
 
@@ -52,3 +53,6 @@ message ListSchema {
   FieldSchema element = 1;
 }
 
+message ImmutableSchema {
+  FieldSchema value = 1;
+}

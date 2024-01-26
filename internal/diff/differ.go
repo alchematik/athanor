@@ -86,6 +86,15 @@ func (e Environment) Operation() Operation {
 	return e.DiffOperation
 }
 
+type Immutable struct {
+	From state.Type
+	To   state.Type
+}
+
+func (i Immutable) Operation() Operation {
+	return OperationNoop
+}
+
 type Unknown struct {
 }
 
@@ -211,6 +220,11 @@ func Diff(from, to state.Type) (Type, error) {
 		}
 
 		return fileDiff(f, t)
+	case state.Immutable:
+		return Immutable{
+			From: f.Value,
+			To:   to,
+		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported type for diff: %T", from)
 	}

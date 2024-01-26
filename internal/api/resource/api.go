@@ -233,6 +233,14 @@ func fromProto(val *providerpb.Value) (state.Type, error) {
 		return state.Bool{
 			Value: v.BoolValue,
 		}, nil
+	case *providerpb.Value_Immutable:
+		value, err := fromProto(v.Immutable.GetValue())
+		if err != nil {
+			return nil, err
+		}
+		return state.Immutable{
+			Value: value,
+		}, nil
 	case nil:
 		return state.Nil{}, nil
 	default:
