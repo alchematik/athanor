@@ -405,7 +405,7 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
+							// fmt.Printf("DIFF >>>>>>>>>> %v\n", string(data))
 
 							reconciler := reconcile.Reconciler{
 								ResourceAPI: api.API{

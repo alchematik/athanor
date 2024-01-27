@@ -241,6 +241,16 @@ func fromProto(val *providerpb.Value) (state.Type, error) {
 		return state.Immutable{
 			Value: value,
 		}, nil
+	case *providerpb.Value_Identifier:
+		value, err := fromProto(v.Identifier.GetValue())
+		if err != nil {
+			return nil, err
+		}
+
+		return state.Identifier{
+			ResourceType: v.Identifier.GetType(),
+			Value:        value,
+		}, nil
 	case nil:
 		return state.Nil{}, nil
 	default:

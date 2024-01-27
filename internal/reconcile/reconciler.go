@@ -181,6 +181,13 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 		return r, nil
 	case state.File:
 		return r, nil
+	case state.Identifier:
+		val, err := resolve(env, r.Value)
+		if err != nil {
+			return nil, err
+		}
+
+		return state.Identifier{ResourceType: r.ResourceType, Value: val, Alias: r.Alias}, nil
 	case state.Map:
 		m := state.Map{
 			Entries: map[string]state.Type{},
