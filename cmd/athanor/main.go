@@ -8,6 +8,7 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/ast"
+	diffview "github.com/alchematik/athanor/internal/cli/view/diff"
 	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
@@ -15,6 +16,7 @@ import (
 	"github.com/alchematik/athanor/internal/interpreter"
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/reconcile"
+	"github.com/alchematik/athanor/internal/spec"
 
 	"github.com/urfave/cli/v2"
 )
@@ -221,10 +223,11 @@ func main() {
 								Dir: c.TranslatorsDir,
 							}
 
-							client, err := translatorPlugManager.Client(c.Translator.Name, c.Translator.Version)
+							client, stop, err := translatorPlugManager.Client(c.Translator.Name, c.Translator.Version)
 							if err != nil {
 								return err
 							}
+							defer stop()
 
 							tempFile, err := os.CreateTemp("", "")
 							if err != nil {
@@ -251,10 +254,12 @@ func main() {
 							}
 
 							for _, clientSDK := range c.ClientSDK {
-								trans, err := translatorPlugManager.Client(clientSDK.Translator.Name, clientSDK.Translator.Version)
+								trans, stop, err := translatorPlugManager.Client(clientSDK.Translator.Name, clientSDK.Translator.Version)
 								if err != nil {
 									return err
 								}
+
+								defer stop()
 
 								_, err = trans.GenerateConsumerSDK(ctx.Context, &translatorpb.GenerateConsumerSDKRequest{
 									InputPath:  tempFile.Name(),
@@ -266,6 +271,21 @@ func main() {
 							}
 
 							return nil
+						},
+					},
+				},
+			},
+			{
+				Name: "diff",
+				Subcommands: []*cli.Command{
+					{
+						Name: "show",
+						Action: func(ctx *cli.Context) error {
+							_, err := diffview.NewShow(diffview.ShowParams{
+								Context: ctx.Context,
+								Path:    ctx.Args().First(),
+							}).Run()
+							return err
 						},
 					},
 				},
@@ -283,6 +303,7 @@ func main() {
 							}
 
 							type Config struct {
+								Name       string `json:"name"`
 								InputPath  string `json:"input_path"`
 								Translator struct {
 									Name    string `json:"name"`
@@ -301,10 +322,12 @@ func main() {
 								Dir: c.TranslatorsDir,
 							}
 
-							client, err := translatorPlugManager.Client(c.Translator.Name, c.Translator.Version)
+							client, stop, err := translatorPlugManager.Client(c.Translator.Name, c.Translator.Version)
 							if err != nil {
 								return err
 							}
+
+							defer stop()
 
 							tempFile, err := os.CreateTemp("", "")
 							if err != nil {
@@ -328,6 +351,8 @@ func main() {
 								return err
 							}
 
+							fmt.Printf("BLUEPRINT DATA >>>> %+v\n", string(blueprintData))
+
 							var blueprint consumerpb.Blueprint
 							if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
 								return err
@@ -346,18 +371,23 @@ func main() {
 							}
 
 							in := interpreter.Interpreter{}
-							build, err := in.Interpret(ctx.Context, bp)
-							if err != nil {
+							s := spec.Spec{
+								Components:    map[string]spec.Component{},
+								DependencyMap: map[string][]string{},
+							}
+							if err = in.Interpret(ctx.Context, s, ast.StmtBuild{
+								Blueprint: ast.ExprBlueprint{
+									Stmts: bp.Stmts,
+								},
+							}); err != nil {
 								return err
 							}
-
-							fmt.Printf("dep map >>> %+v\n", build.DependencyMap)
 
 							eval := evaluator.Evaluator{
 								ResourceAPI: &api.Unresolved{},
 							}
 
-							desiredEnv, err := eval.Evaluate(ctx.Context, build)
+							desiredEnv, err := eval.Evaluate(ctx.Context, s)
 							if err != nil {
 								return err
 							}
@@ -381,7 +411,7 @@ func main() {
 								// },
 							}
 
-							remoteEnv, err := remoteEval.Evaluate(ctx.Context, build)
+							remoteEnv, err := remoteEval.Evaluate(ctx.Context, s)
 							if err != nil {
 								return err
 							}

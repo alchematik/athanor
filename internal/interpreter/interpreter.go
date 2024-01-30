@@ -9,17 +9,6 @@ import (
 
 type Interpreter struct{}
 
-func (in Interpreter) Interpret(ctx context.Context, blueprint ast.Blueprint) (spec.Spec, error) {
-	s := spec.Spec{
-		DependencyMap: map[string][]string{},
-		Components:    map[string]spec.Component{},
-	}
-
-	for _, st := range blueprint.Stmts {
-		if err := in.Stmt(ctx, s, st); err != nil {
-			return spec.Spec{}, err
-		}
-	}
-
-	return s, nil
+func (in Interpreter) Interpret(ctx context.Context, s spec.Spec, build ast.StmtBuild) error {
+	return in.Stmt(ctx, s, build)
 }

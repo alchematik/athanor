@@ -8,7 +8,7 @@ import (
 
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 
-	// "github.com/hashicorp/go-hclog"
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 )
@@ -17,7 +17,7 @@ type Translator struct {
 	Dir string
 }
 
-func (t Translator) Client(name, version string) (translatorpb.TranslatorClient, error) {
+func (t Translator) Client(name, version string) (translatorpb.TranslatorClient, func(), error) {
 	pluginPath := filepath.Join(t.Dir, name, version, "translator")
 
 	client := plugin.NewClient(&plugin.ClientConfig{
@@ -31,25 +31,25 @@ func (t Translator) Client(name, version string) (translatorpb.TranslatorClient,
 		},
 		Cmd:              exec.Command("sh", "-c", pluginPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		// Logger:           hclog.NewNullLogger(),
+		Logger:           hclog.NewNullLogger(),
 	})
 
 	dispensor, err := client.Client()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	rawPlug, err := dispensor.Dispense("translator")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	plug, ok := rawPlug.(translatorpb.TranslatorClient)
 	if !ok {
-		return nil, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
+		return nil, nil, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
 	}
 
-	return plug, nil
+	return plug, client.Kill, nil
 }
 
 type TranslatorPlugin struct {

@@ -4,90 +4,87 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alchematik/athanor/internal/blueprint/expr"
-	"github.com/alchematik/athanor/internal/blueprint/stmt"
-	"github.com/alchematik/athanor/internal/build"
-	"github.com/alchematik/athanor/internal/build/component"
-	"github.com/alchematik/athanor/internal/build/value"
+	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/interpreter"
+	"github.com/alchematik/athanor/internal/spec"
 
 	"github.com/stretchr/testify/require"
 )
 
 func TestInterpreter_Stmt_Provider(t *testing.T) {
 	testCases := map[string]struct {
-		env         build.Spec
-		expectedEnv build.Spec
-		stmt        stmt.Type
+		env         spec.Spec
+		expectedEnv spec.Spec
+		stmt        spec.Value
 		isError     bool
 	}{
 		"new provider": {
-			env: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			env: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
-			stmt: stmt.Provider{
-				Expr: expr.Provider{
-					Identifier: expr.ProviderIdentifier{
+			stmt: spec.Provider{
+				Expr: ast.Provider{
+					Identifier: ast.ProviderIdentifier{
 						Alias:   "my-provider",
-						Name:    expr.String{Value: "gcp"},
-						Version: expr.String{Value: "v0.0.1"},
+						Name:    ast.String{Value: "gcp"},
+						Version: ast.String{Value: "v0.0.1"},
 					},
 				},
 			},
-			expectedEnv: build.Spec{
-				Providers: map[string]value.ValueProvider{
+			expectedEnv: spec.Spec{
+				Providers: map[string]spec.ValueProvider{
 					"my-provider": {
-						Identifier: value.ValueProviderIdentifier{
+						Identifier: spec.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
 						},
 					},
 				},
-				Resources:     map[string]value.ValueResource{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 		},
 		"value not provider": {
-			env: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			env: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
-			stmt: stmt.Provider{
-				Expr: expr.ProviderIdentifier{
+			stmt: spec.Provider{
+				Expr: ast.ProviderIdentifier{
 					Alias:   "my-provider",
-					Name:    expr.String{Value: "gcp"},
-					Version: expr.String{Value: "v0.0.1"},
+					Name:    ast.String{Value: "gcp"},
+					Version: ast.String{Value: "v0.0.1"},
 				},
 			},
-			expectedEnv: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			expectedEnv: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			isError: true,
 		},
 		"invalid Provider": {
-			env: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			env: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
-			stmt: stmt.Provider{
-				Expr: expr.Provider{
-					Identifier: expr.ProviderIdentifier{
+			stmt: spec.Provider{
+				Expr: ast.Provider{
+					Identifier: ast.ProviderIdentifier{
 						Alias:   "",
-						Name:    expr.String{Value: "gcp"},
-						Version: expr.String{Value: "v0.0.1"},
+						Name:    ast.String{Value: "gcp"},
+						Version: ast.String{Value: "v0.0.1"},
 					},
 				},
 			},
-			expectedEnv: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			expectedEnv: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			isError: true,
@@ -111,65 +108,65 @@ func TestInterpreter_Stmt_Provider(t *testing.T) {
 
 func TestInterpreter_Stmt_Resource(t *testing.T) {
 	testCases := map[string]struct {
-		env         build.Spec
-		expectedEnv build.Spec
-		stmt        stmt.Type
+		env         spec.Spec
+		expectedEnv spec.Spec
+		stmt        spec.Value
 		isError     bool
 	}{
 		"new resource": {
-			env: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			env: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 				Components:    map[string]component.Component{},
 			},
-			stmt: stmt.Resource{
-				Expr: expr.Resource{
-					Exists: expr.Bool{Value: true},
-					Identifier: expr.ResourceIdentifier{
+			stmt: spec.Resource{
+				Expr: ast.Resource{
+					Exists: ast.Bool{Value: true},
+					Identifier: ast.ResourceIdentifier{
 						Alias:        "my-resource",
 						ResourceType: "bucket",
-						Value:        expr.String{Value: "foo"},
+						Value:        ast.String{Value: "foo"},
 					},
-					Provider: expr.Provider{
-						Identifier: expr.ProviderIdentifier{
+					Provider: ast.Provider{
+						Identifier: ast.ProviderIdentifier{
 							Alias:   "my-provider",
-							Name:    expr.String{Value: "gcp"},
-							Version: expr.String{Value: "v0.0.1"},
+							Name:    ast.String{Value: "gcp"},
+							Version: ast.String{Value: "v0.0.1"},
 						},
 					},
-					Config: expr.String{Value: "bar"},
+					Config: ast.String{Value: "bar"},
 				},
 			},
-			expectedEnv: build.Spec{
-				Providers: map[string]value.ValueProvider{
+			expectedEnv: spec.Spec{
+				Providers: map[string]spec.ValueProvider{
 					"my-provider": {
-						Identifier: value.ValueProviderIdentifier{
+						Identifier: spec.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
 						},
 					},
 				},
-				Resources: map[string]value.ValueResource{
+				Resources: map[string]spec.ValueResource{
 					"my-resource": {
-						Exists: value.ValueBool{Literal: true},
-						Provider: value.ValueProvider{
-							Identifier: value.ValueProviderIdentifier{
+						Exists: spec.ValueBool{Literal: true},
+						Provider: spec.ValueProvider{
+							Identifier: spec.ValueProviderIdentifier{
 								Alias:   "my-provider",
 								Name:    "gcp",
 								Version: "v0.0.1",
 							},
 						},
-						Identifier: value.ValueResourceIdentifier{
+						Identifier: spec.ValueResourceIdentifier{
 							Alias:        "my-resource",
 							ResourceType: "bucket",
-							Literal:      value.ValueString{Literal: "foo"},
+							Literal:      spec.ValueString{Literal: "foo"},
 						},
-						Config: value.ValueString{Literal: "bar"},
-						Attrs: value.ValueUnresolved{
+						Config: spec.ValueString{Literal: "bar"},
+						Attrs: spec.ValueUnresolved{
 							Name: "attrs",
-							Object: value.ValueResourceRef{
+							Object: spec.ValueResourceRef{
 								Alias: "my-resource",
 							},
 						},
@@ -180,24 +177,24 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 				},
 				Components: map[string]component.Component{
 					"my-resource": component.ComponentResource{
-						Value: value.ValueResource{
-							Exists: value.ValueBool{Literal: true},
-							Provider: value.ValueProvider{
-								Identifier: value.ValueProviderIdentifier{
+						Value: spec.ValueResource{
+							Exists: spec.ValueBool{Literal: true},
+							Provider: spec.ValueProvider{
+								Identifier: spec.ValueProviderIdentifier{
 									Alias:   "my-provider",
 									Name:    "gcp",
 									Version: "v0.0.1",
 								},
 							},
-							Identifier: value.ValueResourceIdentifier{
+							Identifier: spec.ValueResourceIdentifier{
 								Alias:        "my-resource",
 								ResourceType: "bucket",
-								Literal:      value.ValueString{Literal: "foo"},
+								Literal:      spec.ValueString{Literal: "foo"},
 							},
-							Config: value.ValueString{Literal: "bar"},
-							Attrs: value.ValueUnresolved{
+							Config: spec.ValueString{Literal: "bar"},
+							Attrs: spec.ValueUnresolved{
 								Name: "attrs",
-								Object: value.ValueResourceRef{
+								Object: spec.ValueResourceRef{
 									Alias: "my-resource",
 								},
 							},
@@ -207,53 +204,53 @@ func TestInterpreter_Stmt_Resource(t *testing.T) {
 			},
 		},
 		"value not Resource": {
-			env: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			env: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
-			stmt: stmt.Resource{
-				Expr: expr.Provider{
-					Identifier: expr.ProviderIdentifier{
+			stmt: spec.Resource{
+				Expr: ast.Provider{
+					Identifier: ast.ProviderIdentifier{
 						Alias:   "my-provider",
-						Name:    expr.String{Value: "gcp"},
-						Version: expr.String{Value: "v0.0.1"},
+						Name:    ast.String{Value: "gcp"},
+						Version: ast.String{Value: "v0.0.1"},
 					},
 				},
 			},
-			expectedEnv: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			expectedEnv: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			isError: true,
 		},
 		"invalid Resource": {
-			env: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			env: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
-			stmt: stmt.Resource{
-				Expr: expr.Resource{
-					Identifier: expr.ResourceIdentifier{
+			stmt: spec.Resource{
+				Expr: ast.Resource{
+					Identifier: ast.ResourceIdentifier{
 						Alias:        "", // Invalid because alias shouldn't be an empty string.
 						ResourceType: "bucket",
-						Value:        expr.String{Value: "foo"},
+						Value:        ast.String{Value: "foo"},
 					},
-					Provider: expr.Provider{
-						Identifier: expr.ProviderIdentifier{
+					Provider: ast.Provider{
+						Identifier: ast.ProviderIdentifier{
 							Alias:   "my-provider",
-							Name:    expr.String{Value: "gcp"},
-							Version: expr.String{Value: "v0.0.1"},
+							Name:    ast.String{Value: "gcp"},
+							Version: ast.String{Value: "v0.0.1"},
 						},
 					},
-					Config: expr.String{Value: "bar"},
+					Config: ast.String{Value: "bar"},
 				},
 			},
-			expectedEnv: build.Spec{
-				Providers:     map[string]value.ValueProvider{},
-				Resources:     map[string]value.ValueResource{},
+			expectedEnv: spec.Spec{
+				Providers:     map[string]spec.ValueProvider{},
+				Resources:     map[string]spec.ValueResource{},
 				DependencyMap: map[string][]string{},
 			},
 			isError: true,

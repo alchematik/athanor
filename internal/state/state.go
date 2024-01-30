@@ -9,6 +9,7 @@ type Environment struct {
 
 	States        map[string]Type
 	DependencyMap map[string][]string
+	Done          bool
 }
 
 type Provider struct {

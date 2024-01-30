@@ -11,7 +11,8 @@ import (
 func (e Evaluator) Component(ctx context.Context, env state.Environment, alias string, comp spec.Component) error {
 	switch c := comp.(type) {
 	case spec.ComponentResource:
-		return e.resource(ctx, env, alias, c)
+		_, err := e.resource(ctx, env, alias, c)
+		return err
 	case spec.ComponentBuild:
 		return e.build(ctx, env, alias, c)
 	default:
@@ -19,19 +20,19 @@ func (e Evaluator) Component(ctx context.Context, env state.Environment, alias s
 	}
 }
 
-func (e Evaluator) resource(ctx context.Context, env state.Environment, alias string, comp spec.ComponentResource) error {
+func (e Evaluator) resource(ctx context.Context, env state.Environment, alias string, comp spec.ComponentResource) (state.Resource, error) {
 	val, err := e.Value(ctx, env, comp.Value)
 	if err != nil {
-		return err
+		return state.Resource{}, err
 	}
 
 	r, ok := val.(state.Resource)
 	if !ok {
-		return fmt.Errorf("expected Resource type, got %T", val)
+		return state.Resource{}, fmt.Errorf("expected Resource type, got %T", val)
 	}
 
-	env.States[alias] = r
-	return nil
+	// env.States[alias] = r
+	return r, nil
 }
 
 func (e Evaluator) build(ctx context.Context, env state.Environment, alias string, comp spec.ComponentBuild) error {

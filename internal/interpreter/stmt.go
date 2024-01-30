@@ -13,7 +13,6 @@ func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error 
 	switch s := st.(type) {
 	case ast.StmtResource:
 		return in.resourceStmt(ctx, b, s)
-	// case ast.StmtBlueprint:
 	case ast.StmtBuild:
 		return in.buildStmt(ctx, b, s)
 	default:

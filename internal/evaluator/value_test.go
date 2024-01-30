@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/alchematik/athanor/build/value"
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/evaluator"
+	"github.com/alchematik/athanor/internal/spec"
 	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/stretchr/testify/require"
@@ -15,13 +15,13 @@ import (
 func TestEvaluator_Value_Provider(t *testing.T) {
 	testCases := map[string]struct {
 		env     state.Environment
-		input   value.Value
+		input   spec.Value
 		output  state.Type
 		isError bool
 	}{
 		"valid provider": {
-			input: value.ValueProvider{
-				Identifier: value.ValueProviderIdentifier{
+			input: spec.ValueProvider{
+				Identifier: spec.ValueProviderIdentifier{
 					Name:    "gcp",
 					Version: "v0.0.1",
 				},
@@ -32,8 +32,8 @@ func TestEvaluator_Value_Provider(t *testing.T) {
 			},
 		},
 		"missing name": {
-			input: value.ValueProvider{
-				Identifier: value.ValueProviderIdentifier{
+			input: spec.ValueProvider{
+				Identifier: spec.ValueProviderIdentifier{
 					Name:    "",
 					Version: "v0.0.1",
 				},
@@ -42,8 +42,8 @@ func TestEvaluator_Value_Provider(t *testing.T) {
 			isError: true,
 		},
 		"missing version": {
-			input: value.ValueProvider{
-				Identifier: value.ValueProviderIdentifier{
+			input: spec.ValueProvider{
+				Identifier: spec.ValueProviderIdentifier{
 					Name:    "gcp",
 					Version: "",
 				},
@@ -70,7 +70,7 @@ func TestEvaluator_Value_Provider(t *testing.T) {
 func TestEvaluator_Value_String(t *testing.T) {
 	eval := evaluator.Evaluator{}
 	env := state.Environment{}
-	out, err := eval.Value(context.Background(), env, value.ValueString{Literal: "foo"})
+	out, err := eval.Value(context.Background(), env, spec.ValueString{Literal: "foo"})
 	require.NoError(t, err)
 	require.Equal(t, state.String{Value: "foo"}, out)
 }
@@ -78,14 +78,14 @@ func TestEvaluator_Value_String(t *testing.T) {
 func TestEvaluator_Value_Map(t *testing.T) {
 	testCases := map[string]struct {
 		env     state.Environment
-		input   value.Value
+		input   spec.Value
 		output  state.Type
 		isError bool
 	}{
 		"single entry": {
-			input: value.ValueMap{
-				Entries: map[string]value.Value{
-					"foo": value.ValueString{Literal: "bar"},
+			input: spec.ValueMap{
+				Entries: map[string]spec.Value{
+					"foo": spec.ValueString{Literal: "bar"},
 				},
 			},
 			output: state.Map{
@@ -95,10 +95,10 @@ func TestEvaluator_Value_Map(t *testing.T) {
 			},
 		},
 		"several entries": {
-			input: value.ValueMap{
-				Entries: map[string]value.Value{
-					"foo": value.ValueString{Literal: "bar"},
-					"baz": value.ValueString{Literal: "bam"},
+			input: spec.ValueMap{
+				Entries: map[string]spec.Value{
+					"foo": spec.ValueString{Literal: "bar"},
+					"baz": spec.ValueString{Literal: "bam"},
 				},
 			},
 			output: state.Map{
@@ -127,15 +127,15 @@ func TestEvaluator_Value_Map(t *testing.T) {
 func TestEvaluator_Value_ResourceIdentifier(t *testing.T) {
 	testCases := map[string]struct {
 		env     state.Environment
-		input   value.Value
+		input   spec.Value
 		output  state.Type
 		isError bool
 	}{
 		"valid": {
-			input: value.ValueResourceIdentifier{
+			input: spec.ValueResourceIdentifier{
 				Alias:        "my-resource",
 				ResourceType: "bucket",
-				Literal:      value.ValueString{Literal: "bucket-id"},
+				Literal:      spec.ValueString{Literal: "bucket-id"},
 			},
 			output: state.Identifier{
 				Alias:        "my-resource",
@@ -144,25 +144,25 @@ func TestEvaluator_Value_ResourceIdentifier(t *testing.T) {
 			},
 		},
 		"missing alias": {
-			input: value.ValueResourceIdentifier{
+			input: spec.ValueResourceIdentifier{
 				Alias:        "",
 				ResourceType: "bucket",
-				Literal:      value.ValueString{Literal: "bucket-id"},
+				Literal:      spec.ValueString{Literal: "bucket-id"},
 			},
 			output:  state.Identifier{},
 			isError: true,
 		},
 		"missing resource type": {
-			input: value.ValueResourceIdentifier{
+			input: spec.ValueResourceIdentifier{
 				Alias:        "my-resource",
 				ResourceType: "",
-				Literal:      value.ValueString{Literal: "bucket-id"},
+				Literal:      spec.ValueString{Literal: "bucket-id"},
 			},
 			output:  state.Identifier{},
 			isError: true,
 		},
 		"missing value": {
-			input: value.ValueResourceIdentifier{
+			input: spec.ValueResourceIdentifier{
 				Alias:        "my-resource",
 				ResourceType: "bucket",
 				Literal:      nil,
@@ -189,7 +189,7 @@ func TestEvaluator_Value_ResourceIdentifier(t *testing.T) {
 func TestEvaluator_Value_ResourceRef(t *testing.T) {
 	testCases := map[string]struct {
 		env     state.Environment
-		input   value.Value
+		input   spec.Value
 		output  state.Type
 		isError bool
 	}{
@@ -205,7 +205,7 @@ func TestEvaluator_Value_ResourceRef(t *testing.T) {
 					},
 				},
 			},
-			input: value.ValueResourceRef{
+			input: spec.ValueResourceRef{
 				Alias: "my-resource",
 			},
 			output: state.Resource{
@@ -220,7 +220,7 @@ func TestEvaluator_Value_ResourceRef(t *testing.T) {
 			env: state.Environment{
 				Resources: map[string]state.Resource{},
 			},
-			input: value.ValueResourceRef{
+			input: spec.ValueResourceRef{
 				Alias: "my-resource",
 			},
 			output:  state.Resource{},
@@ -245,48 +245,48 @@ func TestEvaluator_Value_ResourceRef(t *testing.T) {
 func TestEvaluator_Value_Unresolved(t *testing.T) {
 	testCases := map[string]struct {
 		env     state.Environment
-		input   value.Value
+		input   spec.Value
 		output  state.Type
 		isError bool
 	}{
 		"map entry": {
-			input: value.ValueUnresolved{
+			input: spec.ValueUnresolved{
 				Name: "foo",
-				Object: value.ValueMap{
-					Entries: map[string]value.Value{
-						"foo": value.ValueString{Literal: "bar"},
+				Object: spec.ValueMap{
+					Entries: map[string]spec.Value{
+						"foo": spec.ValueString{Literal: "bar"},
 					},
 				},
 			},
 			output: state.String{Value: "bar"},
 		},
 		"map entry missing": {
-			input: value.ValueUnresolved{
+			input: spec.ValueUnresolved{
 				Name: "foo",
-				Object: value.ValueMap{
-					Entries: map[string]value.Value{},
+				Object: spec.ValueMap{
+					Entries: map[string]spec.Value{},
 				},
 			},
 			isError: true,
 		},
 		"resource identifier": {
-			input: value.ValueUnresolved{
+			input: spec.ValueUnresolved{
 				Name: "identifier",
-				Object: value.ValueResource{
-					Provider: value.ValueProvider{
-						Identifier: value.ValueProviderIdentifier{
+				Object: spec.ValueResource{
+					Provider: spec.ValueProvider{
+						Identifier: spec.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
 						},
 					},
-					Identifier: value.ValueResourceIdentifier{
+					Identifier: spec.ValueResourceIdentifier{
 						Alias:        "my-resource",
 						ResourceType: "bucket",
-						Literal:      value.ValueString{Literal: "foo"},
+						Literal:      spec.ValueString{Literal: "foo"},
 					},
-					Config: value.ValueString{Literal: "bar"},
-					Exists: value.ValueBool{Literal: true},
+					Config: spec.ValueString{Literal: "bar"},
+					Exists: spec.ValueBool{Literal: true},
 				},
 			},
 			output: state.Identifier{
@@ -296,45 +296,45 @@ func TestEvaluator_Value_Unresolved(t *testing.T) {
 			},
 		},
 		"resource config": {
-			input: value.ValueUnresolved{
+			input: spec.ValueUnresolved{
 				Name: "config",
-				Object: value.ValueResource{
-					Exists: value.ValueBool{Literal: true},
-					Provider: value.ValueProvider{
-						Identifier: value.ValueProviderIdentifier{
+				Object: spec.ValueResource{
+					Exists: spec.ValueBool{Literal: true},
+					Provider: spec.ValueProvider{
+						Identifier: spec.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
 						},
 					},
-					Identifier: value.ValueResourceIdentifier{
+					Identifier: spec.ValueResourceIdentifier{
 						Alias:        "my-resource",
 						ResourceType: "bucket",
-						Literal:      value.ValueString{Literal: "foo"},
+						Literal:      spec.ValueString{Literal: "foo"},
 					},
-					Config: value.ValueString{Literal: "bar"},
+					Config: spec.ValueString{Literal: "bar"},
 				},
 			},
 			output: state.String{Value: "bar"},
 		},
 		"resource attrs": {
-			input: value.ValueUnresolved{
+			input: spec.ValueUnresolved{
 				Name: "attrs",
-				Object: value.ValueResource{
-					Exists: value.ValueBool{Literal: true},
-					Provider: value.ValueProvider{
-						Identifier: value.ValueProviderIdentifier{
+				Object: spec.ValueResource{
+					Exists: spec.ValueBool{Literal: true},
+					Provider: spec.ValueProvider{
+						Identifier: spec.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
 						},
 					},
-					Identifier: value.ValueResourceIdentifier{
+					Identifier: spec.ValueResourceIdentifier{
 						Alias:        "my-resource",
 						ResourceType: "bucket",
-						Literal:      value.ValueString{Literal: "foo"},
+						Literal:      spec.ValueString{Literal: "foo"},
 					},
-					Config: value.ValueString{Literal: "bar"},
+					Config: spec.ValueString{Literal: "bar"},
 				},
 			},
 			output: state.Unknown{
@@ -345,22 +345,22 @@ func TestEvaluator_Value_Unresolved(t *testing.T) {
 			},
 		},
 		"resource not a real field": {
-			input: value.ValueUnresolved{
+			input: spec.ValueUnresolved{
 				Name: "fake",
-				Object: value.ValueResource{
-					Provider: value.ValueProvider{
-						Identifier: value.ValueProviderIdentifier{
+				Object: spec.ValueResource{
+					Provider: spec.ValueProvider{
+						Identifier: spec.ValueProviderIdentifier{
 							Alias:   "my-provider",
 							Name:    "gcp",
 							Version: "v0.0.1",
 						},
 					},
-					Identifier: value.ValueResourceIdentifier{
+					Identifier: spec.ValueResourceIdentifier{
 						Alias:        "my-resource",
 						ResourceType: "bucket",
-						Literal:      value.ValueString{Literal: "foo"},
+						Literal:      spec.ValueString{Literal: "foo"},
 					},
-					Config: value.ValueString{Literal: "bar"},
+					Config: spec.ValueString{Literal: "bar"},
 				},
 			},
 			isError: true,
@@ -387,29 +387,29 @@ func TestEvaluator_Value_Unresolved(t *testing.T) {
 func TestEvaluator_Value_Resource(t *testing.T) {
 	testCases := map[string]struct {
 		env     state.Environment
-		input   value.Value
+		input   spec.Value
 		output  state.Type
 		isError bool
 	}{
 		"valid resource": {
-			input: value.ValueResource{
-				Exists: value.ValueBool{Literal: true},
-				Provider: value.ValueProvider{
-					Identifier: value.ValueProviderIdentifier{
+			input: spec.ValueResource{
+				Exists: spec.ValueBool{Literal: true},
+				Provider: spec.ValueProvider{
+					Identifier: spec.ValueProviderIdentifier{
 						Alias:   "my-provider",
 						Name:    "gcp",
 						Version: "v0.0.1",
 					},
 				},
-				Identifier: value.ValueResourceIdentifier{
+				Identifier: spec.ValueResourceIdentifier{
 					Alias:        "my-resource",
 					ResourceType: "bucket",
-					Literal:      value.ValueString{Literal: "foo"},
+					Literal:      spec.ValueString{Literal: "foo"},
 				},
-				Config: value.ValueString{Literal: "bar"},
-				Attrs: value.ValueUnresolved{
+				Config: spec.ValueString{Literal: "bar"},
+				Attrs: spec.ValueUnresolved{
 					Name: "attrs",
-					Object: value.ValueResourceRef{
+					Object: spec.ValueResourceRef{
 						Alias: "my-resource",
 					},
 				},
