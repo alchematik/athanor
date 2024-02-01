@@ -30,24 +30,6 @@ type Selector struct {
 	Bookend bool
 }
 
-func Find(env state.Environment, selector Selector) state.Type {
-	if selector.Parent == nil {
-		return env.States[selector.Name]
-	}
-
-	parent := Find(env, *selector.Parent)
-	if parent == nil {
-		return nil
-	}
-
-	parentEnv, ok := parent.(state.Environment)
-	if !ok {
-		return nil
-	}
-
-	return parentEnv.States[selector.Name]
-}
-
 func NewEvaluator(api ResourceAPI, s spec.Spec, env state.Environment) *Evaluator {
 	e := Evaluator{
 		Env:         env,
