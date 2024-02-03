@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/spec"
 	"github.com/alchematik/athanor/internal/state"
 )
@@ -14,20 +15,14 @@ type Evaluator struct {
 	Spec        spec.Spec
 	Env         state.Environment
 
-	queue            []Selector
-	parentToChildren map[Selector][]Selector
-	indegrees        map[Selector]int
+	queue            []selector.Selector
+	parentToChildren map[selector.Selector][]selector.Selector
+	indegrees        map[selector.Selector]int
 	queueLock        *sync.Mutex
 }
 
 type ResourceAPI interface {
 	GetResource(context.Context, state.Resource) (state.Resource, error)
-}
-
-type Selector struct {
-	Name    string
-	Parent  *Selector
-	Bookend bool
 }
 
 func NewEvaluator(api ResourceAPI, s spec.Spec, env state.Environment) *Evaluator {
@@ -36,14 +31,14 @@ func NewEvaluator(api ResourceAPI, s spec.Spec, env state.Environment) *Evaluato
 		Spec:        s,
 		ResourceAPI: api,
 
-		parentToChildren: map[Selector][]Selector{},
-		indegrees:        map[Selector]int{},
+		parentToChildren: map[selector.Selector][]selector.Selector{},
+		indegrees:        map[selector.Selector]int{},
 		queueLock:        &sync.Mutex{},
-		queue:            []Selector{},
+		queue:            []selector.Selector{},
 	}
 
 	for alias := range s.Components {
-		e.queue = append(e.queue, Selector{
+		e.queue = append(e.queue, selector.Selector{
 			Name: alias,
 		})
 	}
@@ -51,45 +46,45 @@ func NewEvaluator(api ResourceAPI, s spec.Spec, env state.Environment) *Evaluato
 	return &e
 }
 
-func (e *Evaluator) Next() []Selector {
+func (e *Evaluator) Next() []selector.Selector {
 	e.queueLock.Lock()
 	defer e.queueLock.Unlock()
 
 	out := e.queue
-	e.queue = []Selector{}
+	e.queue = []selector.Selector{}
 	return out
 }
 
-func (e *Evaluator) Eval(ctx context.Context, selector Selector) error {
-	s, ok := findSpec(e.Spec, selector)
+func (e *Evaluator) Eval(ctx context.Context, sel selector.Selector) error {
+	s, ok := selector.SelectSpec(e.Spec, sel)
 	if !ok {
-		return fmt.Errorf("cannot find spec with selector: %v", selector)
+		return fmt.Errorf("cannot find spec with selector: %v", sel)
 	}
 
-	env, ok := findEnvironment(e.Env, selector)
+	env, ok := selector.SelectEnvironment(e.Env, sel)
 	if !ok {
-		return fmt.Errorf("cannot find environment for selector: %v", selector)
+		return fmt.Errorf("cannot find environment for selector: %v", sel)
 	}
 
-	c, ok := s.Components[selector.Name]
+	c, ok := s.Components[sel.Name]
 	if !ok {
-		return fmt.Errorf("cannot find component for selector: %v", selector)
+		return fmt.Errorf("cannot find component for selector: %v", sel)
 	}
 
 	switch c := c.(type) {
 	case spec.ComponentResource:
-		r, err := e.resource(ctx, env, selector.Name, c)
+		r, err := e.resource(ctx, env, sel.Name, c)
 		if err != nil {
 			return err
 		}
 
 		e.queueLock.Lock()
 
-		env.States[selector.Name] = r
-		bookend := Selector{
-			Name:    selector.Parent.Name,
-			Parent:  selector.Parent.Parent,
-			Bookend: true,
+		env.States[sel.Name] = r
+
+		bookend := selector.Selector{
+			Name:   sel.Parent.Name,
+			Parent: sel.Parent.Parent,
 		}
 		e.indegrees[bookend]--
 		if e.indegrees[bookend] == 0 {
@@ -97,7 +92,7 @@ func (e *Evaluator) Eval(ctx context.Context, selector Selector) error {
 			delete(e.indegrees, bookend)
 		}
 
-		children := e.parentToChildren[selector]
+		children := e.parentToChildren[sel]
 		for _, child := range children {
 			e.indegrees[child]--
 			indegrees := e.indegrees[child]
@@ -109,43 +104,37 @@ func (e *Evaluator) Eval(ctx context.Context, selector Selector) error {
 
 		e.queueLock.Unlock()
 	case spec.ComponentBuild:
-		if selector.Bookend {
-			e.queueLock.Lock()
-			st, ok := env.States[selector.Name]
+		e.queueLock.Lock()
+		defer e.queueLock.Unlock()
+		st, ok := env.States[sel.Name]
+		if ok {
+			subEnv, ok := st.(state.Environment)
 			if !ok {
-				return fmt.Errorf("cannot find sub state")
+				return fmt.Errorf("expected Environment, got %T", st)
 			}
 
-			subEnv, ok := st.(state.Environment)
 			subEnv.Done = true
-			env.States[selector.Name] = subEnv
-			e.queueLock.Unlock()
+			env.States[sel.Name] = subEnv
 			return nil
 		}
 
-		e.queueLock.Lock()
-		env.States[selector.Name] = state.Environment{
+		env.States[sel.Name] = state.Environment{
 			States: map[string]state.Type{},
 		}
 
-		bookend := Selector{
-			Name:    selector.Name,
-			Parent:  selector.Parent,
-			Bookend: true,
-		}
-		e.indegrees[bookend] = len(c.Spec.DependencyMap)
+		e.indegrees[sel] = len(c.Spec.DependencyMap)
 
 		for child, parents := range c.Spec.DependencyMap {
-			childSelector := Selector{
+			childSelector := selector.Selector{
 				Name:   child,
-				Parent: &selector,
+				Parent: &sel,
 			}
 
 			e.indegrees[childSelector] = len(parents)
 			for _, parent := range parents {
-				parentSelector := Selector{
+				parentSelector := selector.Selector{
 					Name:   parent,
-					Parent: &selector,
+					Parent: &sel,
 				}
 				e.parentToChildren[parentSelector] = append(e.parentToChildren[parentSelector], childSelector)
 			}
@@ -158,8 +147,6 @@ func (e *Evaluator) Eval(ctx context.Context, selector Selector) error {
 			}
 		}
 
-		e.queueLock.Unlock()
-
 		// TODO: detect cycle.
 
 	default:
@@ -167,49 +154,6 @@ func (e *Evaluator) Eval(ctx context.Context, selector Selector) error {
 	}
 
 	return nil
-}
-
-func findEnvironment(env state.Environment, selector Selector) (state.Environment, bool) {
-	if selector.Parent == nil {
-		return env, true
-	}
-
-	parent, ok := findEnvironment(env, *selector.Parent)
-	if !ok {
-		return state.Environment{}, false
-	}
-
-	st, ok := parent.States[selector.Parent.Name]
-	if !ok {
-		return state.Environment{}, false
-	}
-
-	envSt, ok := st.(state.Environment)
-
-	return envSt, true
-}
-
-func findSpec(s spec.Spec, selector Selector) (spec.Spec, bool) {
-	if selector.Parent == nil {
-		return s, true
-	}
-
-	parent, ok := findSpec(s, *selector.Parent)
-	if !ok {
-		return spec.Spec{}, false
-	}
-
-	comp, ok := parent.Components[selector.Parent.Name]
-	if !ok {
-		return spec.Spec{}, false
-	}
-
-	build, ok := comp.(spec.ComponentBuild)
-	if !ok {
-		return spec.Spec{}, false
-	}
-
-	return build.Spec, true
 }
 
 func (e Evaluator) Evaluate(ctx context.Context, b spec.Spec) (state.Environment, error) {

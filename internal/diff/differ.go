@@ -2,9 +2,142 @@ package diff
 
 import (
 	"fmt"
+	"sync"
 
+	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/state"
 )
+
+type Differ struct {
+	Target state.Environment
+	Actual state.Environment
+	Result Environment
+
+	Lock *sync.Mutex
+}
+
+func (d *Differ) Diff(s selector.Selector) error {
+	targetEnv, ok := selector.SelectEnvironment(d.Target, s)
+	if !ok {
+		targetEnv = state.Environment{
+			States: map[string]state.Type{},
+		}
+	}
+
+	actualEnv, ok := selector.SelectEnvironment(d.Actual, s)
+	if !ok {
+		actualEnv = state.Environment{
+			States: map[string]state.Type{},
+		}
+	}
+
+	targetVal := targetEnv.States[s.Name]
+	actualVal := actualEnv.States[s.Name]
+
+	e, ok := findDiffEnvironment(d.Result, s)
+	if !ok {
+		return fmt.Errorf("cannot find environment with selector: %v", s)
+	}
+
+	var result Type
+	var err error
+
+	switch actual := actualVal.(type) {
+	case state.Environment:
+		current, ok := e.Diffs[s.Name].(Environment)
+		if !ok {
+			d.Lock.Lock()
+			e.Diffs[s.Name] = Environment{
+				Diffs: map[string]Type{},
+			}
+			d.Lock.Unlock()
+			return nil
+		}
+
+		ops := map[Operation]int{}
+		for _, v := range current.Diffs {
+			ops[v.Operation()]++
+		}
+
+		var op Operation
+		switch {
+		case ops[OperationUpdate] > 0:
+			op = OperationUpdate
+		case ops[OperationUnknown] > 0:
+			op = OperationUnknown
+		case len(current.Diffs) == ops[OperationCreate]:
+			op = OperationCreate
+		case len(current.Diffs) == ops[OperationDelete]:
+			op = OperationDelete
+		case len(current.Diffs) == ops[OperationNoop]:
+			op = OperationNoop
+		default:
+			op = OperationUpdate
+		}
+
+		current.DiffOperation = op
+		d.Lock.Lock()
+		e.Diffs[s.Name] = current
+		d.Lock.Unlock()
+		return nil
+	case state.Resource:
+		if targetVal == nil {
+			result, err = resourceDiff(actual, state.Resource{})
+		} else {
+			target, ok := targetVal.(state.Resource)
+			if !ok {
+				return fmt.Errorf("invalid diff: trying to compare Resource to %T", targetVal)
+			}
+
+			result, err = resourceDiff(actual, target)
+		}
+		if err != nil {
+			return err
+		}
+
+		d.Lock.Lock()
+		e.Diffs[s.Name] = result
+		d.Lock.Unlock()
+		return nil
+	case nil:
+		switch target := targetVal.(type) {
+		case state.Resource:
+			result, err := resourceDiff(state.Resource{}, target)
+			if err != nil {
+				return err
+			}
+
+			d.Lock.Lock()
+			e.Diffs[s.Name] = result
+			d.Lock.Unlock()
+			return nil
+		default:
+			return fmt.Errorf("unhandled target type for diff: %T", targetVal)
+		}
+	default:
+		return fmt.Errorf("unhandled type for diff: %T", actualVal)
+	}
+}
+
+func findDiffEnvironment(env Environment, selector selector.Selector) (Environment, bool) {
+	if selector.Parent == nil {
+		return env, true
+	}
+
+	parent, ok := findDiffEnvironment(env, *selector.Parent)
+	if !ok {
+		return Environment{}, false
+	}
+
+	d, ok := parent.Diffs[selector.Parent.Name]
+	if !ok {
+		return Environment{}, false
+	}
+
+	sub, ok := d.(Environment)
+
+	return sub, true
+}
 
 type Type interface {
 	Operation() Operation

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sync"
 
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	"github.com/alchematik/athanor/internal/state"
@@ -19,16 +20,22 @@ type Provider struct {
 	Logger hclog.Logger
 
 	clients map[string]backendpb.ProviderClient
+	lock    *sync.Mutex
+}
+
+func NewProvider() *Provider {
+	return &Provider{
+		clients: map[string]backendpb.ProviderClient{},
+		lock:    &sync.Mutex{},
+	}
 }
 
 func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, error) {
 	pluginPath := filepath.Join(p.Dir, provider.Name, provider.Version, "provider")
 
-	if p.clients == nil {
-		p.clients = map[string]backendpb.ProviderClient{}
-	}
-
+	p.lock.Lock()
 	c, ok := p.clients[pluginPath]
+	p.lock.Unlock()
 	if ok {
 		return c, nil
 	}
@@ -62,7 +69,9 @@ func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, er
 		return nil, fmt.Errorf("expected BackendClient, got %T", rawPlug)
 	}
 
+	p.lock.Lock()
 	p.clients[pluginPath] = plug
+	p.lock.Unlock()
 
 	return plug, nil
 }
