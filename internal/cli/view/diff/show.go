@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 	"sync"
-	// "time"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/ast"
@@ -37,8 +36,6 @@ const (
 )
 
 var (
-	resourceHeaderStyle = lipgloss.NewStyle().Bold(true)
-
 	ColorMain = ColorCyan500
 
 	ColorCyan400 = lipgloss.Color("#7df2fe")
@@ -72,7 +69,16 @@ var (
 )
 
 type Show struct {
-	Model *ShowModel
+	Context         context.Context
+	InputPath       string
+	State           string
+	Spec            spec.Spec
+	TargetEvaluator *evaluator.Evaluator
+	ActualEvaluator *evaluator.Evaluator
+	Diff            diff.Differ
+	Config          Config
+	Spinner         spinner.Model
+	Error           error
 }
 
 type Config struct {
@@ -91,65 +97,42 @@ type ShowParams struct {
 	Path    string
 }
 
-type ShowModel struct {
-	Context         context.Context
-	InputPath       string
-	BlueprintName   string
-	State           string
-	Spec            spec.Spec
-	Error           error
-	TargetEvaluator *evaluator.Evaluator
-	ActualEvaluator *evaluator.Evaluator
-	Diff            diff.Differ
-	Config          Config
-	Spinner         spinner.Model
-}
-
 func NewShow(params ShowParams) *tea.Program {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(ColorCyan500)
 
 	return tea.NewProgram(&Show{
-		Model: &ShowModel{
-			Spinner:   s,
-			Context:   params.Context,
-			State:     showStateInitializing,
-			InputPath: params.Path,
-			Spec: spec.Spec{
-				Components:    map[string]spec.Component{},
-				DependencyMap: map[string][]string{},
-			},
+		Spinner:   s,
+		Context:   params.Context,
+		State:     showStateInitializing,
+		InputPath: params.Path,
+		Spec: spec.Spec{
+			Components:    map[string]spec.Component{},
+			DependencyMap: map[string][]string{},
 		},
 	})
 }
 
 func (v *Show) Init() tea.Cmd {
-	return v.Model.Spinner.Tick
+	return tea.Batch(v.Spinner.Tick, loadConfig(v.InputPath))
 }
 
 func (v *Show) View() string {
-	switch v.Model.State {
+	switch v.State {
 	case showStateInitializing:
 		return "initializing..."
 	case showStateInterpreting:
 		return "interpreting..."
 	case showStateEvaluating:
-		rows := v.rows(0, v.Model.Spec, v.Model.Diff.Result)
-		str := ""
-		for _, r := range rows {
-			str += fmt.Sprintf("%s %s\n", r[0], r[1])
-		}
-		return str
-	case "done":
-		rows := v.rows(0, v.Model.Spec, v.Model.Diff.Result)
+		rows := v.rows(0, v.Spec, v.Diff.Result)
 		str := ""
 		for _, r := range rows {
 			str += fmt.Sprintf("%s %s\n", r[0], r[1])
 		}
 		return str
 	case showStateError:
-		return "ERROR: " + v.Model.Error.Error()
+		return "ERROR: " + v.Error.Error()
 	default:
 		return ""
 	}
@@ -182,14 +165,12 @@ func (v *Show) rows(spaces int, s spec.Spec, envDiff diff.Environment) [][]strin
 		resources := resourceToAlias[rt]
 		sort.Strings(resources)
 		for j, r := range resources {
-			st := v.Model.Spinner.View()
-			// st := "loading"
-			v.Model.Diff.Lock.Lock()
+			st := v.Spinner.View()
+			v.Diff.Lock.Lock()
 			if d, ok := envDiff.Diffs[r]; ok {
 				st = sign(d.Operation())
-				// fmt.Printf(">> %v\n", st)
 			}
-			v.Model.Diff.Lock.Unlock()
+			v.Diff.Lock.Unlock()
 			tree := "├─"
 			if i == len(resourceTypes)-1 && j == len(resources)-1 && len(builds) == 0 {
 				tree = "└─"
@@ -201,8 +182,7 @@ func (v *Show) rows(spaces int, s spec.Spec, envDiff diff.Environment) [][]strin
 	for i, b := range builds {
 		build := s.Components[b].(spec.ComponentBuild)
 
-		st := v.Model.Spinner.View()
-		// st := "loading"
+		st := v.Spinner.View()
 		d, ok := envDiff.Diffs[b]
 		if ok && d.Operation() != diff.OperationEmpty {
 			st = sign(d.Operation())
@@ -249,219 +229,122 @@ func sign(op diff.Operation) string {
 }
 
 func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// if _, ok := msg.(spinner.TickMsg); !ok {
-	// 	fmt.Printf("UPDATE: %T, %+v\n", msg, msg)
-	// }
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		if v.Model.State == showStateInitializing {
-			return v, loadConfig
-		}
-
-		return v, nil
 	case tea.KeyMsg:
 		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
 			return v, tea.Quit
 		}
 
 		return v, nil
-	case loadConfigMsg:
-		return v, func() tea.Msg {
-			f, err := os.ReadFile(v.Model.InputPath)
-			if err != nil {
-				return displayError(err)
-			}
+	case setConfigMsg:
+		v.Config = msg.config
+		v.State = showStateTranslating
+		return v, translateBlueprint(
+			v.Context,
+			v.Config,
+		)
+	case setSpecMsg:
+		v.Spec = msg.spec
+		v.TargetEvaluator = evaluator.NewEvaluator(
+			&api.Unresolved{},
+			v.Spec,
+			state.Environment{
+				States:        map[string]state.Type{},
+				DependencyMap: map[string][]string{},
+			},
+		)
 
-			var c Config
-			if err := json.Unmarshal(f, &c); err != nil {
-				return displayError(err)
-			}
-
-			v.Model.BlueprintName = c.Name
-			v.Model.State = showStateTranslating
-			v.Model.Config = c
-			return translateBlueprint(c.InputPath, c.Translator.Name, c.Translator.Version, c.TranslatorsDir)
+		p := plug.NewProvider()
+		p.Dir = v.Config.ProvidersDir
+		p.Logger = hclog.NewNullLogger()
+		v.ActualEvaluator = evaluator.NewEvaluator(
+			&api.API{
+				ProviderPluginManager: p,
+			},
+			v.Spec,
+			state.Environment{
+				States:        map[string]state.Type{},
+				DependencyMap: map[string][]string{},
+			},
+		)
+		v.Diff = diff.Differ{
+			Target: v.TargetEvaluator.Env,
+			Actual: v.ActualEvaluator.Env,
+			Result: diff.Environment{
+				Diffs: map[string]diff.Type{},
+			},
+			Lock: &sync.Mutex{},
 		}
-	case translateBlueprintMsg:
-		return v, func() tea.Msg {
-			translatorPlugManager := plug.Translator{
-				Dir: msg.dir,
-			}
-
-			client, stop, err := translatorPlugManager.Client(msg.name, msg.version)
-			if err != nil {
-				return displayError(fmt.Errorf("error getting translation client: %v", err))
-			}
-			defer stop()
-
-			tempFile, err := os.CreateTemp("", "")
-			if err != nil {
-				return displayError(err)
-			}
-
-			defer os.Remove(tempFile.Name())
-
-			_, err = client.TranslateBlueprint(v.Model.Context, &translatorpb.TranslateBlueprintRequest{
-				InputPath:  msg.path,
-				OutputPath: tempFile.Name(),
-			})
-			if err != nil {
-				return displayError(fmt.Errorf("error translating blueprint: %v", err))
-			}
-
-			blueprintData, err := os.ReadFile(tempFile.Name())
-			if err != nil {
-				return displayError(err)
-			}
-
-			var blueprint consumerpb.Blueprint
-			if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
-				return displayError(fmt.Errorf("error unmarshaling blueprint: %v", err))
-			}
-
-			bp, err := convertBlueprint(&blueprint)
-			if err != nil {
-				return displayError(fmt.Errorf("error converting blueprint: %v", err))
-			}
-
-			v.Model.State = showStateInterpreting
-			return interpretBlueprint(bp)
-		}
-	case interpretBlueprintMsg:
-		return v, func() tea.Msg {
-			in := interpreter.Interpreter{}
-			if err := in.Interpret(v.Model.Context, v.Model.Spec, ast.StmtBuild{
-				Alias: v.Model.BlueprintName,
-				Blueprint: ast.ExprBlueprint{
-					Stmts: msg.blueprint.Stmts,
-				},
-			}); err != nil {
-				return displayError(err)
-			}
-
-			v.Model.TargetEvaluator = evaluator.NewEvaluator(
-				&api.Unresolved{},
-				v.Model.Spec,
-				state.Environment{
-					States:        map[string]state.Type{},
-					DependencyMap: map[string][]string{},
-				},
-			)
-
-			p := plug.NewProvider()
-			p.Dir = v.Model.Config.ProvidersDir
-			p.Logger = hclog.NewNullLogger()
-			v.Model.ActualEvaluator = evaluator.NewEvaluator(
-				&api.API{
-					ProviderPluginManager: p,
-				},
-				v.Model.Spec,
-				state.Environment{
-					States:        map[string]state.Type{},
-					DependencyMap: map[string][]string{},
-				},
-			)
-			v.Model.Diff = diff.Differ{
-				Target: v.Model.TargetEvaluator.Env,
-				Actual: v.Model.ActualEvaluator.Env,
-				Result: diff.Environment{
-					Diffs: map[string]diff.Type{},
-				},
-				Lock: &sync.Mutex{},
-			}
-			v.Model.State = showStateEvaluating
-
-			return startEvaluateSpec()
-		}
-	case startEvaluateSpecMsg:
-		next := v.Model.ActualEvaluator.Next()
-		// fmt.Printf("NEXT: %v\n", next)
-		if len(next) == 0 {
+		v.State = showStateEvaluating
+		return v, evaluateNext(v.ActualEvaluator)
+	case evaluateNextMsg:
+		if len(msg.next) == 0 {
 			return v, nil
 		}
 
 		var cmds []tea.Cmd
-		for _, n := range next {
-			cmds = append(cmds, evaluate(n))
+		for _, n := range msg.next {
+			cmds = append(cmds, evaluate(v.Context, n, v.TargetEvaluator, v.ActualEvaluator, v.Diff))
 		}
 		return v, tea.Batch(cmds...)
-	case evaluateMsg:
-		return v, tea.Sequence(func() tea.Msg {
-			// fmt.Printf("START EVAL >>>>>>>> %v\n", msg)
-			if err := v.Model.TargetEvaluator.Eval(v.Model.Context, msg.selector); err != nil {
-				return displayError(err)
-			}
-
-			// start := time.Now()
-			if err := v.Model.ActualEvaluator.Eval(v.Model.Context, msg.selector); err != nil {
-				return displayError(err)
-			}
-			// fmt.Printf("TIME: %v\n", time.Since(start))
-
-			// fmt.Printf("DONE EVAL >>>>>>>> %v\n", msg)
-
-			return doDiff(msg.selector)
-		}, startEvaluateSpec)
-	case diffMsg:
-		return v, func() tea.Msg {
-			if err := v.Model.Diff.Diff(msg.selector); err != nil {
-				return displayError(err)
-			}
-
-			// fmt.Printf("DONE >>>>>>>> %v\n", msg)
-			if msg.selector.Parent == nil {
-				if v.Model.Diff.Result.Diffs[msg.selector.Name].Operation() != diff.OperationEmpty {
-					return doneEvaluateSpec()
-				}
-			}
-
-			return nil
-		}
 	case doneEvaluateSpecMsg:
 		return v, tea.Quit
-		// return v, nil
-	case exitMsg:
-		return v, tea.Quit
 	case displayErrorMsg:
-		v.Model.Error = msg.error
-		v.Model.State = showStateError
-		// return v, tea.Quit
-		return v, nil
+		v.Error = msg.error
+		v.State = showStateError
+		return v, tea.Quit
 	case spinner.TickMsg:
 		var cmd tea.Cmd
-		v.Model.Spinner, cmd = v.Model.Spinner.Update(msg)
+		v.Spinner, cmd = v.Spinner.Update(msg)
 		return v, cmd
 	default:
 		return v, nil
 	}
 }
 
-type exitMsg struct {
-}
-
-type diffMsg struct {
-	selector selector.Selector
-}
-
-func doDiff(s selector.Selector) tea.Msg {
-	return diffMsg{selector: s}
-}
-
-type evaluateMsg struct {
-	selector selector.Selector
-}
-
-func evaluate(s selector.Selector) tea.Cmd {
+func evaluate(ctx context.Context, s selector.Selector, target, actual *evaluator.Evaluator, d diff.Differ) tea.Cmd {
 	return func() tea.Msg {
-		return evaluateMsg{selector: s}
+		if err := target.Eval(ctx, s); err != nil {
+			return displayError(err)
+		}
+
+		if err := actual.Eval(ctx, s); err != nil {
+			return displayError(err)
+		}
+
+		if err := d.Diff(s); err != nil {
+			return displayError(err)
+		}
+
+		if s.Parent == nil {
+			if d.Result.Diffs[s.Name].Operation() != diff.OperationEmpty {
+				return doneEvaluateSpec()
+			}
+		}
+
+		return evaluateNextMsg{next: actual.Next()}
 	}
 }
 
-func loadConfig() tea.Msg {
-	return loadConfigMsg{}
+func loadConfig(inputPath string) tea.Cmd {
+	return func() tea.Msg {
+		f, err := os.ReadFile(inputPath)
+		if err != nil {
+			return displayError(err)
+		}
+
+		var c Config
+		if err := json.Unmarshal(f, &c); err != nil {
+			return displayError(err)
+		}
+
+		return setConfigMsg{config: c}
+	}
 }
 
-type loadConfigMsg struct{}
+type setConfigMsg struct {
+	config Config
+}
 
 func displayError(err error) tea.Msg {
 	return displayErrorMsg{
@@ -473,37 +356,82 @@ type displayErrorMsg struct {
 	error error
 }
 
-func translateBlueprint(inputPath, name, version, dir string) tea.Msg {
-	return translateBlueprintMsg{
-		path:    inputPath,
-		name:    name,
-		version: version,
-		dir:     dir,
+func translateBlueprint(ctx context.Context, config Config) tea.Cmd {
+	return func() tea.Msg {
+		translatorPlugManager := plug.Translator{
+			Dir: config.TranslatorsDir,
+		}
+
+		client, stop, err := translatorPlugManager.Client(config.Translator.Name, config.Translator.Version)
+		if err != nil {
+			return displayError(fmt.Errorf("error getting translation client: %v", err))
+		}
+		defer stop()
+
+		tempFile, err := os.CreateTemp("", "")
+		if err != nil {
+			return displayError(err)
+		}
+
+		defer os.Remove(tempFile.Name())
+
+		_, err = client.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
+			InputPath:  config.InputPath,
+			OutputPath: tempFile.Name(),
+		})
+		if err != nil {
+			return displayError(fmt.Errorf("error translating blueprint: %v", err))
+		}
+
+		blueprintData, err := os.ReadFile(tempFile.Name())
+		if err != nil {
+			return displayError(err)
+		}
+
+		var blueprint consumerpb.Blueprint
+		if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
+			return displayError(fmt.Errorf("error unmarshaling blueprint: %v", err))
+		}
+
+		bp, err := convertBlueprint(&blueprint)
+		if err != nil {
+			return displayError(fmt.Errorf("error converting blueprint: %v", err))
+		}
+
+		in := interpreter.Interpreter{}
+		s := spec.Spec{
+			Components:    map[string]spec.Component{},
+			DependencyMap: map[string][]string{},
+		}
+		if err := in.Interpret(ctx, s, ast.StmtBuild{
+			Alias: config.Name,
+			Blueprint: ast.ExprBlueprint{
+				Stmts: bp.Stmts,
+			},
+		}); err != nil {
+			return displayError(err)
+		}
+
+		return setSpecMsg{
+			spec: s,
+		}
 	}
 }
 
-type translateBlueprintMsg struct {
-	path    string
-	name    string
-	version string
-	dir     string
+type setSpecMsg struct {
+	spec spec.Spec
 }
 
-func interpretBlueprint(bp ast.Blueprint) tea.Msg {
-	return interpretBlueprintMsg{
-		blueprint: bp,
+func evaluateNext(eval *evaluator.Evaluator) tea.Cmd {
+	return func() tea.Msg {
+		return evaluateNextMsg{
+			next: eval.Next(),
+		}
 	}
 }
 
-type interpretBlueprintMsg struct {
-	blueprint ast.Blueprint
-}
-
-func startEvaluateSpec() tea.Msg {
-	return startEvaluateSpecMsg{}
-}
-
-type startEvaluateSpecMsg struct {
+type evaluateNextMsg struct {
+	next []selector.Selector
 }
 
 func doneEvaluateSpec() tea.Msg {
