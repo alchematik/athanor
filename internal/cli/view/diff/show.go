@@ -2,29 +2,17 @@ package diff
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"os"
-	"sort"
-	"strings"
-	"sync"
 
-	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
-	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
-	"github.com/alchematik/athanor/internal/interpreter"
-	plug "github.com/alchematik/athanor/internal/plugin"
-	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/spec"
-	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -79,6 +67,8 @@ type Show struct {
 	Config          Config
 	Spinner         spinner.Model
 	Error           error
+
+	Tree *Tree
 }
 
 type Config struct {
@@ -98,134 +88,18 @@ type ShowParams struct {
 }
 
 func NewShow(params ShowParams) *tea.Program {
-	s := spinner.New()
-	s.Spinner = spinner.MiniDot
-	s.Style = lipgloss.NewStyle().Foreground(ColorCyan500)
-
+	t := NewTree(params.Context, params.Path)
 	return tea.NewProgram(&Show{
-		Spinner:   s,
-		Context:   params.Context,
-		State:     showStateInitializing,
-		InputPath: params.Path,
-		Spec: spec.Spec{
-			Components:    map[string]spec.Component{},
-			DependencyMap: map[string][]string{},
-		},
+		Tree: t,
 	})
 }
 
 func (v *Show) Init() tea.Cmd {
-	return tea.Batch(v.Spinner.Tick, loadConfig(v.InputPath))
+	return v.Tree.Init()
 }
 
 func (v *Show) View() string {
-	switch v.State {
-	case showStateInitializing:
-		return "initializing..."
-	case showStateInterpreting:
-		return "interpreting..."
-	case showStateEvaluating:
-		rows := v.rows(0, v.Spec, v.Diff.Result)
-		str := ""
-		for _, r := range rows {
-			str += fmt.Sprintf("%s %s\n", r[0], r[1])
-		}
-		return str
-	case showStateError:
-		return "ERROR: " + v.Error.Error()
-	default:
-		return ""
-	}
-}
-
-func (v *Show) rows(spaces int, s spec.Spec, envDiff diff.Environment) [][]string {
-	resourceToAlias := map[string][]string{}
-	var builds []string
-	for k, comp := range s.Components {
-		switch comp := comp.(type) {
-		case spec.ComponentResource:
-			rt := comp.Value.Identifier.ResourceType
-			resourceToAlias[rt] = append(resourceToAlias[rt], k)
-		case spec.ComponentBuild:
-			builds = append(builds, k)
-		}
-	}
-
-	resourceTypes := make([]string, 0, len(resourceToAlias))
-	for k := range resourceToAlias {
-		resourceTypes = append(resourceTypes, k)
-	}
-
-	sort.Strings(resourceTypes)
-
-	sort.Strings(builds)
-
-	var out [][]string
-	for i, rt := range resourceTypes {
-		resources := resourceToAlias[rt]
-		sort.Strings(resources)
-		for j, r := range resources {
-			st := v.Spinner.View()
-			v.Diff.Lock.Lock()
-			if d, ok := envDiff.Diffs[r]; ok {
-				st = sign(d.Operation())
-			}
-			v.Diff.Lock.Unlock()
-			tree := "├─"
-			if i == len(resourceTypes)-1 && j == len(resources)-1 && len(builds) == 0 {
-				tree = "└─"
-			}
-			out = append(out, []string{st, strings.Repeat(" ", spaces) + tree + " " + rt + "/" + r})
-		}
-	}
-
-	for i, b := range builds {
-		build := s.Components[b].(spec.ComponentBuild)
-
-		st := v.Spinner.View()
-		d, ok := envDiff.Diffs[b]
-		if ok && d.Operation() != diff.OperationEmpty {
-			st = sign(d.Operation())
-		}
-
-		subEnv, ok := d.(diff.Environment)
-		if !ok {
-			subEnv = diff.Environment{}
-		}
-
-		tree := ""
-		if spaces > 0 {
-			tree = "├─"
-			if i == len(builds)-1 {
-				tree = "└─"
-			}
-		}
-
-		out = append(out, []string{st, strings.Repeat(" ", spaces) + tree + "blueprint" + "/" + b})
-		sub := v.rows(spaces+1, build.Spec, subEnv)
-		out = append(out, sub...)
-	}
-
-	return out
-}
-
-func sign(op diff.Operation) string {
-	switch op {
-	case diff.OperationEmpty:
-		return " "
-	case diff.OperationUpdate:
-		return lipgloss.NewStyle().Foreground(ColorOrange500).Render("~")
-	case diff.OperationCreate:
-		return lipgloss.NewStyle().Foreground(ColorGreen500).Render("+")
-	case diff.OperationDelete:
-		return lipgloss.NewStyle().Foreground(ColorRed500).Render("-")
-	case diff.OperationNoop:
-		return " "
-	case diff.OperationUnknown:
-		return "?"
-	default:
-		return " "
-	}
+	return v.Tree.View()
 }
 
 func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -236,209 +110,11 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return v, nil
-	case setConfigMsg:
-		v.Config = msg.config
-		v.State = showStateTranslating
-		return v, translateBlueprint(
-			v.Context,
-			v.Config,
-		)
-	case setSpecMsg:
-		v.Spec = msg.spec
-		v.TargetEvaluator = evaluator.NewEvaluator(
-			&api.Unresolved{},
-			v.Spec,
-			state.Environment{
-				States:        map[string]state.Type{},
-				DependencyMap: map[string][]string{},
-			},
-		)
-
-		p := plug.NewProvider()
-		p.Dir = v.Config.ProvidersDir
-		p.Logger = hclog.NewNullLogger()
-		v.ActualEvaluator = evaluator.NewEvaluator(
-			&api.API{
-				ProviderPluginManager: p,
-			},
-			v.Spec,
-			state.Environment{
-				States:        map[string]state.Type{},
-				DependencyMap: map[string][]string{},
-			},
-		)
-		v.Diff = diff.Differ{
-			Target: v.TargetEvaluator.Env,
-			Actual: v.ActualEvaluator.Env,
-			Result: diff.Environment{
-				Diffs: map[string]diff.Type{},
-			},
-			Lock: &sync.Mutex{},
-		}
-		v.State = showStateEvaluating
-		return v, evaluateNext(v.ActualEvaluator)
-	case evaluateNextMsg:
-		if len(msg.next) == 0 {
-			return v, nil
-		}
-
-		var cmds []tea.Cmd
-		for _, n := range msg.next {
-			cmds = append(cmds, evaluate(v.Context, n, v.TargetEvaluator, v.ActualEvaluator, v.Diff))
-		}
-		return v, tea.Batch(cmds...)
-	case doneEvaluateSpecMsg:
-		return v, tea.Quit
-	case displayErrorMsg:
-		v.Error = msg.error
-		v.State = showStateError
-		return v, tea.Quit
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		v.Spinner, cmd = v.Spinner.Update(msg)
-		return v, cmd
 	default:
-		return v, nil
+		var cmd tea.Cmd
+		v.Tree, cmd = v.Tree.Update(msg)
+		return v, cmd
 	}
-}
-
-func evaluate(ctx context.Context, s selector.Selector, target, actual *evaluator.Evaluator, d diff.Differ) tea.Cmd {
-	return func() tea.Msg {
-		if err := target.Eval(ctx, s); err != nil {
-			return displayError(err)
-		}
-
-		if err := actual.Eval(ctx, s); err != nil {
-			return displayError(err)
-		}
-
-		if err := d.Diff(s); err != nil {
-			return displayError(err)
-		}
-
-		if s.Parent == nil {
-			if d.Result.Diffs[s.Name].Operation() != diff.OperationEmpty {
-				return doneEvaluateSpec()
-			}
-		}
-
-		return evaluateNextMsg{next: actual.Next()}
-	}
-}
-
-func loadConfig(inputPath string) tea.Cmd {
-	return func() tea.Msg {
-		f, err := os.ReadFile(inputPath)
-		if err != nil {
-			return displayError(err)
-		}
-
-		var c Config
-		if err := json.Unmarshal(f, &c); err != nil {
-			return displayError(err)
-		}
-
-		return setConfigMsg{config: c}
-	}
-}
-
-type setConfigMsg struct {
-	config Config
-}
-
-func displayError(err error) tea.Msg {
-	return displayErrorMsg{
-		error: err,
-	}
-}
-
-type displayErrorMsg struct {
-	error error
-}
-
-func translateBlueprint(ctx context.Context, config Config) tea.Cmd {
-	return func() tea.Msg {
-		translatorPlugManager := plug.Translator{
-			Dir: config.TranslatorsDir,
-		}
-
-		client, stop, err := translatorPlugManager.Client(config.Translator.Name, config.Translator.Version)
-		if err != nil {
-			return displayError(fmt.Errorf("error getting translation client: %v", err))
-		}
-		defer stop()
-
-		tempFile, err := os.CreateTemp("", "")
-		if err != nil {
-			return displayError(err)
-		}
-
-		defer os.Remove(tempFile.Name())
-
-		_, err = client.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
-			InputPath:  config.InputPath,
-			OutputPath: tempFile.Name(),
-		})
-		if err != nil {
-			return displayError(fmt.Errorf("error translating blueprint: %v", err))
-		}
-
-		blueprintData, err := os.ReadFile(tempFile.Name())
-		if err != nil {
-			return displayError(err)
-		}
-
-		var blueprint consumerpb.Blueprint
-		if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
-			return displayError(fmt.Errorf("error unmarshaling blueprint: %v", err))
-		}
-
-		bp, err := convertBlueprint(&blueprint)
-		if err != nil {
-			return displayError(fmt.Errorf("error converting blueprint: %v", err))
-		}
-
-		in := interpreter.Interpreter{}
-		s := spec.Spec{
-			Components:    map[string]spec.Component{},
-			DependencyMap: map[string][]string{},
-		}
-		if err := in.Interpret(ctx, s, ast.StmtBuild{
-			Alias: config.Name,
-			Blueprint: ast.ExprBlueprint{
-				Stmts: bp.Stmts,
-			},
-		}); err != nil {
-			return displayError(err)
-		}
-
-		return setSpecMsg{
-			spec: s,
-		}
-	}
-}
-
-type setSpecMsg struct {
-	spec spec.Spec
-}
-
-func evaluateNext(eval *evaluator.Evaluator) tea.Cmd {
-	return func() tea.Msg {
-		return evaluateNextMsg{
-			next: eval.Next(),
-		}
-	}
-}
-
-type evaluateNextMsg struct {
-	next []selector.Selector
-}
-
-func doneEvaluateSpec() tea.Msg {
-	return doneEvaluateSpecMsg{}
-}
-
-type doneEvaluateSpecMsg struct {
 }
 
 func convertBlueprint(bp *consumerpb.Blueprint) (ast.Blueprint, error) {

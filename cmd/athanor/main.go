@@ -288,6 +288,14 @@ func main() {
 							return err
 						},
 					},
+					{
+						Name: "reconcile",
+						Action: func(ctx *cli.Context) error {
+							_, err := diffview.NewReconcile().Run()
+							return err
+
+						},
+					},
 				},
 			},
 			{
