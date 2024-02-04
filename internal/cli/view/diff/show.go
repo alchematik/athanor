@@ -5,12 +5,8 @@ import (
 	"fmt"
 
 	"github.com/alchematik/athanor/internal/ast"
-	"github.com/alchematik/athanor/internal/diff"
-	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
-	"github.com/alchematik/athanor/internal/spec"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -57,17 +53,6 @@ var (
 )
 
 type Show struct {
-	Context         context.Context
-	InputPath       string
-	State           string
-	Spec            spec.Spec
-	TargetEvaluator *evaluator.Evaluator
-	ActualEvaluator *evaluator.Evaluator
-	Diff            diff.Differ
-	Config          Config
-	Spinner         spinner.Model
-	Error           error
-
 	Tree *Tree
 }
 
@@ -102,6 +87,10 @@ func (v *Show) View() string {
 	return v.Tree.View()
 }
 
+type testOne struct{}
+
+type testTwo struct{}
+
 func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -110,6 +99,8 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return v, nil
+	case doneEvaluateSpecMsg:
+		return v, tea.Quit
 	default:
 		var cmd tea.Cmd
 		v.Tree, cmd = v.Tree.Update(msg)

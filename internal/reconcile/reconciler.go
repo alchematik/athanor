@@ -3,14 +3,23 @@ package reconcile
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/state"
 )
 
 type Reconciler struct {
 	ResourceAPI ResourceAPI
+	Env         diff.Environment
+	Result      state.Environment
+
+	queue            []selector.Selector
+	queueLock        *sync.Mutex
+	parentToChildren map[selector.Selector][]selector.Selector
+	indegrees        map[selector.Selector]int
 }
 
 type ResourceAPI interface {
@@ -18,6 +27,121 @@ type ResourceAPI interface {
 	CreateResource(context.Context, state.Resource) (state.Resource, error)
 	DeleteResource(context.Context, state.Resource) error
 	UpdateResource(context.Context, state.Resource, []api.Field) (state.Resource, error)
+}
+
+func NewReconciler(api ResourceAPI, env diff.Environment, result state.Environment) *Reconciler {
+	var queue []selector.Selector
+	for alias := range env.Diffs {
+		queue = append(queue, selector.Selector{Name: alias})
+	}
+	return &Reconciler{
+		ResourceAPI:      api,
+		Env:              env,
+		Result:           result,
+		queueLock:        &sync.Mutex{},
+		queue:            queue,
+		parentToChildren: map[selector.Selector][]selector.Selector{},
+		indegrees:        map[selector.Selector]int{},
+	}
+}
+
+func (r *Reconciler) Next() []selector.Selector {
+	r.queueLock.Lock()
+	defer r.queueLock.Unlock()
+
+	out := r.queue
+	r.queue = []selector.Selector{}
+	return out
+}
+
+func (r *Reconciler) Reconcile(ctx context.Context, sel selector.Selector) error {
+	e, ok := diff.SelectDiffEnvironment(r.Env, sel)
+	if !ok {
+		return fmt.Errorf("cannot find environment with selector: %v", sel)
+	}
+
+	env, ok := selector.SelectEnvironment(r.Result, sel)
+	if !ok {
+		return fmt.Errorf("cannot find result environment with selector: %v", sel)
+	}
+
+	current, ok := e.Diffs[sel.Name]
+	if !ok {
+		return fmt.Errorf("cannot find diff with selector: %v", sel)
+	}
+
+	switch d := current.(type) {
+	case diff.Resource:
+		res, err := r.ReconcileResource(ctx, r.Result, d)
+		if err != nil {
+			return err
+		}
+
+		r.queueLock.Lock()
+		env.States[sel.Name] = res
+		parent := *sel.Parent
+		r.indegrees[parent]--
+		if r.indegrees[parent] == 0 {
+			r.queue = append(r.queue, parent)
+			delete(r.indegrees, parent)
+		}
+
+		children := r.parentToChildren[sel]
+		for _, child := range children {
+			r.indegrees[child]--
+			if r.indegrees[child] == 0 {
+				r.queue = append(r.queue, child)
+				delete(r.indegrees, child)
+			}
+		}
+		r.queueLock.Unlock()
+	case diff.Environment:
+		r.queueLock.Lock()
+		defer r.queueLock.Unlock()
+
+		st, ok := env.States[sel.Name]
+		if ok {
+			subEnv, ok := st.(state.Environment)
+			if !ok {
+				return fmt.Errorf("expected Environment, got %T", st)
+			}
+
+			subEnv.Done = true
+			env.States[sel.Name] = subEnv
+			return nil
+		}
+
+		env.States[sel.Name] = state.Environment{
+			States: map[string]state.Type{},
+		}
+
+		r.indegrees[sel] = len(d.Diffs)
+		for child, parents := range d.Dependencies {
+			childSelector := selector.Selector{
+				Name:   child,
+				Parent: &sel,
+			}
+
+			r.indegrees[childSelector] = len(parents)
+			for _, parent := range parents {
+				parentSelector := selector.Selector{
+					Name:   parent,
+					Parent: &sel,
+				}
+				r.parentToChildren[parentSelector] = append(r.parentToChildren[parentSelector], childSelector)
+			}
+		}
+
+		for s, in := range r.indegrees {
+			if in == 0 {
+				r.queue = append(r.queue, s)
+				delete(r.indegrees, s)
+			}
+		}
+
+	}
+
+	return nil
 }
 
 func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment) (state.Environment, error) {

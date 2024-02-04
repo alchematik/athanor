@@ -291,9 +291,11 @@ func main() {
 					{
 						Name: "reconcile",
 						Action: func(ctx *cli.Context) error {
-							_, err := diffview.NewReconcile().Run()
+							_, err := diffview.NewReconcile(diffview.ShowParams{
+								Context: ctx.Context,
+								Path:    ctx.Args().First(),
+							}).Run()
 							return err
-
 						},
 					},
 				},

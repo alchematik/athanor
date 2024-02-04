@@ -27,6 +27,103 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+type LoaderTree struct {
+	Spec    spec.Spec
+	Spinner spinner.Model
+	Queuer  selector.Queuer
+}
+
+func (t LoaderTree) Init() tea.Cmd {
+	return func() tea.Msg {
+		var cmds []tea.Cmd
+		return tea.Batch(cmds...)
+	}
+}
+
+// func (t LoaderTree) View() string {
+// 	rows := t.loaderTreeRow(0, t.Diff, t.Spec, t.Diff.Result)
+// 	str := ""
+// 	for _, r := range rows {
+// 		str += fmt.Sprintf("%s %s\n", r[0], r[1])
+// 	}
+// 	return str
+// }
+
+func (t LoaderTree) loaderTreeRow(spaces int, differ diff.Differ, s spec.Spec, envDiff diff.Environment) [][]string {
+	resourceToAlias := map[string][]string{}
+	var builds []string
+	for k, comp := range s.Components {
+		switch comp := comp.(type) {
+		case spec.ComponentResource:
+			rt := comp.Value.Identifier.ResourceType
+			resourceToAlias[rt] = append(resourceToAlias[rt], k)
+		case spec.ComponentBuild:
+			builds = append(builds, k)
+		}
+	}
+
+	resourceTypes := make([]string, 0, len(resourceToAlias))
+	for k := range resourceToAlias {
+		resourceTypes = append(resourceTypes, k)
+	}
+
+	sort.Strings(resourceTypes)
+
+	sort.Strings(builds)
+
+	var out [][]string
+	for i, rt := range resourceTypes {
+		resources := resourceToAlias[rt]
+		sort.Strings(resources)
+		for j, r := range resources {
+			st := t.Spinner.View()
+			differ.Lock.Lock()
+			if d, ok := envDiff.Diffs[r]; ok {
+				st = sign(d.Operation())
+			}
+			differ.Lock.Unlock()
+			tree := "├─"
+			if i == len(resourceTypes)-1 && j == len(resources)-1 && len(builds) == 0 {
+				tree = "└─"
+			}
+			out = append(out, []string{st, strings.Repeat(" ", spaces) + tree + " " + rt + "/" + r})
+		}
+	}
+
+	for i, b := range builds {
+		build := s.Components[b].(spec.ComponentBuild)
+
+		st := t.Spinner.View()
+		d, ok := envDiff.Diffs[b]
+		if ok && d.Operation() != diff.OperationEmpty {
+			st = sign(d.Operation())
+		}
+
+		subEnv, ok := d.(diff.Environment)
+		if !ok {
+			subEnv = diff.Environment{}
+		}
+
+		tree := ""
+		if spaces > 0 {
+			tree = "├─"
+			if i == len(builds)-1 {
+				tree = "└─"
+			}
+		}
+
+		out = append(out, []string{st, strings.Repeat(" ", spaces) + tree + "blueprint" + "/" + b})
+		sub := t.loaderTreeRow(spaces+1, differ, build.Spec, subEnv)
+		out = append(out, sub...)
+	}
+
+	return out
+}
+
+func (t LoaderTree) Update(msg tea.Msg) (LoaderTree, tea.Cmd) {
+	return t, nil
+}
+
 type Tree struct {
 	Context         context.Context
 	InputPath       string
@@ -37,6 +134,7 @@ type Tree struct {
 	Diff            diff.Differ
 	Config          Config
 	Spinner         spinner.Model
+	Queuer          *selector.Queuer
 	Error           error
 }
 
@@ -87,6 +185,10 @@ func (t *Tree) Update(msg tea.Msg) (*Tree, tea.Cmd) {
 		)
 	case setSpecMsg:
 		t.Spec = msg.spec
+
+		q := selector.NewQueuer(t.Config.Name, msg.spec)
+		t.Queuer = q
+
 		t.TargetEvaluator = evaluator.NewEvaluator(
 			&api.Unresolved{},
 			t.Spec,
@@ -118,7 +220,7 @@ func (t *Tree) Update(msg tea.Msg) (*Tree, tea.Cmd) {
 			Lock: &sync.Mutex{},
 		}
 		t.State = showStateEvaluating
-		return t, evaluateNext(t.ActualEvaluator)
+		return t, evaluateNext(t.Queuer)
 	case evaluateNextMsg:
 		if len(msg.next) == 0 {
 			return t, nil
@@ -126,11 +228,11 @@ func (t *Tree) Update(msg tea.Msg) (*Tree, tea.Cmd) {
 
 		var cmds []tea.Cmd
 		for _, n := range msg.next {
-			cmds = append(cmds, evaluate(t.Context, n, t.TargetEvaluator, t.ActualEvaluator, t.Diff))
+			cmds = append(cmds, evaluate(t.Context, t.Queuer, n, t.TargetEvaluator, t.ActualEvaluator, t.Diff))
 		}
 		return t, tea.Batch(cmds...)
 	case doneEvaluateSpecMsg:
-		return t, tea.Quit
+		return t, nil
 	case displayErrorMsg:
 		t.Error = msg.error
 		t.State = showStateError
@@ -234,7 +336,7 @@ func sign(op diff.Operation) string {
 	}
 }
 
-func evaluate(ctx context.Context, s selector.Selector, target, actual *evaluator.Evaluator, d diff.Differ) tea.Cmd {
+func evaluate(ctx context.Context, q *selector.Queuer, s selector.Selector, target, actual *evaluator.Evaluator, d diff.Differ) tea.Cmd {
 	return func() tea.Msg {
 		if err := target.Eval(ctx, s); err != nil {
 			return displayError(err)
@@ -248,13 +350,15 @@ func evaluate(ctx context.Context, s selector.Selector, target, actual *evaluato
 			return displayError(err)
 		}
 
+		q.Done(s)
+
 		if s.Parent == nil {
 			if d.Result.Diffs[s.Name].Operation() != diff.OperationEmpty {
 				return doneEvaluateSpec()
 			}
 		}
 
-		return evaluateNextMsg{next: actual.Next()}
+		return evaluateNextMsg{next: q.Next()}
 	}
 }
 
@@ -279,6 +383,7 @@ type setConfigMsg struct {
 }
 
 func displayError(err error) tea.Msg {
+	panic(err)
 	return displayErrorMsg{
 		error: err,
 	}
@@ -354,10 +459,12 @@ type setSpecMsg struct {
 	spec spec.Spec
 }
 
-func evaluateNext(eval *evaluator.Evaluator) tea.Cmd {
+func evaluateNext(q *selector.Queuer) tea.Cmd {
 	return func() tea.Msg {
+		next := q.Next()
+		fmt.Printf("NEXT> %v\n", next)
 		return evaluateNextMsg{
-			next: eval.Next(),
+			next: next,
 		}
 	}
 }

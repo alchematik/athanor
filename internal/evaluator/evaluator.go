@@ -15,10 +15,7 @@ type Evaluator struct {
 	Spec        spec.Spec
 	Env         state.Environment
 
-	queue            []selector.Selector
-	parentToChildren map[selector.Selector][]selector.Selector
-	indegrees        map[selector.Selector]int
-	queueLock        *sync.Mutex
+	queueLock *sync.Mutex
 }
 
 type ResourceAPI interface {
@@ -31,28 +28,10 @@ func NewEvaluator(api ResourceAPI, s spec.Spec, env state.Environment) *Evaluato
 		Spec:        s,
 		ResourceAPI: api,
 
-		parentToChildren: map[selector.Selector][]selector.Selector{},
-		indegrees:        map[selector.Selector]int{},
-		queueLock:        &sync.Mutex{},
-		queue:            []selector.Selector{},
-	}
-
-	for alias := range s.Components {
-		e.queue = append(e.queue, selector.Selector{
-			Name: alias,
-		})
+		queueLock: &sync.Mutex{},
 	}
 
 	return &e
-}
-
-func (e *Evaluator) Next() []selector.Selector {
-	e.queueLock.Lock()
-	defer e.queueLock.Unlock()
-
-	out := e.queue
-	e.queue = []selector.Selector{}
-	return out
 }
 
 func (e *Evaluator) Eval(ctx context.Context, sel selector.Selector) error {
@@ -82,73 +61,20 @@ func (e *Evaluator) Eval(ctx context.Context, sel selector.Selector) error {
 
 		env.States[sel.Name] = r
 
-		bookend := selector.Selector{
-			Name:   sel.Parent.Name,
-			Parent: sel.Parent.Parent,
-		}
-		e.indegrees[bookend]--
-		if e.indegrees[bookend] == 0 {
-			e.queue = append(e.queue, bookend)
-			delete(e.indegrees, bookend)
-		}
-
-		children := e.parentToChildren[sel]
-		for _, child := range children {
-			e.indegrees[child]--
-			indegrees := e.indegrees[child]
-			if indegrees == 0 {
-				e.queue = append(e.queue, child)
-				delete(e.indegrees, child)
-			}
-		}
-
 		e.queueLock.Unlock()
 	case spec.ComponentBuild:
 		e.queueLock.Lock()
 		defer e.queueLock.Unlock()
-		st, ok := env.States[sel.Name]
-		if ok {
-			subEnv, ok := st.(state.Environment)
-			if !ok {
-				return fmt.Errorf("expected Environment, got %T", st)
-			}
 
-			subEnv.Done = true
-			env.States[sel.Name] = subEnv
+		_, ok := env.States[sel.Name]
+		if ok {
 			return nil
 		}
 
 		env.States[sel.Name] = state.Environment{
-			States: map[string]state.Type{},
+			States:        map[string]state.Type{},
+			DependencyMap: c.Spec.DependencyMap,
 		}
-
-		e.indegrees[sel] = len(c.Spec.DependencyMap)
-
-		for child, parents := range c.Spec.DependencyMap {
-			childSelector := selector.Selector{
-				Name:   child,
-				Parent: &sel,
-			}
-
-			e.indegrees[childSelector] = len(parents)
-			for _, parent := range parents {
-				parentSelector := selector.Selector{
-					Name:   parent,
-					Parent: &sel,
-				}
-				e.parentToChildren[parentSelector] = append(e.parentToChildren[parentSelector], childSelector)
-			}
-		}
-
-		for s, in := range e.indegrees {
-			if in == 0 {
-				e.queue = append(e.queue, s)
-				delete(e.indegrees, s)
-			}
-		}
-
-		// TODO: detect cycle.
-
 	default:
 		return fmt.Errorf("not able to eval type: %T", c)
 	}

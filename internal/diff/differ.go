@@ -34,7 +34,7 @@ func (d *Differ) Diff(s selector.Selector) error {
 	targetVal := targetEnv.States[s.Name]
 	actualVal := actualEnv.States[s.Name]
 
-	e, ok := findDiffEnvironment(d.Result, s)
+	e, ok := SelectDiffEnvironment(d.Result, s)
 	if !ok {
 		return fmt.Errorf("cannot find environment with selector: %v", s)
 	}
@@ -75,6 +75,7 @@ func (d *Differ) Diff(s selector.Selector) error {
 			op = OperationUpdate
 		}
 
+		current.Dependencies = actual.DependencyMap
 		current.DiffOperation = op
 		d.Lock.Lock()
 		e.Diffs[s.Name] = current
@@ -119,12 +120,12 @@ func (d *Differ) Diff(s selector.Selector) error {
 	}
 }
 
-func findDiffEnvironment(env Environment, selector selector.Selector) (Environment, bool) {
+func SelectDiffEnvironment(env Environment, selector selector.Selector) (Environment, bool) {
 	if selector.Parent == nil {
 		return env, true
 	}
 
-	parent, ok := findDiffEnvironment(env, *selector.Parent)
+	parent, ok := SelectDiffEnvironment(env, *selector.Parent)
 	if !ok {
 		return Environment{}, false
 	}
