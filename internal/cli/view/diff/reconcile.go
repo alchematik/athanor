@@ -14,14 +14,14 @@ import (
 )
 
 type Reconcile struct {
-	Tree       *Tree
+	Tree       *DiffModel
 	State      string
 	Input      help.Model
 	Reconciler *reconcile.Reconciler
 }
 
 func NewReconcile(params ShowParams) *tea.Program {
-	t := NewTree(params.Context, params.Path)
+	t := NewDiff(params.Context, params.Path)
 	return tea.NewProgram(&Reconcile{
 		State: "loading",
 		Tree:  t,
@@ -96,13 +96,13 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					States:        map[string]state.Type{},
 					DependencyMap: map[string][]string{},
 				}
-				r.Reconciler = reconcile.NewReconciler(a, r.Tree.Diff.Result, e)
+				r.Reconciler = reconcile.NewReconciler(a, r.Tree.Differ.Result, e)
 			case "n":
 				return r, tea.Quit
 			}
 		}
 	case doneEvaluateSpecMsg:
-		if r.Tree.Diff.Result.Operation() == internaldiff.OperationNoop {
+		if r.Tree.Differ.Result.Operation() == internaldiff.OperationNoop {
 			return r, tea.Quit
 		}
 

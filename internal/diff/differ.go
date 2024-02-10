@@ -16,7 +16,7 @@ type Differ struct {
 	Lock *sync.Mutex
 }
 
-func (d *Differ) Diff(s selector.Selector) error {
+func (d *Differ) Diff(s selector.Selector) (Type, error) {
 	targetEnv, ok := selector.SelectEnvironment(d.Target, s)
 	if !ok {
 		targetEnv = state.Environment{
@@ -36,7 +36,7 @@ func (d *Differ) Diff(s selector.Selector) error {
 
 	e, ok := SelectDiffEnvironment(d.Result, s)
 	if !ok {
-		return fmt.Errorf("cannot find environment with selector: %v", s)
+		return nil, fmt.Errorf("cannot find environment with selector: %v", s)
 	}
 
 	var result Type
@@ -51,7 +51,8 @@ func (d *Differ) Diff(s selector.Selector) error {
 				Diffs: map[string]Type{},
 			}
 			d.Lock.Unlock()
-			return nil
+
+			return current, nil
 		}
 
 		ops := map[Operation]int{}
@@ -80,43 +81,43 @@ func (d *Differ) Diff(s selector.Selector) error {
 		d.Lock.Lock()
 		e.Diffs[s.Name] = current
 		d.Lock.Unlock()
-		return nil
+		return current, nil
 	case state.Resource:
 		if targetVal == nil {
 			result, err = resourceDiff(actual, state.Resource{})
 		} else {
 			target, ok := targetVal.(state.Resource)
 			if !ok {
-				return fmt.Errorf("invalid diff: trying to compare Resource to %T", targetVal)
+				return nil, fmt.Errorf("invalid diff: trying to compare Resource to %T", targetVal)
 			}
 
 			result, err = resourceDiff(actual, target)
 		}
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		d.Lock.Lock()
 		e.Diffs[s.Name] = result
 		d.Lock.Unlock()
-		return nil
+		return result, nil
 	case nil:
 		switch target := targetVal.(type) {
 		case state.Resource:
 			result, err := resourceDiff(state.Resource{}, target)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			d.Lock.Lock()
 			e.Diffs[s.Name] = result
 			d.Lock.Unlock()
-			return nil
+			return result, nil
 		default:
-			return fmt.Errorf("unhandled target type for diff: %T", targetVal)
+			return nil, fmt.Errorf("unhandled target type for diff: %T", targetVal)
 		}
 	default:
-		return fmt.Errorf("unhandled type for diff: %T", actualVal)
+		return nil, fmt.Errorf("unhandled type for diff: %T", actualVal)
 	}
 }
 

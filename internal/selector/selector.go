@@ -6,6 +6,7 @@ import (
 
 	"github.com/alchematik/athanor/internal/spec"
 	"github.com/alchematik/athanor/internal/state"
+	// "github.com/alchematik/athanor/internal/diff"
 )
 
 type Queuer struct {
@@ -27,6 +28,8 @@ func NewQueuer(name string, s spec.Spec) *Queuer {
 	q.queue = append(q.queue, Selector{Name: name})
 	return q
 }
+
+// func FromDiff(q *Queuer, sel *Selector, d diff.Differ)
 
 func FromSpec(q *Queuer, sel *Selector, s spec.Spec) {
 	for dependent, dependencies := range s.DependencyMap {

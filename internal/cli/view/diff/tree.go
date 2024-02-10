@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"strings"
 	"sync"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
@@ -27,146 +27,46 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
-type LoaderTree struct {
-	Spec    spec.Spec
-	Spinner spinner.Model
-	Queuer  selector.Queuer
-}
-
-func (t LoaderTree) Init() tea.Cmd {
-	return func() tea.Msg {
-		var cmds []tea.Cmd
-		return tea.Batch(cmds...)
-	}
-}
-
-// func (t LoaderTree) View() string {
-// 	rows := t.loaderTreeRow(0, t.Diff, t.Spec, t.Diff.Result)
-// 	str := ""
-// 	for _, r := range rows {
-// 		str += fmt.Sprintf("%s %s\n", r[0], r[1])
-// 	}
-// 	return str
-// }
-
-func (t LoaderTree) loaderTreeRow(spaces int, differ diff.Differ, s spec.Spec, envDiff diff.Environment) [][]string {
-	resourceToAlias := map[string][]string{}
-	var builds []string
-	for k, comp := range s.Components {
-		switch comp := comp.(type) {
-		case spec.ComponentResource:
-			rt := comp.Value.Identifier.ResourceType
-			resourceToAlias[rt] = append(resourceToAlias[rt], k)
-		case spec.ComponentBuild:
-			builds = append(builds, k)
-		}
-	}
-
-	resourceTypes := make([]string, 0, len(resourceToAlias))
-	for k := range resourceToAlias {
-		resourceTypes = append(resourceTypes, k)
-	}
-
-	sort.Strings(resourceTypes)
-
-	sort.Strings(builds)
-
-	var out [][]string
-	for i, rt := range resourceTypes {
-		resources := resourceToAlias[rt]
-		sort.Strings(resources)
-		for j, r := range resources {
-			st := t.Spinner.View()
-			differ.Lock.Lock()
-			if d, ok := envDiff.Diffs[r]; ok {
-				st = sign(d.Operation())
-			}
-			differ.Lock.Unlock()
-			tree := "├─"
-			if i == len(resourceTypes)-1 && j == len(resources)-1 && len(builds) == 0 {
-				tree = "└─"
-			}
-			out = append(out, []string{st, strings.Repeat(" ", spaces) + tree + " " + rt + "/" + r})
-		}
-	}
-
-	for i, b := range builds {
-		build := s.Components[b].(spec.ComponentBuild)
-
-		st := t.Spinner.View()
-		d, ok := envDiff.Diffs[b]
-		if ok && d.Operation() != diff.OperationEmpty {
-			st = sign(d.Operation())
-		}
-
-		subEnv, ok := d.(diff.Environment)
-		if !ok {
-			subEnv = diff.Environment{}
-		}
-
-		tree := ""
-		if spaces > 0 {
-			tree = "├─"
-			if i == len(builds)-1 {
-				tree = "└─"
-			}
-		}
-
-		out = append(out, []string{st, strings.Repeat(" ", spaces) + tree + "blueprint" + "/" + b})
-		sub := t.loaderTreeRow(spaces+1, differ, build.Spec, subEnv)
-		out = append(out, sub...)
-	}
-
-	return out
-}
-
-func (t LoaderTree) Update(msg tea.Msg) (LoaderTree, tea.Cmd) {
-	return t, nil
-}
-
-type Tree struct {
+type DiffModel struct {
 	Context         context.Context
 	InputPath       string
 	State           string
 	Spec            spec.Spec
 	TargetEvaluator *evaluator.Evaluator
 	ActualEvaluator *evaluator.Evaluator
-	Diff            diff.Differ
+	Differ          diff.Differ
 	Config          Config
-	Spinner         spinner.Model
 	Queuer          *selector.Queuer
+	Tree            *component.TreeModel
 	Error           error
 }
 
-func NewTree(ctx context.Context, inputPath string) *Tree {
+func NewDiff(ctx context.Context, inputPath string) *DiffModel {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
-	s.Style = lipgloss.NewStyle().Foreground(ColorCyan500)
-	return &Tree{
-		Spinner:   s,
+	s.Style = lipgloss.NewStyle().Foreground(component.ColorCyan500)
+	return &DiffModel{
 		Context:   ctx,
 		State:     showStateInitializing,
 		InputPath: inputPath,
+		Tree: &component.TreeModel{
+			Spinner: s,
+		},
 	}
 }
 
-func (t *Tree) Init() tea.Cmd {
-	return tea.Batch(t.Spinner.Tick, loadConfig(t.InputPath))
+func (t *DiffModel) Init() tea.Cmd {
+	return tea.Batch(t.Tree.Init(), t.loadConfigCmd())
 }
 
-func (t *Tree) View() string {
+func (t *DiffModel) View() string {
 	switch t.State {
 	case showStateInitializing:
 		return "initializing..."
 	case showStateInterpreting:
 		return "interpreting..."
 	case showStateEvaluating:
-		rows := rows(0, t.Spinner, t.Diff, t.Spec, t.Diff.Result)
-		str := ""
-		for _, r := range rows {
-			str += fmt.Sprintf("%s %s\n", r[0], r[1])
-		}
-		return str
+		return t.Tree.View()
 	case showStateError:
 		return "ERROR: " + t.Error.Error()
 	default:
@@ -174,17 +74,18 @@ func (t *Tree) View() string {
 	}
 }
 
-func (t *Tree) Update(msg tea.Msg) (*Tree, tea.Cmd) {
+func (t *DiffModel) Update(msg tea.Msg) (*DiffModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case setConfigMsg:
 		t.Config = msg.config
 		t.State = showStateTranslating
-		return t, translateBlueprint(
-			t.Context,
-			t.Config,
-		)
+		return t, t.translateBlueprintCmd(t.Context)
 	case setSpecMsg:
 		t.Spec = msg.spec
+		entries := componentsToEntries(msg.spec.Components)
+		t.Tree.Root = &component.TreeNode{
+			Entries: entries,
+		}
 
 		q := selector.NewQueuer(t.Config.Name, msg.spec)
 		t.Queuer = q
@@ -211,7 +112,7 @@ func (t *Tree) Update(msg tea.Msg) (*Tree, tea.Cmd) {
 				DependencyMap: map[string][]string{},
 			},
 		)
-		t.Diff = diff.Differ{
+		t.Differ = diff.Differ{
 			Target: t.TargetEvaluator.Env,
 			Actual: t.ActualEvaluator.Env,
 			Result: diff.Environment{
@@ -228,149 +129,98 @@ func (t *Tree) Update(msg tea.Msg) (*Tree, tea.Cmd) {
 
 		var cmds []tea.Cmd
 		for _, n := range msg.next {
-			cmds = append(cmds, evaluate(t.Context, t.Queuer, n, t.TargetEvaluator, t.ActualEvaluator, t.Diff))
+			cmds = append(cmds, t.evaluateCmd(t.Context, n))
 		}
 		return t, tea.Batch(cmds...)
 	case doneEvaluateSpecMsg:
 		return t, nil
+	case setStatusMsg:
+		next := t.Queuer.Next()
+		var cmds []tea.Cmd
+		cmds = append(cmds, tea.Batch(
+			func() tea.Msg { return evaluateNextMsg{next: next} },
+			func() tea.Msg {
+				// Initial evaluation of a blueprint is empty. Diff status is set later.
+				st := msg.status
+				if st == "" {
+					st = "loading"
+				}
+				return component.UpdateTreeNodeMsg{
+					Selector: msg.selector,
+					Status:   component.TreeNodeStatus(st),
+				}
+			},
+		))
+
+		if msg.selector.Parent == nil {
+			if t.Differ.Result.Diffs[msg.selector.Name].Operation() != diff.OperationEmpty {
+				cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
+			}
+		}
+
+		return t, tea.Sequence(cmds...)
 	case displayErrorMsg:
 		t.Error = msg.error
 		t.State = showStateError
 		return t, tea.Quit
-	case spinner.TickMsg:
+	default:
 		var cmd tea.Cmd
-		t.Spinner, cmd = t.Spinner.Update(msg)
+		t.Tree, cmd = t.Tree.Update(msg)
 		return t, cmd
-	default:
-		return t, nil
 	}
 }
 
-func rows(spaces int, spin spinner.Model, differ diff.Differ, s spec.Spec, envDiff diff.Environment) [][]string {
-	resourceToAlias := map[string][]string{}
-	var builds []string
-	for k, comp := range s.Components {
-		switch comp := comp.(type) {
-		case spec.ComponentResource:
-			rt := comp.Value.Identifier.ResourceType
-			resourceToAlias[rt] = append(resourceToAlias[rt], k)
-		case spec.ComponentBuild:
-			builds = append(builds, k)
-		}
-	}
-
-	resourceTypes := make([]string, 0, len(resourceToAlias))
-	for k := range resourceToAlias {
-		resourceTypes = append(resourceTypes, k)
-	}
-
-	sort.Strings(resourceTypes)
-
-	sort.Strings(builds)
-
-	var out [][]string
-	for i, rt := range resourceTypes {
-		resources := resourceToAlias[rt]
-		sort.Strings(resources)
-		for j, r := range resources {
-			st := spin.View()
-			differ.Lock.Lock()
-			if d, ok := envDiff.Diffs[r]; ok {
-				st = sign(d.Operation())
-			}
-			differ.Lock.Unlock()
-			tree := "├─"
-			if i == len(resourceTypes)-1 && j == len(resources)-1 && len(builds) == 0 {
-				tree = "└─"
-			}
-			out = append(out, []string{st, strings.Repeat(" ", spaces) + tree + " " + rt + "/" + r})
-		}
-	}
-
-	for i, b := range builds {
-		build := s.Components[b].(spec.ComponentBuild)
-
-		st := spin.View()
-		d, ok := envDiff.Diffs[b]
-		if ok && d.Operation() != diff.OperationEmpty {
-			st = sign(d.Operation())
-		}
-
-		subEnv, ok := d.(diff.Environment)
-		if !ok {
-			subEnv = diff.Environment{}
-		}
-
-		tree := ""
-		if spaces > 0 {
-			tree = "├─"
-			if i == len(builds)-1 {
-				tree = "└─"
-			}
-		}
-
-		out = append(out, []string{st, strings.Repeat(" ", spaces) + tree + "blueprint" + "/" + b})
-		sub := rows(spaces+1, spin, differ, build.Spec, subEnv)
-		out = append(out, sub...)
-	}
-
-	return out
-}
-
-func sign(op diff.Operation) string {
-	switch op {
-	case diff.OperationEmpty:
-		return " "
-	case diff.OperationUpdate:
-		return lipgloss.NewStyle().Foreground(ColorOrange500).Render("~")
-	case diff.OperationCreate:
-		return lipgloss.NewStyle().Foreground(ColorGreen500).Render("+")
-	case diff.OperationDelete:
-		return lipgloss.NewStyle().Foreground(ColorRed500).Render("-")
-	case diff.OperationNoop:
-		return " "
-	case diff.OperationUnknown:
-		return "?"
-	default:
-		return " "
-	}
-}
-
-func evaluate(ctx context.Context, q *selector.Queuer, s selector.Selector, target, actual *evaluator.Evaluator, d diff.Differ) tea.Cmd {
+func (t *DiffModel) evaluateCmd(ctx context.Context, s selector.Selector) tea.Cmd {
 	return func() tea.Msg {
-		if err := target.Eval(ctx, s); err != nil {
-			return displayError(err)
-		}
-
-		if err := actual.Eval(ctx, s); err != nil {
-			return displayError(err)
-		}
-
-		if err := d.Diff(s); err != nil {
-			return displayError(err)
-		}
-
-		q.Done(s)
-
-		if s.Parent == nil {
-			if d.Result.Diffs[s.Name].Operation() != diff.OperationEmpty {
-				return doneEvaluateSpec()
-			}
-		}
-
-		return evaluateNextMsg{next: q.Next()}
-	}
-}
-
-func loadConfig(inputPath string) tea.Cmd {
-	return func() tea.Msg {
-		f, err := os.ReadFile(inputPath)
+		res, err := t.evaluate(ctx, s)
 		if err != nil {
 			return displayError(err)
 		}
 
-		var c Config
-		if err := json.Unmarshal(f, &c); err != nil {
+		return setStatusMsg{
+			selector: s,
+			status:   string(res.Operation()),
+		}
+	}
+}
+
+func (t *DiffModel) evaluate(ctx context.Context, s selector.Selector) (diff.Type, error) {
+	if err := t.TargetEvaluator.Eval(ctx, s); err != nil {
+		return nil, err
+	}
+
+	if err := t.ActualEvaluator.Eval(ctx, s); err != nil {
+		return nil, err
+	}
+
+	res, err := t.Differ.Diff(s)
+	if err != nil {
+		return nil, err
+	}
+
+	t.Queuer.Done(s)
+
+	return res, nil
+}
+
+type setStatusMsg struct {
+	selector selector.Selector
+	status   string
+}
+
+func setStatus(s selector.Selector, status string) tea.Cmd {
+	return func() tea.Msg {
+		return setStatusMsg{
+			selector: s,
+			status:   status,
+		}
+	}
+}
+
+func (t *DiffModel) loadConfigCmd() tea.Cmd {
+	return func() tea.Msg {
+		c, err := t.loadConfig()
+		if err != nil {
 			return displayError(err)
 		}
 
@@ -378,12 +228,25 @@ func loadConfig(inputPath string) tea.Cmd {
 	}
 }
 
+func (t *DiffModel) loadConfig() (Config, error) {
+	f, err := os.ReadFile(t.InputPath)
+	if err != nil {
+		return Config{}, err
+	}
+
+	var c Config
+	if err := json.Unmarshal(f, &c); err != nil {
+		return Config{}, err
+	}
+
+	return c, nil
+}
+
 type setConfigMsg struct {
 	config Config
 }
 
 func displayError(err error) tea.Msg {
-	panic(err)
 	return displayErrorMsg{
 		error: err,
 	}
@@ -393,66 +256,75 @@ type displayErrorMsg struct {
 	error error
 }
 
-func translateBlueprint(ctx context.Context, config Config) tea.Cmd {
+func (t *DiffModel) translateBlueprintCmd(ctx context.Context) tea.Cmd {
 	return func() tea.Msg {
-		translatorPlugManager := plug.Translator{
-			Dir: config.TranslatorsDir,
-		}
-
-		client, stop, err := translatorPlugManager.Client(config.Translator.Name, config.Translator.Version)
-		if err != nil {
-			return displayError(fmt.Errorf("error getting translation client: %v", err))
-		}
-		defer stop()
-
-		tempFile, err := os.CreateTemp("", "")
+		s, err := t.translateBlueprint(ctx)
 		if err != nil {
 			return displayError(err)
 		}
-
-		defer os.Remove(tempFile.Name())
-
-		_, err = client.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
-			InputPath:  config.InputPath,
-			OutputPath: tempFile.Name(),
-		})
-		if err != nil {
-			return displayError(fmt.Errorf("error translating blueprint: %v", err))
-		}
-
-		blueprintData, err := os.ReadFile(tempFile.Name())
-		if err != nil {
-			return displayError(err)
-		}
-
-		var blueprint consumerpb.Blueprint
-		if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
-			return displayError(fmt.Errorf("error unmarshaling blueprint: %v", err))
-		}
-
-		bp, err := convertBlueprint(&blueprint)
-		if err != nil {
-			return displayError(fmt.Errorf("error converting blueprint: %v", err))
-		}
-
-		in := interpreter.Interpreter{}
-		s := spec.Spec{
-			Components:    map[string]spec.Component{},
-			DependencyMap: map[string][]string{},
-		}
-		if err := in.Interpret(ctx, s, ast.StmtBuild{
-			Alias: config.Name,
-			Blueprint: ast.ExprBlueprint{
-				Stmts: bp.Stmts,
-			},
-		}); err != nil {
-			return displayError(err)
-		}
-
 		return setSpecMsg{
 			spec: s,
 		}
 	}
+}
+
+func (t *DiffModel) translateBlueprint(ctx context.Context) (spec.Spec, error) {
+	translatorPlugManager := plug.Translator{
+		Dir: t.Config.TranslatorsDir,
+	}
+
+	client, stop, err := translatorPlugManager.Client(t.Config.Translator.Name, t.Config.Translator.Version)
+	if err != nil {
+		return spec.Spec{}, err
+	}
+	defer stop()
+
+	tempFile, err := os.CreateTemp("", "")
+	if err != nil {
+		return spec.Spec{}, err
+	}
+
+	defer os.Remove(tempFile.Name())
+
+	_, err = client.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
+		InputPath:  t.Config.InputPath,
+		OutputPath: tempFile.Name(),
+	})
+	if err != nil {
+		return spec.Spec{}, fmt.Errorf("error translating blueprint: %v", err)
+	}
+
+	blueprintData, err := os.ReadFile(tempFile.Name())
+	if err != nil {
+		return spec.Spec{}, err
+	}
+
+	var blueprint consumerpb.Blueprint
+	if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
+		return spec.Spec{}, fmt.Errorf("error unmarshaling blueprint: %v", err)
+	}
+
+	bp, err := convertBlueprint(&blueprint)
+	if err != nil {
+		return spec.Spec{}, fmt.Errorf("error converting blueprint: %v", err)
+	}
+
+	in := interpreter.Interpreter{}
+	s := spec.Spec{
+		Components:    map[string]spec.Component{},
+		DependencyMap: map[string][]string{},
+	}
+	if err := in.Interpret(ctx, s, ast.StmtBuild{
+		Alias: t.Config.Name,
+		Blueprint: ast.ExprBlueprint{
+			Stmts: bp.Stmts,
+		},
+	}); err != nil {
+		return spec.Spec{}, err
+	}
+
+	return s, nil
+
 }
 
 type setSpecMsg struct {
@@ -462,7 +334,6 @@ type setSpecMsg struct {
 func evaluateNext(q *selector.Queuer) tea.Cmd {
 	return func() tea.Msg {
 		next := q.Next()
-		fmt.Printf("NEXT> %v\n", next)
 		return evaluateNextMsg{
 			next: next,
 		}
@@ -478,4 +349,55 @@ func doneEvaluateSpec() tea.Msg {
 }
 
 type doneEvaluateSpecMsg struct {
+}
+
+type sorter []*component.TreeNode
+
+func (s sorter) Len() int {
+	return len(s)
+}
+
+func (s sorter) Swap(i, j int) {
+	s[i], s[j] = s[j], s[i]
+}
+
+func (s sorter) Less(i, j int) bool {
+	if s[i].Kind == s[j].Kind {
+		return s[i].Name < s[j].Name
+	}
+
+	if s[i].Kind == "blueprint" {
+		return true
+	}
+
+	if s[j].Kind == "blueprint" {
+		return false
+	}
+
+	return s[i].Kind < s[j].Kind
+}
+
+func componentsToEntries(components map[string]spec.Component) []*component.TreeNode {
+	var out []*component.TreeNode
+	for name, comp := range components {
+		var sub []*component.TreeNode
+		var kind string
+		switch comp := comp.(type) {
+		case spec.ComponentBuild:
+			sub = componentsToEntries(comp.Spec.Components)
+			kind = "blueprint"
+		case spec.ComponentResource:
+			kind = comp.Value.Identifier.ResourceType
+		}
+		out = append(out, &component.TreeNode{
+			Name:    name,
+			Kind:    kind,
+			Entries: sub,
+			Status:  "loading",
+		})
+	}
+
+	sort.Sort(sorter(out))
+
+	return out
 }
