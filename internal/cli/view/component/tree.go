@@ -102,6 +102,7 @@ const (
 	TreeNodeStatusUpdate                 = "update"
 	TreeNodeStatusCreate                 = "create"
 	TreeNodeStatusDelete                 = "delete"
+	TreeNodeStatusDone                   = "done"
 )
 
 func (m *TreeModel) renderTreeNodeStatus(s TreeNodeStatus) string {
@@ -114,6 +115,8 @@ func (m *TreeModel) renderTreeNodeStatus(s TreeNodeStatus) string {
 		return lipgloss.NewStyle().Foreground(ColorOrange500).Render("~")
 	case TreeNodeStatusDelete:
 		return lipgloss.NewStyle().Foreground(ColorRed500).Render("-")
+	case TreeNodeStatusDone:
+		return lipgloss.NewStyle().Foreground(ColorGreen400).Render("✓")
 	default:
 		return " "
 	}
