@@ -56,7 +56,7 @@ func NewDiff(ctx context.Context, inputPath string) *DiffModel {
 }
 
 func (t *DiffModel) Init() tea.Cmd {
-	return tea.Batch(t.Tree.Init(), t.loadConfigCmd())
+	return tea.Batch(t.Tree.Init(), loadConfigCmd(t.InputPath))
 }
 
 func (t *DiffModel) View() string {
@@ -76,10 +76,10 @@ func (t *DiffModel) View() string {
 
 func (t *DiffModel) Update(msg tea.Msg) (*DiffModel, tea.Cmd) {
 	switch msg := msg.(type) {
-	case setConfigMsg:
+	case configLoadedMsg:
 		t.Config = msg.config
 		t.State = showStateTranslating
-		return t, t.translateBlueprintCmd(t.Context)
+		return t, translateBlueprintCmd(t.Context, t.Config)
 	case setSpecMsg:
 		t.Spec = msg.spec
 		entries := componentsToEntries(msg.spec.Components)
@@ -129,7 +129,7 @@ func (t *DiffModel) Update(msg tea.Msg) (*DiffModel, tea.Cmd) {
 
 		var cmds []tea.Cmd
 		for _, n := range msg.next {
-			cmds = append(cmds, t.evaluateCmd(t.Context, n))
+			cmds = append(cmds, evaluateCmd(t.Context, n, t.TargetEvaluator, t.ActualEvaluator, t.Differ, t.Queuer))
 		}
 		return t, tea.Batch(cmds...)
 	case doneEvaluateSpecMsg:
@@ -159,6 +159,7 @@ func (t *DiffModel) Update(msg tea.Msg) (*DiffModel, tea.Cmd) {
 		}
 
 		return t, tea.Sequence(cmds...)
+
 	case displayErrorMsg:
 		t.Error = msg.error
 		t.State = showStateError
@@ -170,9 +171,9 @@ func (t *DiffModel) Update(msg tea.Msg) (*DiffModel, tea.Cmd) {
 	}
 }
 
-func (t *DiffModel) evaluateCmd(ctx context.Context, s selector.Selector) tea.Cmd {
+func evaluateCmd(ctx context.Context, s selector.Selector, target, actual *evaluator.Evaluator, differ diff.Differ, q *selector.Queuer) tea.Cmd {
 	return func() tea.Msg {
-		res, err := t.evaluate(ctx, s)
+		res, err := evaluate(ctx, s, target, actual, differ, q)
 		if err != nil {
 			return displayError(err)
 		}
@@ -184,21 +185,21 @@ func (t *DiffModel) evaluateCmd(ctx context.Context, s selector.Selector) tea.Cm
 	}
 }
 
-func (t *DiffModel) evaluate(ctx context.Context, s selector.Selector) (diff.Type, error) {
-	if err := t.TargetEvaluator.Eval(ctx, s); err != nil {
+func evaluate(ctx context.Context, s selector.Selector, target, actual *evaluator.Evaluator, differ diff.Differ, q *selector.Queuer) (diff.Type, error) {
+	if err := target.Eval(ctx, s); err != nil {
 		return nil, err
 	}
 
-	if err := t.ActualEvaluator.Eval(ctx, s); err != nil {
+	if err := actual.Eval(ctx, s); err != nil {
 		return nil, err
 	}
 
-	res, err := t.Differ.Diff(s)
+	res, err := differ.Diff(s)
 	if err != nil {
 		return nil, err
 	}
 
-	t.Queuer.Done(s)
+	q.Done(s)
 
 	return res, nil
 }
@@ -217,19 +218,19 @@ func setStatus(s selector.Selector, status string) tea.Cmd {
 	}
 }
 
-func (t *DiffModel) loadConfigCmd() tea.Cmd {
+func loadConfigCmd(configPath string) tea.Cmd {
 	return func() tea.Msg {
-		c, err := t.loadConfig()
+		c, err := loadConfig(configPath)
 		if err != nil {
 			return displayError(err)
 		}
 
-		return setConfigMsg{config: c}
+		return configLoadedMsg{config: c}
 	}
 }
 
-func (t *DiffModel) loadConfig() (Config, error) {
-	f, err := os.ReadFile(t.InputPath)
+func loadConfig(configPath string) (Config, error) {
+	f, err := os.ReadFile(configPath)
 	if err != nil {
 		return Config{}, err
 	}
@@ -242,7 +243,7 @@ func (t *DiffModel) loadConfig() (Config, error) {
 	return c, nil
 }
 
-type setConfigMsg struct {
+type configLoadedMsg struct {
 	config Config
 }
 
@@ -256,9 +257,9 @@ type displayErrorMsg struct {
 	error error
 }
 
-func (t *DiffModel) translateBlueprintCmd(ctx context.Context) tea.Cmd {
+func translateBlueprintCmd(ctx context.Context, config Config) tea.Cmd {
 	return func() tea.Msg {
-		s, err := t.translateBlueprint(ctx)
+		s, err := translateBlueprint(ctx, config)
 		if err != nil {
 			return displayError(err)
 		}
@@ -268,12 +269,12 @@ func (t *DiffModel) translateBlueprintCmd(ctx context.Context) tea.Cmd {
 	}
 }
 
-func (t *DiffModel) translateBlueprint(ctx context.Context) (spec.Spec, error) {
+func translateBlueprint(ctx context.Context, config Config) (spec.Spec, error) {
 	translatorPlugManager := plug.Translator{
-		Dir: t.Config.TranslatorsDir,
+		Dir: config.TranslatorsDir,
 	}
 
-	client, stop, err := translatorPlugManager.Client(t.Config.Translator.Name, t.Config.Translator.Version)
+	client, stop, err := translatorPlugManager.Client(config.Translator.Name, config.Translator.Version)
 	if err != nil {
 		return spec.Spec{}, err
 	}
@@ -287,7 +288,7 @@ func (t *DiffModel) translateBlueprint(ctx context.Context) (spec.Spec, error) {
 	defer os.Remove(tempFile.Name())
 
 	_, err = client.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
-		InputPath:  t.Config.InputPath,
+		InputPath:  config.InputPath,
 		OutputPath: tempFile.Name(),
 	})
 	if err != nil {
@@ -315,7 +316,7 @@ func (t *DiffModel) translateBlueprint(ctx context.Context) (spec.Spec, error) {
 		DependencyMap: map[string][]string{},
 	}
 	if err := in.Interpret(ctx, s, ast.StmtBuild{
-		Alias: t.Config.Name,
+		Alias: config.Name,
 		Blueprint: ast.ExprBlueprint{
 			Stmts: bp.Stmts,
 		},
