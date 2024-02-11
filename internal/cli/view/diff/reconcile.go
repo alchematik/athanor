@@ -38,6 +38,7 @@ type Reconcile struct {
 	Spinner         spinner.Model
 	Differ          diff.Differ
 	API             *api.API
+	Error           error
 }
 
 func NewReconcile(params ShowParams) *tea.Program {
@@ -79,6 +80,8 @@ func (r *Reconcile) View() string {
 	case "reconciling":
 		t := r.ReconcileTree.View()
 		return t
+	case "error":
+		return "error: " + r.Error.Error() + "\n"
 	default:
 		return ""
 	}
@@ -248,6 +251,12 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				next: r.ReconcileQueuer.Next(),
 			}
 		})
+	case displayErrorMsg:
+		r.Error = msg.error
+		r.State = "error"
+		return r, quit
+	case quitMsg:
+		return r, tea.Quit
 	}
 
 	if r.State == "reconciling" {

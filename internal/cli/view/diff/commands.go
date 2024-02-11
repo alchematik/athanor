@@ -20,6 +20,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func quit() tea.Msg {
+	return quitMsg{}
+}
+
+type quitMsg struct{}
+
 func evaluateCmd(ctx context.Context, s selector.Selector, differ diff.Differ, q *selector.Queuer) tea.Cmd {
 	return func() tea.Msg {
 		res, err := evaluate(ctx, s, differ, q)

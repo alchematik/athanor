@@ -86,7 +86,7 @@ func (v *Show) View() string {
 	case showStateEvaluating:
 		return v.DiffTree.View()
 	case showStateError:
-		return "ERROR: " + v.Error.Error()
+		return "ERROR: " + v.Error.Error() + "\n"
 	default:
 		return ""
 	}
@@ -183,6 +183,8 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case displayErrorMsg:
 		v.Error = msg.error
 		v.State = showStateError
+		return v, quit
+	case quitMsg:
 		return v, tea.Quit
 	default:
 		var cmd tea.Cmd
