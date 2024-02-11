@@ -2,7 +2,6 @@ package diff
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
@@ -114,9 +113,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case configLoadedMsg:
 		r.Config = msg.config
 		return r, translateBlueprintCmd(r.Context, r.Config)
-		// cmds = append(cmds, translateBlueprintCmd(r.Context, r.Config))
 	case setSpecMsg:
-		fmt.Printf("SETTING SPEC\n")
 		r.Spec = msg.spec
 		entries := componentsToEntries(msg.spec.Components)
 		r.DiffTree.Root = &component.TreeNode{

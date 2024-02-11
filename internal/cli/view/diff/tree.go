@@ -6,9 +6,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
-	"sync"
 
-	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/diff"
@@ -19,157 +17,9 @@ import (
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/spec"
-	"github.com/alchematik/athanor/internal/state"
 
-	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/hashicorp/go-hclog"
 )
-
-type DiffModel struct {
-	Context         context.Context
-	InputPath       string
-	State           string
-	Spec            spec.Spec
-	TargetEvaluator *evaluator.Evaluator
-	ActualEvaluator *evaluator.Evaluator
-	Differ          diff.Differ
-	Config          Config
-	Queuer          *selector.Queuer
-	Tree            *component.TreeModel
-	Error           error
-}
-
-func NewDiff(ctx context.Context, inputPath string) *DiffModel {
-	s := spinner.New()
-	s.Spinner = spinner.MiniDot
-	s.Style = lipgloss.NewStyle().Foreground(component.ColorCyan500)
-	return &DiffModel{
-		Context:   ctx,
-		State:     showStateInitializing,
-		InputPath: inputPath,
-		Tree: &component.TreeModel{
-			Spinner: s,
-		},
-	}
-}
-
-func (t *DiffModel) Init() tea.Cmd {
-	return tea.Batch(t.Tree.Init(), loadConfigCmd(t.InputPath))
-}
-
-func (t *DiffModel) View() string {
-	switch t.State {
-	case showStateInitializing:
-		return "initializing..."
-	case showStateInterpreting:
-		return "interpreting..."
-	case showStateEvaluating:
-		return t.Tree.View()
-	case showStateError:
-		return "ERROR: " + t.Error.Error()
-	default:
-		return ""
-	}
-}
-
-func (t *DiffModel) Update(msg tea.Msg) (*DiffModel, tea.Cmd) {
-	switch msg := msg.(type) {
-	case configLoadedMsg:
-		t.Config = msg.config
-		t.State = showStateTranslating
-		return t, translateBlueprintCmd(t.Context, t.Config)
-	case setSpecMsg:
-		t.Spec = msg.spec
-		entries := componentsToEntries(msg.spec.Components)
-		t.Tree.Root = &component.TreeNode{
-			Entries: entries,
-		}
-
-		q := selector.NewQueuer(t.Config.Name, msg.spec)
-		t.Queuer = q
-
-		t.TargetEvaluator = evaluator.NewEvaluator(
-			&api.Unresolved{},
-			t.Spec,
-			state.Environment{
-				States:        map[string]state.Type{},
-				DependencyMap: map[string][]string{},
-			},
-		)
-
-		p := plug.NewProvider()
-		p.Dir = t.Config.ProvidersDir
-		p.Logger = hclog.NewNullLogger()
-		t.ActualEvaluator = evaluator.NewEvaluator(
-			&api.API{
-				ProviderPluginManager: p,
-			},
-			t.Spec,
-			state.Environment{
-				States:        map[string]state.Type{},
-				DependencyMap: map[string][]string{},
-			},
-		)
-		t.Differ = diff.Differ{
-			Target: t.TargetEvaluator.Env,
-			Actual: t.ActualEvaluator.Env,
-			Result: diff.Environment{
-				Diffs: map[string]diff.Type{},
-			},
-			Lock: &sync.Mutex{},
-		}
-		t.State = showStateEvaluating
-		return t, evaluateNext(t.Queuer)
-	case evaluateNextMsg:
-		if len(msg.next) == 0 {
-			return t, nil
-		}
-
-		var cmds []tea.Cmd
-		for _, n := range msg.next {
-			cmds = append(cmds, evaluateCmd(t.Context, n, t.TargetEvaluator, t.ActualEvaluator, t.Differ, t.Queuer))
-		}
-		return t, tea.Batch(cmds...)
-	case doneEvaluateSpecMsg:
-		return t, nil
-	case setStatusMsg:
-		next := t.Queuer.Next()
-		var cmds []tea.Cmd
-		cmds = append(cmds, tea.Batch(
-			func() tea.Msg { return evaluateNextMsg{next: next} },
-			func() tea.Msg {
-				// Initial evaluation of a blueprint is empty. Diff status is set later.
-				st := msg.status
-				if st == "" {
-					st = "loading"
-				}
-				return component.UpdateTreeNodeMsg{
-					Selector: msg.selector,
-					Status:   component.TreeNodeStatus(st),
-				}
-			},
-		))
-
-		if msg.selector.Parent == nil {
-			if t.Differ.Result.Diffs[msg.selector.Name].Operation() != diff.OperationEmpty {
-				cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
-			}
-		}
-
-		return t, tea.Sequence(cmds...)
-
-	case displayErrorMsg:
-		t.Error = msg.error
-		t.State = showStateError
-		return t, tea.Quit
-	default:
-		var cmd tea.Cmd
-		t.Tree, cmd = t.Tree.Update(msg)
-		return t, cmd
-	}
-}
 
 func evaluateCmd(ctx context.Context, s selector.Selector, target, actual *evaluator.Evaluator, differ diff.Differ, q *selector.Queuer) tea.Cmd {
 	return func() tea.Msg {

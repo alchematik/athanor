@@ -3,11 +3,23 @@ package diff
 import (
 	"context"
 	"fmt"
+	"sync"
 
+	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/cli/view/component"
+	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
+	plug "github.com/alchematik/athanor/internal/plugin"
+	"github.com/alchematik/athanor/internal/selector"
+	"github.com/alchematik/athanor/internal/spec"
+	"github.com/alchematik/athanor/internal/state"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -19,7 +31,18 @@ const (
 )
 
 type Show struct {
-	Tree *DiffModel
+	Context         context.Context
+	Config          Config
+	Spec            spec.Spec
+	State           string
+	InputPath       string
+	DiffTree        *component.TreeModel
+	DiffQueuer      *selector.Queuer
+	Spinner         spinner.Model
+	TargetEvaluator *evaluator.Evaluator
+	ActualEvaluator *evaluator.Evaluator
+	Differ          diff.Differ
+	Error           error
 }
 
 type Config struct {
@@ -39,18 +62,36 @@ type ShowParams struct {
 }
 
 func NewShow(params ShowParams) *tea.Program {
-	t := NewDiff(params.Context, params.Path)
+	s := spinner.New()
+	s.Spinner = spinner.MiniDot
+	s.Style = lipgloss.NewStyle().Foreground(component.ColorCyan500)
 	return tea.NewProgram(&Show{
-		Tree: t,
+		Context:   params.Context,
+		State:     showStateInitializing,
+		InputPath: params.Path,
+		DiffTree: &component.TreeModel{
+			Spinner: s,
+		},
 	})
 }
 
 func (v *Show) Init() tea.Cmd {
-	return v.Tree.Init()
+	return tea.Batch(v.Spinner.Tick, loadConfigCmd(v.InputPath))
 }
 
 func (v *Show) View() string {
-	return v.Tree.View()
+	switch v.State {
+	case showStateInitializing:
+		return "initializing..."
+	case showStateInterpreting:
+		return "interpreting..."
+	case showStateEvaluating:
+		return v.DiffTree.View()
+	case showStateError:
+		return "ERROR: " + v.Error.Error()
+	default:
+		return ""
+	}
 }
 
 func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -63,9 +104,94 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v, nil
 	case doneEvaluateSpecMsg:
 		return v, tea.Quit
+	case configLoadedMsg:
+		v.Config = msg.config
+		v.State = showStateTranslating
+		return v, translateBlueprintCmd(v.Context, v.Config)
+	case setSpecMsg:
+		v.Spec = msg.spec
+		entries := componentsToEntries(msg.spec.Components)
+		v.DiffTree.Root = &component.TreeNode{
+			Entries: entries,
+		}
+
+		q := selector.NewQueuer(v.Config.Name, msg.spec)
+		v.DiffQueuer = q
+
+		v.TargetEvaluator = evaluator.NewEvaluator(
+			&api.Unresolved{},
+			v.Spec,
+			state.Environment{
+				States:        map[string]state.Type{},
+				DependencyMap: map[string][]string{},
+			},
+		)
+
+		p := plug.NewProvider()
+		p.Dir = v.Config.ProvidersDir
+		p.Logger = hclog.NewNullLogger()
+		v.ActualEvaluator = evaluator.NewEvaluator(
+			&api.API{
+				ProviderPluginManager: p,
+			},
+			v.Spec,
+			state.Environment{
+				States:        map[string]state.Type{},
+				DependencyMap: map[string][]string{},
+			},
+		)
+		v.Differ = diff.Differ{
+			Target: v.TargetEvaluator.Env,
+			Actual: v.ActualEvaluator.Env,
+			Result: diff.Environment{
+				Diffs: map[string]diff.Type{},
+			},
+			Lock: &sync.Mutex{},
+		}
+		v.State = showStateEvaluating
+		return v, evaluateNext(v.DiffQueuer)
+	case evaluateNextMsg:
+		if len(msg.next) == 0 {
+			return v, nil
+		}
+
+		var cmds []tea.Cmd
+		for _, n := range msg.next {
+			cmds = append(cmds, evaluateCmd(v.Context, n, v.TargetEvaluator, v.ActualEvaluator, v.Differ, v.DiffQueuer))
+		}
+		return v, tea.Batch(cmds...)
+	case setStatusMsg:
+		next := v.DiffQueuer.Next()
+		var cmds []tea.Cmd
+		cmds = append(cmds, tea.Batch(
+			func() tea.Msg { return evaluateNextMsg{next: next} },
+			func() tea.Msg {
+				// Initial evaluation of a blueprint is empty. Diff status is set later.
+				st := msg.status
+				if st == "" {
+					st = "loading"
+				}
+				return component.UpdateTreeNodeMsg{
+					Selector: msg.selector,
+					Status:   component.TreeNodeStatus(st),
+				}
+			},
+		))
+
+		if msg.selector.Parent == nil {
+			if v.Differ.Result.Diffs[msg.selector.Name].Operation() != diff.OperationEmpty {
+				cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
+			}
+		}
+
+		return v, tea.Sequence(cmds...)
+	case displayErrorMsg:
+		v.Error = msg.error
+		v.State = showStateError
+		return v, tea.Quit
 	default:
 		var cmd tea.Cmd
-		v.Tree, cmd = v.Tree.Update(msg)
+		v.DiffTree, cmd = v.DiffTree.Update(msg)
 		return v, cmd
 	}
 }
