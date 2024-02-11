@@ -31,18 +31,16 @@ const (
 )
 
 type Show struct {
-	Context         context.Context
-	Config          Config
-	Spec            spec.Spec
-	State           string
-	InputPath       string
-	DiffTree        *component.TreeModel
-	DiffQueuer      *selector.Queuer
-	Spinner         spinner.Model
-	TargetEvaluator *evaluator.Evaluator
-	ActualEvaluator *evaluator.Evaluator
-	Differ          diff.Differ
-	Error           error
+	Context    context.Context
+	Config     Config
+	Spec       spec.Spec
+	State      string
+	InputPath  string
+	DiffTree   *component.TreeModel
+	DiffQueuer *selector.Queuer
+	Spinner    spinner.Model
+	Differ     diff.Differ
+	Error      error
 }
 
 type Config struct {
@@ -110,15 +108,13 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v, translateBlueprintCmd(v.Context, v.Config)
 	case setSpecMsg:
 		v.Spec = msg.spec
-		entries := componentsToEntries(msg.spec.Components)
 		v.DiffTree.Root = &component.TreeNode{
-			Entries: entries,
+			Entries: componentsToEntries(msg.spec.Components),
 		}
 
-		q := selector.NewQueuer(v.Config.Name, msg.spec)
-		v.DiffQueuer = q
+		v.DiffQueuer = selector.NewQueuer(v.Config.Name, msg.spec)
 
-		v.TargetEvaluator = evaluator.NewEvaluator(
+		target := evaluator.NewEvaluator(
 			&api.Unresolved{},
 			v.Spec,
 			state.Environment{
@@ -127,12 +123,9 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 
-		p := plug.NewProvider()
-		p.Dir = v.Config.ProvidersDir
-		p.Logger = hclog.NewNullLogger()
-		v.ActualEvaluator = evaluator.NewEvaluator(
+		actual := evaluator.NewEvaluator(
 			&api.API{
-				ProviderPluginManager: p,
+				ProviderPluginManager: plug.NewProvider(v.Config.ProvidersDir, hclog.NewNullLogger()),
 			},
 			v.Spec,
 			state.Environment{
@@ -140,14 +133,16 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				DependencyMap: map[string][]string{},
 			},
 		)
+
 		v.Differ = diff.Differ{
-			Target: v.TargetEvaluator.Env,
-			Actual: v.ActualEvaluator.Env,
+			Target: target,
+			Actual: actual,
 			Result: diff.Environment{
 				Diffs: map[string]diff.Type{},
 			},
 			Lock: &sync.Mutex{},
 		}
+
 		v.State = showStateEvaluating
 		return v, evaluateNext(v.DiffQueuer)
 	case evaluateNextMsg:
@@ -157,7 +152,7 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		var cmds []tea.Cmd
 		for _, n := range msg.next {
-			cmds = append(cmds, evaluateCmd(v.Context, n, v.TargetEvaluator, v.ActualEvaluator, v.Differ, v.DiffQueuer))
+			cmds = append(cmds, evaluateCmd(v.Context, n, v.Differ, v.DiffQueuer))
 		}
 		return v, tea.Batch(cmds...)
 	case setStatusMsg:

@@ -10,7 +10,6 @@ import (
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/diff"
-	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/internal/interpreter"
@@ -21,9 +20,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func evaluateCmd(ctx context.Context, s selector.Selector, target, actual *evaluator.Evaluator, differ diff.Differ, q *selector.Queuer) tea.Cmd {
+func evaluateCmd(ctx context.Context, s selector.Selector, differ diff.Differ, q *selector.Queuer) tea.Cmd {
 	return func() tea.Msg {
-		res, err := evaluate(ctx, s, target, actual, differ, q)
+		res, err := evaluate(ctx, s, differ, q)
 		if err != nil {
 			return displayError(err)
 		}
@@ -35,16 +34,8 @@ func evaluateCmd(ctx context.Context, s selector.Selector, target, actual *evalu
 	}
 }
 
-func evaluate(ctx context.Context, s selector.Selector, target, actual *evaluator.Evaluator, differ diff.Differ, q *selector.Queuer) (diff.Type, error) {
-	if err := target.Eval(ctx, s); err != nil {
-		return nil, err
-	}
-
-	if err := actual.Eval(ctx, s); err != nil {
-		return nil, err
-	}
-
-	res, err := differ.Diff(s)
+func evaluate(ctx context.Context, s selector.Selector, differ diff.Differ, q *selector.Queuer) (diff.Type, error) {
+	res, err := differ.Diff(ctx, s)
 	if err != nil {
 		return nil, err
 	}

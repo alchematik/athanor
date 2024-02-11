@@ -23,8 +23,10 @@ type Provider struct {
 	lock    *sync.Mutex
 }
 
-func NewProvider() *Provider {
+func NewProvider(dir string, logger hclog.Logger) *Provider {
 	return &Provider{
+		Dir:     dir,
+		Logger:  logger,
 		clients: map[string]backendpb.ProviderClient{},
 		lock:    &sync.Mutex{},
 	}

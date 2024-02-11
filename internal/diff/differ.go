@@ -1,38 +1,33 @@
 package diff
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
+	"github.com/alchematik/athanor/internal/evaluator"
 	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/state"
 )
 
 type Differ struct {
-	Target state.Environment
-	Actual state.Environment
+	Target *evaluator.Evaluator
+	Actual *evaluator.Evaluator
 	Result Environment
 
 	Lock *sync.Mutex
 }
 
-func (d *Differ) Diff(s selector.Selector) (Type, error) {
-	targetEnv, ok := selector.SelectEnvironment(d.Target, s)
-	if !ok {
-		targetEnv = state.Environment{
-			States: map[string]state.Type{},
-		}
+func (d *Differ) Diff(ctx context.Context, s selector.Selector) (Type, error) {
+	target, err := d.Target.Eval(ctx, s)
+	if err != nil {
+		return nil, err
 	}
 
-	actualEnv, ok := selector.SelectEnvironment(d.Actual, s)
-	if !ok {
-		actualEnv = state.Environment{
-			States: map[string]state.Type{},
-		}
+	actual, err := d.Actual.Eval(ctx, s)
+	if err != nil {
+		return nil, err
 	}
-
-	targetVal := targetEnv.States[s.Name]
-	actualVal := actualEnv.States[s.Name]
 
 	e, ok := SelectDiffEnvironment(d.Result, s)
 	if !ok {
@@ -40,9 +35,8 @@ func (d *Differ) Diff(s selector.Selector) (Type, error) {
 	}
 
 	var result Type
-	var err error
 
-	switch actual := actualVal.(type) {
+	switch actual := actual.(type) {
 	case state.Environment:
 		current, ok := e.Diffs[s.Name].(Environment)
 		if !ok {
@@ -83,12 +77,12 @@ func (d *Differ) Diff(s selector.Selector) (Type, error) {
 		d.Lock.Unlock()
 		return current, nil
 	case state.Resource:
-		if targetVal == nil {
+		if target == nil {
 			result, err = resourceDiff(actual, state.Resource{})
 		} else {
-			target, ok := targetVal.(state.Resource)
+			target, ok := target.(state.Resource)
 			if !ok {
-				return nil, fmt.Errorf("invalid diff: trying to compare Resource to %T", targetVal)
+				return nil, fmt.Errorf("invalid diff: trying to compare Resource to %T", target)
 			}
 
 			result, err = resourceDiff(actual, target)
@@ -102,7 +96,7 @@ func (d *Differ) Diff(s selector.Selector) (Type, error) {
 		d.Lock.Unlock()
 		return result, nil
 	case nil:
-		switch target := targetVal.(type) {
+		switch target := target.(type) {
 		case state.Resource:
 			result, err := resourceDiff(state.Resource{}, target)
 			if err != nil {
@@ -114,10 +108,10 @@ func (d *Differ) Diff(s selector.Selector) (Type, error) {
 			d.Lock.Unlock()
 			return result, nil
 		default:
-			return nil, fmt.Errorf("unhandled target type for diff: %T", targetVal)
+			return nil, fmt.Errorf("unhandled target type for diff: %T", target)
 		}
 	default:
-		return nil, fmt.Errorf("unhandled type for diff: %T", actualVal)
+		return nil, fmt.Errorf("unhandled type for diff: %T", actual)
 	}
 }
 

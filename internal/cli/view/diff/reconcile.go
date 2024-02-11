@@ -36,10 +36,8 @@ type Reconcile struct {
 	DiffTree        *component.TreeModel
 	DiffQueuer      *selector.Queuer
 	Spinner         spinner.Model
-
-	TargetEvaluator *evaluator.Evaluator
-	ActualEvaluator *evaluator.Evaluator
 	Differ          diff.Differ
+	API             *api.API
 }
 
 func NewReconcile(params ShowParams) *tea.Program {
@@ -123,7 +121,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		q := selector.NewQueuer(r.Config.Name, msg.spec)
 		r.DiffQueuer = q
 
-		r.TargetEvaluator = evaluator.NewEvaluator(
+		target := evaluator.NewEvaluator(
 			&api.Unresolved{},
 			r.Spec,
 			state.Environment{
@@ -132,13 +130,12 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 
-		p := plug.NewProvider()
-		p.Dir = r.Config.ProvidersDir
-		p.Logger = hclog.NewNullLogger()
-		r.ActualEvaluator = evaluator.NewEvaluator(
-			&api.API{
-				ProviderPluginManager: p,
-			},
+		r.API = &api.API{
+			ProviderPluginManager: plug.NewProvider(r.Config.ProvidersDir, hclog.NewNullLogger()),
+		}
+
+		actual := evaluator.NewEvaluator(
+			r.API,
 			r.Spec,
 			state.Environment{
 				States:        map[string]state.Type{},
@@ -146,8 +143,8 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 		r.Differ = diff.Differ{
-			Target: r.TargetEvaluator.Env,
-			Actual: r.ActualEvaluator.Env,
+			Target: target,
+			Actual: actual,
 			Result: diff.Environment{
 				Diffs: map[string]diff.Type{},
 			},
@@ -161,7 +158,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		for _, n := range msg.next {
-			cmds = append(cmds, evaluateCmd(r.Context, n, r.TargetEvaluator, r.ActualEvaluator, r.Differ, r.DiffQueuer))
+			cmds = append(cmds, evaluateCmd(r.Context, n, r.Differ, r.DiffQueuer))
 		}
 		return r, tea.Batch(cmds...)
 	case setStatusMsg:
@@ -201,17 +198,11 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if r.State == "ready" {
 			switch msg.String() {
 			case "y":
-				p := plug.NewProvider()
-				p.Dir = r.Config.ProvidersDir
-				p.Logger = hclog.NewNullLogger()
-				a := api.API{
-					ProviderPluginManager: p,
-				}
 				e := state.Environment{
 					States:        map[string]state.Type{},
 					DependencyMap: map[string][]string{},
 				}
-				r.Reconciler = reconcile.NewReconciler(a, r.Differ.Result, e)
+				r.Reconciler = reconcile.NewReconciler(r.API, r.Differ.Result, e)
 
 				q := selector.NewQueuer(r.Config.Name, r.Spec)
 				r.ReconcileQueuer = q
