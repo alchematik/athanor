@@ -41,6 +41,8 @@ type Show struct {
 	Spinner    spinner.Model
 	Differ     diff.Differ
 	Error      error
+
+	Logger hclog.Logger
 }
 
 type Config struct {
@@ -63,6 +65,14 @@ func NewShow(params ShowParams) *tea.Program {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(component.ColorCyan500)
+	// f, err := tea.LogToFile("debug.log", "debug")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// logger := hclog.New(&hclog.LoggerOptions{
+	// 	Output: f,
+	// 	Level:  hclog.Debug,
+	// })
 	return tea.NewProgram(&Show{
 		Context:   params.Context,
 		State:     showStateInitializing,
@@ -70,6 +80,7 @@ func NewShow(params ShowParams) *tea.Program {
 		DiffTree: &component.TreeModel{
 			Spinner: s,
 		},
+		Logger: hclog.NewNullLogger(),
 	})
 }
 
@@ -123,9 +134,11 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 
+		v.Logger.Info("HEY AGAIN")
+
 		actual := evaluator.NewEvaluator(
 			&api.API{
-				ProviderPluginManager: plug.NewProvider(v.Config.ProvidersDir, hclog.NewNullLogger()),
+				ProviderPluginManager: plug.NewProvider(v.Config.ProvidersDir, v.Logger),
 			},
 			v.Spec,
 			state.Environment{

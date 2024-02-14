@@ -39,12 +39,24 @@ type Reconcile struct {
 	Differ          diff.Differ
 	API             *api.API
 	Error           error
+
+	Logger hclog.Logger
 }
 
 func NewReconcile(params ShowParams) *tea.Program {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(component.ColorCyan500)
+
+	// f, err := tea.LogToFile("debug.log", "debug")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// logger := hclog.New(&hclog.LoggerOptions{
+	// 	Output: f,
+	// 	Level:  hclog.Debug,
+	// })
+	logger := hclog.NewNullLogger()
 	return tea.NewProgram(&Reconcile{
 		Context: params.Context,
 		State:   "initializing",
@@ -57,6 +69,7 @@ func NewReconcile(params ShowParams) *tea.Program {
 			Spinner: s,
 		},
 		Spinner: s,
+		Logger:  logger,
 	})
 }
 
@@ -134,7 +147,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		)
 
 		r.API = &api.API{
-			ProviderPluginManager: plug.NewProvider(r.Config.ProvidersDir, hclog.NewNullLogger()),
+			ProviderPluginManager: plug.NewProvider(r.Config.ProvidersDir, r.Logger),
 		}
 
 		actual := evaluator.NewEvaluator(

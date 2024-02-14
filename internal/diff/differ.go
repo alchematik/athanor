@@ -191,6 +191,16 @@ func (l List) Operation() Operation {
 	return l.DiffOperation
 }
 
+type Identifier struct {
+	From          state.Identifier
+	To            state.Identifier
+	DiffOperation Operation
+}
+
+func (d Identifier) Operation() Operation {
+	return d.DiffOperation
+}
+
 type Resource struct {
 	From          state.Resource
 	To            state.Resource
@@ -264,8 +274,10 @@ func Diff(from, to state.Type) (Type, error) {
 			return fileDiff(state.File{}, t)
 		case state.List:
 			return listDiff(state.List{}, t)
+		case state.Identifier:
+			return identifierDiff(state.Identifier{}, t)
 		default:
-			return nil, fmt.Errorf("invalid type for nil diff: %T", to)
+			return nil, fmt.Errorf("invalid type for nil diff: %T, %+v", to, to)
 		}
 	}
 
@@ -283,6 +295,17 @@ func Diff(from, to state.Type) (Type, error) {
 		}
 
 		return environmentDiff(f, t)
+	case state.Identifier:
+		if toIsEmpty {
+			return identifierDiff(f, state.Identifier{})
+		}
+
+		t, ok := to.(state.Identifier)
+		if !ok {
+			return nil, fmt.Errorf("invalid type for identifier diff: %T", to)
+		}
+
+		return identifierDiff(f, t)
 	case state.String:
 		if toIsEmpty {
 			return stringDiff(f, state.String{})
@@ -535,6 +558,41 @@ func fileDiff(from, to state.File) (File, error) {
 		From:          from,
 		To:            to,
 		DiffOperation: op,
+	}, nil
+}
+
+func identifierDiff(from, to state.Identifier) (Identifier, error) {
+	if from.ResourceType == "" && to.ResourceType != "" {
+		return Identifier{
+			From:          from,
+			To:            to,
+			DiffOperation: OperationCreate,
+		}, nil
+	}
+
+	if from.ResourceType != "" && to.ResourceType == "" {
+		return Identifier{
+			DiffOperation: OperationDelete,
+		}, nil
+	}
+
+	if from.ResourceType != to.ResourceType {
+		return Identifier{
+			From:          from,
+			To:            to,
+			DiffOperation: OperationUpdate,
+		}, nil
+	}
+
+	valDiff, err := Diff(from.Value, to.Value)
+	if err != nil {
+		return Identifier{}, err
+	}
+
+	return Identifier{
+		From:          from,
+		To:            to,
+		DiffOperation: valDiff.Operation(),
 	}, nil
 }
 

@@ -327,6 +327,10 @@ func toProto(val state.Type) (*providerpb.Value, error) {
 				BoolValue: v.Value,
 			},
 		}, nil
+	case state.Nil:
+		return &providerpb.Value{
+			Type: &providerpb.Value_Nil{},
+		}, nil
 	default:
 		return nil, fmt.Errorf("convert proto: unknown type %T\n", val)
 	}
