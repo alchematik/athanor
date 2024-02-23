@@ -249,6 +249,8 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 		}
 
 		return fields, nil
+	case diff.Identifier:
+		return nil, nil
 	default:
 		return nil, fmt.Errorf("unsupported type for mask %T\n", d)
 	}

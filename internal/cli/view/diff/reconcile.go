@@ -43,20 +43,23 @@ type Reconcile struct {
 	Logger hclog.Logger
 }
 
-func NewReconcile(params ShowParams) *tea.Program {
+func NewReconcile(params ShowParams) (*tea.Program, error) {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(component.ColorCyan500)
 
-	// f, err := tea.LogToFile("debug.log", "debug")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// logger := hclog.New(&hclog.LoggerOptions{
-	// 	Output: f,
-	// 	Level:  hclog.Debug,
-	// })
 	logger := hclog.NewNullLogger()
+	if params.Debug {
+		f, err := tea.LogToFile("debug.log", "debug")
+		if err != nil {
+			return nil, err
+		}
+
+		logger = hclog.New(&hclog.LoggerOptions{
+			Output: f,
+			Level:  hclog.Debug,
+		})
+	}
 	return tea.NewProgram(&Reconcile{
 		Context: params.Context,
 		State:   "initializing",
@@ -70,7 +73,7 @@ func NewReconcile(params ShowParams) *tea.Program {
 		},
 		Spinner: s,
 		Logger:  logger,
-	})
+	}), nil
 }
 
 func (r *Reconcile) Init() tea.Cmd {
@@ -123,6 +126,21 @@ func (k reconcileHelpKeyMap) FullHelp() [][]key.Binding {
 
 func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	if r.State == "reconciling" {
+		var reconcileTreeCmd tea.Cmd
+		r.ReconcileTree, reconcileTreeCmd = r.ReconcileTree.Update(msg)
+		if reconcileTreeCmd != nil {
+			cmds = append(cmds, reconcileTreeCmd)
+		}
+	} else {
+		var treeCmd tea.Cmd
+		r.DiffTree, treeCmd = r.DiffTree.Update(msg)
+		if treeCmd != nil {
+			cmds = append(cmds, treeCmd)
+		}
+	}
+
 	switch msg := msg.(type) {
 	case configLoadedMsg:
 		r.Config = msg.config
@@ -174,12 +192,11 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		for _, n := range msg.next {
-			cmds = append(cmds, evaluateCmd(r.Context, n, r.Differ, r.DiffQueuer))
+			cmds = append(cmds, evaluateCmd(r.Logger, r.Context, n, r.Differ, r.DiffQueuer))
 		}
 		return r, tea.Batch(cmds...)
 	case setStatusMsg:
 		next := r.DiffQueuer.Next()
-		var cmds []tea.Cmd
 		cmds = append(cmds, tea.Batch(
 			func() tea.Msg { return evaluateNextMsg{next: next} },
 			func() tea.Msg {
@@ -202,10 +219,6 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return r, tea.Sequence(cmds...)
-	case spinner.TickMsg:
-		if r.State == "ready" {
-			return r, nil
-		}
 	case tea.KeyMsg:
 		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
 			return r, tea.Quit
@@ -247,7 +260,6 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return r, nil
 		}
 
-		var cmds []tea.Cmd
 		for _, n := range msg.next {
 			cmds = append(cmds, r.reconcileCmd(n))
 		}
@@ -270,20 +282,6 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return r, quit
 	case quitMsg:
 		return r, tea.Quit
-	}
-
-	if r.State == "reconciling" {
-		var reconcileTreeCmd tea.Cmd
-		r.ReconcileTree, reconcileTreeCmd = r.ReconcileTree.Update(msg)
-		if reconcileTreeCmd != nil {
-			cmds = append(cmds, reconcileTreeCmd)
-		}
-	} else {
-		var treeCmd tea.Cmd
-		r.DiffTree, treeCmd = r.DiffTree.Update(msg)
-		if treeCmd != nil {
-			cmds = append(cmds, treeCmd)
-		}
 	}
 
 	if len(cmds) == 0 {

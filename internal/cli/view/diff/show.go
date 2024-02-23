@@ -59,20 +59,24 @@ type Config struct {
 type ShowParams struct {
 	Context context.Context
 	Path    string
+	Debug   bool
 }
 
-func NewShow(params ShowParams) *tea.Program {
+func NewShow(params ShowParams) (*tea.Program, error) {
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(component.ColorCyan500)
-	// f, err := tea.LogToFile("debug.log", "debug")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// logger := hclog.New(&hclog.LoggerOptions{
-	// 	Output: f,
-	// 	Level:  hclog.Debug,
-	// })
+	logger := hclog.NewNullLogger()
+	if params.Debug {
+		f, err := tea.LogToFile("debug.log", "debug")
+		if err != nil {
+			return nil, err
+		}
+		logger = hclog.New(&hclog.LoggerOptions{
+			Output: f,
+			Level:  hclog.Debug,
+		})
+	}
 	return tea.NewProgram(&Show{
 		Context:   params.Context,
 		State:     showStateInitializing,
@@ -80,8 +84,8 @@ func NewShow(params ShowParams) *tea.Program {
 		DiffTree: &component.TreeModel{
 			Spinner: s,
 		},
-		Logger: hclog.NewNullLogger(),
-	})
+		Logger: logger,
+	}), nil
 }
 
 func (v *Show) Init() tea.Cmd {
@@ -134,8 +138,6 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 
-		v.Logger.Info("HEY AGAIN")
-
 		actual := evaluator.NewEvaluator(
 			&api.API{
 				ProviderPluginManager: plug.NewProvider(v.Config.ProvidersDir, v.Logger),
@@ -165,7 +167,7 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		var cmds []tea.Cmd
 		for _, n := range msg.next {
-			cmds = append(cmds, evaluateCmd(v.Context, n, v.Differ, v.DiffQueuer))
+			cmds = append(cmds, evaluateCmd(v.Logger, v.Context, n, v.Differ, v.DiffQueuer))
 		}
 		return v, tea.Batch(cmds...)
 	case setStatusMsg:

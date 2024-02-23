@@ -18,6 +18,7 @@ import (
 	"github.com/alchematik/athanor/internal/spec"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/hashicorp/go-hclog"
 )
 
 func quit() tea.Msg {
@@ -26,7 +27,7 @@ func quit() tea.Msg {
 
 type quitMsg struct{}
 
-func evaluateCmd(ctx context.Context, s selector.Selector, differ diff.Differ, q *selector.Queuer) tea.Cmd {
+func evaluateCmd(logger hclog.Logger, ctx context.Context, s selector.Selector, differ diff.Differ, q *selector.Queuer) tea.Cmd {
 	return func() tea.Msg {
 		res, err := evaluate(ctx, s, differ, q)
 		if err != nil {

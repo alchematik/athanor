@@ -655,7 +655,7 @@ func listDiff(from, to state.List) (List, error) {
 			i++
 		}
 		for i < len(to.Elements) {
-			d, err := Diff(state.Nil{}, from.Elements[i])
+			d, err := Diff(state.Nil{}, to.Elements[i])
 			if err != nil {
 				return List{}, err
 			}
