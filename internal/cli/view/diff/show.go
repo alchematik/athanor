@@ -9,6 +9,7 @@ import (
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	plug "github.com/alchematik/athanor/internal/plugin"
@@ -39,7 +40,7 @@ type Show struct {
 	DiffTree   *component.TreeModel
 	DiffQueuer *selector.Queuer
 	Spinner    spinner.Model
-	Differ     diff.Differ
+	Differ     differ.Differ
 	Error      error
 
 	Logger hclog.Logger
@@ -149,7 +150,7 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 
-		v.Differ = diff.Differ{
+		v.Differ = differ.Differ{
 			Target: target,
 			Actual: actual,
 			Result: diff.Environment{

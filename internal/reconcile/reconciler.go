@@ -7,6 +7,7 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/state"
 )
@@ -51,7 +52,7 @@ func (r *Reconciler) Next() []selector.Selector {
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, sel selector.Selector) (bool, error) {
-	e, ok := diff.SelectDiffEnvironment(r.Env, sel)
+	e, ok := differ.SelectDiffEnvironment(r.Env, sel)
 	if !ok {
 		return false, fmt.Errorf("cannot find environment with selector: %v", sel)
 	}

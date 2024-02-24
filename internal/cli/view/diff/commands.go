@@ -10,6 +10,7 @@ import (
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/differ"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/internal/interpreter"
@@ -27,7 +28,7 @@ func quit() tea.Msg {
 
 type quitMsg struct{}
 
-func evaluateCmd(logger hclog.Logger, ctx context.Context, s selector.Selector, differ diff.Differ, q *selector.Queuer) tea.Cmd {
+func evaluateCmd(logger hclog.Logger, ctx context.Context, s selector.Selector, differ differ.Differ, q *selector.Queuer) tea.Cmd {
 	return func() tea.Msg {
 		res, err := evaluate(ctx, s, differ, q)
 		if err != nil {
@@ -41,7 +42,7 @@ func evaluateCmd(logger hclog.Logger, ctx context.Context, s selector.Selector, 
 	}
 }
 
-func evaluate(ctx context.Context, s selector.Selector, differ diff.Differ, q *selector.Queuer) (diff.Type, error) {
+func evaluate(ctx context.Context, s selector.Selector, differ differ.Differ, q *selector.Queuer) (diff.Type, error) {
 	res, err := differ.Diff(ctx, s)
 	if err != nil {
 		return nil, err

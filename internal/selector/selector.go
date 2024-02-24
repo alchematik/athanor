@@ -4,9 +4,9 @@ import (
 	// "fmt"
 	"sync"
 
+	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/spec"
 	"github.com/alchematik/athanor/internal/state"
-	// "github.com/alchematik/athanor/internal/diff"
 )
 
 type Queuer struct {
@@ -29,7 +29,9 @@ func NewQueuer(name string, s spec.Spec) *Queuer {
 	return q
 }
 
-// func FromDiff(q *Queuer, sel *Selector, d diff.Differ)
+func FromDiff(q *Queuer, sel *Selector, d diff.Environment) {
+
+}
 
 func FromSpec(q *Queuer, sel *Selector, s spec.Spec) {
 	for dependent, dependencies := range s.DependencyMap {
@@ -65,14 +67,6 @@ func FromSpec(q *Queuer, sel *Selector, s spec.Spec) {
 func (q *Queuer) Next() []Selector {
 	q.lock.Lock()
 	defer q.lock.Unlock()
-
-	// for k, v := range q.dependencyToDependents {
-	// 	fmt.Printf("%v -> ", k)
-	// 	for _, val := range v {
-	// 		fmt.Printf("%v, ", val)
-	// 	}
-	// 	fmt.Println()
-	// }
 
 	queue := q.queue
 	q.queue = []Selector{}

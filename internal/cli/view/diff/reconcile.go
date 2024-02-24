@@ -8,6 +8,7 @@ import (
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/diff"
 	internaldiff "github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/reconcile"
@@ -36,7 +37,7 @@ type Reconcile struct {
 	DiffTree        *component.TreeModel
 	DiffQueuer      *selector.Queuer
 	Spinner         spinner.Model
-	Differ          diff.Differ
+	Differ          differ.Differ
 	API             *api.API
 	Error           error
 
@@ -176,7 +177,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				DependencyMap: map[string][]string{},
 			},
 		)
-		r.Differ = diff.Differ{
+		r.Differ = differ.Differ{
 			Target: target,
 			Actual: actual,
 			Result: diff.Environment{

@@ -1,9 +1,9 @@
-package diff_test
+package differ_test
 
 import (
 	"testing"
 
-	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/state"
 	"github.com/stretchr/testify/require"
 )
