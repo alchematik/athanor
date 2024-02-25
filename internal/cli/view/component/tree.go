@@ -103,6 +103,7 @@ const (
 	TreeNodeStatusCreate                 = "create"
 	TreeNodeStatusDelete                 = "delete"
 	TreeNodeStatusDone                   = "done"
+	TreeNodeStatusEmpty                  = ""
 )
 
 func (m *TreeModel) renderTreeNodeStatus(s TreeNodeStatus) string {

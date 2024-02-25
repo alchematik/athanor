@@ -8,14 +8,11 @@ import (
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/cli/view/component"
-	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/selector"
-	"github.com/alchematik/athanor/internal/spec"
-	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -32,16 +29,15 @@ const (
 )
 
 type Show struct {
-	Context    context.Context
-	Config     Config
-	Spec       spec.Spec
-	State      string
-	InputPath  string
-	DiffTree   *component.TreeModel
-	DiffQueuer *selector.Queuer
-	Spinner    spinner.Model
-	Differ     differ.Differ
-	Error      error
+	Context   context.Context
+	Config    Config
+	State     string
+	InputPath string
+	DiffTree  *component.TreeModel
+	Spinner   spinner.Model
+	Error     error
+
+	Controller *selector.DiffController
 
 	Logger hclog.Logger
 }
@@ -123,44 +119,32 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		v.State = showStateTranslating
 		return v, translateBlueprintCmd(v.Context, v.Config)
 	case setSpecMsg:
-		v.Spec = msg.spec
 		v.DiffTree.Root = &component.TreeNode{
-			Entries: componentsToEntries(msg.spec.Components),
+			Entries: componentsToEntries(msg.spec.Spec.Components),
 		}
 
-		v.DiffQueuer = selector.NewQueuer(v.Config.Name, msg.spec)
-
-		target := evaluator.NewEvaluator(
-			&api.Unresolved{},
-			v.Spec,
-			state.Environment{
-				States:        map[string]state.Type{},
-				DependencyMap: map[string][]string{},
-			},
-		)
+		target := evaluator.NewEvaluator(&api.Unresolved{})
 
 		actual := evaluator.NewEvaluator(
 			&api.API{
 				ProviderPluginManager: plug.NewProvider(v.Config.ProvidersDir, v.Logger),
 			},
-			v.Spec,
-			state.Environment{
-				States:        map[string]state.Type{},
-				DependencyMap: map[string][]string{},
-			},
 		)
 
-		v.Differ = differ.Differ{
-			Target: target,
-			Actual: actual,
-			Result: diff.Environment{
-				Diffs: map[string]diff.Type{},
-			},
+		d := differ.Differ{
 			Lock: &sync.Mutex{},
 		}
 
+		v.Controller = selector.NewDiffController(
+			v.Logger,
+			msg.spec,
+			target,
+			actual,
+			d,
+		)
+
 		v.State = showStateEvaluating
-		return v, evaluateNext(v.DiffQueuer)
+		return v, evaluateNext(v.Controller)
 	case evaluateNextMsg:
 		if len(msg.next) == 0 {
 			return v, nil
@@ -168,31 +152,25 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		var cmds []tea.Cmd
 		for _, n := range msg.next {
-			cmds = append(cmds, evaluateCmd(v.Logger, v.Context, n, v.Differ, v.DiffQueuer))
+			cmds = append(cmds, evaluateCmd(v.Logger, v.Context, v.Controller, n))
 		}
+
 		return v, tea.Batch(cmds...)
 	case setStatusMsg:
-		next := v.DiffQueuer.Next()
+		next := v.Controller.Next()
 		var cmds []tea.Cmd
 		cmds = append(cmds, tea.Batch(
 			func() tea.Msg { return evaluateNextMsg{next: next} },
 			func() tea.Msg {
-				// Initial evaluation of a blueprint is empty. Diff status is set later.
-				st := msg.status
-				if st == "" {
-					st = "loading"
-				}
 				return component.UpdateTreeNodeMsg{
 					Selector: msg.selector,
-					Status:   component.TreeNodeStatus(st),
+					Status:   component.TreeNodeStatus(msg.status),
 				}
 			},
 		))
 
-		if msg.selector.Parent == nil {
-			if v.Differ.Result.Diffs[msg.selector.Name].Operation() != diff.OperationEmpty {
-				cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
-			}
+		if msg.selector.Parent == nil && msg.status != string(selector.TreeNodeStatusLoading) {
+			cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
 		}
 
 		return v, tea.Sequence(cmds...)

@@ -7,9 +7,7 @@ type Type interface {
 type Environment struct {
 	Type
 
-	States        map[string]Type
-	DependencyMap map[string][]string
-	Done          bool
+	States map[string]Type
 }
 
 type Provider struct {

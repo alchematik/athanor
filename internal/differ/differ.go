@@ -6,43 +6,22 @@ import (
 	"sync"
 
 	"github.com/alchematik/athanor/internal/diff"
-	"github.com/alchematik/athanor/internal/evaluator"
-	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/state"
 )
 
 type Differ struct {
-	Target *evaluator.Evaluator
-	Actual *evaluator.Evaluator
-	Result diff.Environment
-
 	Lock *sync.Mutex
 }
 
-func (d *Differ) Diff(ctx context.Context, s selector.Selector) (diff.Type, error) {
-	target, err := d.Target.Eval(ctx, s)
-	if err != nil {
-		return nil, err
-	}
-
-	actual, err := d.Actual.Eval(ctx, s)
-	if err != nil {
-		return nil, err
-	}
-
-	e, ok := SelectDiffEnvironment(d.Result, s)
-	if !ok {
-		return nil, fmt.Errorf("cannot find environment with selector: %v", s)
-	}
-
+func (d *Differ) Diff(ctx context.Context, e diff.Environment, alias string, target, actual state.Type) (diff.Type, error) {
 	var result diff.Type
 
 	switch actual := actual.(type) {
 	case state.Environment:
-		current, ok := e.Diffs[s.Name].(diff.Environment)
+		current, ok := e.Diffs[alias].(diff.Environment)
 		if !ok {
 			d.Lock.Lock()
-			e.Diffs[s.Name] = diff.Environment{
+			e.Diffs[alias] = diff.Environment{
 				Diffs: map[string]diff.Type{},
 			}
 			d.Lock.Unlock()
@@ -71,13 +50,13 @@ func (d *Differ) Diff(ctx context.Context, s selector.Selector) (diff.Type, erro
 			op = diff.OperationUpdate
 		}
 
-		current.Dependencies = actual.DependencyMap
 		current.DiffOperation = op
 		d.Lock.Lock()
-		e.Diffs[s.Name] = current
+		e.Diffs[alias] = current
 		d.Lock.Unlock()
 		return current, nil
 	case state.Resource:
+		var err error
 		if target == nil {
 			result, err = diff.Diff(actual, state.Resource{})
 		} else {
@@ -93,7 +72,7 @@ func (d *Differ) Diff(ctx context.Context, s selector.Selector) (diff.Type, erro
 		}
 
 		d.Lock.Lock()
-		e.Diffs[s.Name] = result
+		e.Diffs[alias] = result
 		d.Lock.Unlock()
 		return result, nil
 	case nil:
@@ -105,7 +84,7 @@ func (d *Differ) Diff(ctx context.Context, s selector.Selector) (diff.Type, erro
 			}
 
 			d.Lock.Lock()
-			e.Diffs[s.Name] = result
+			e.Diffs[alias] = result
 			d.Lock.Unlock()
 			return result, nil
 		default:
@@ -116,22 +95,22 @@ func (d *Differ) Diff(ctx context.Context, s selector.Selector) (diff.Type, erro
 	}
 }
 
-func SelectDiffEnvironment(env diff.Environment, selector selector.Selector) (diff.Environment, bool) {
-	if selector.Parent == nil {
-		return env, true
-	}
-
-	parent, ok := SelectDiffEnvironment(env, *selector.Parent)
-	if !ok {
-		return diff.Environment{}, false
-	}
-
-	d, ok := parent.Diffs[selector.Parent.Name]
-	if !ok {
-		return diff.Environment{}, false
-	}
-
-	sub, ok := d.(diff.Environment)
-
-	return sub, true
-}
+// func SelectDiffEnvironment(env diff.Environment, selector selector.Selector) (diff.Environment, bool) {
+// 	if selector.Parent == nil {
+// 		return env, true
+// 	}
+//
+// 	parent, ok := SelectDiffEnvironment(env, *selector.Parent)
+// 	if !ok {
+// 		return diff.Environment{}, false
+// 	}
+//
+// 	d, ok := parent.Diffs[selector.Parent.Name]
+// 	if !ok {
+// 		return diff.Environment{}, false
+// 	}
+//
+// 	sub, ok := d.(diff.Environment)
+//
+// 	return sub, true
+// }

@@ -9,8 +9,6 @@ import (
 
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/cli/view/component"
-	"github.com/alchematik/athanor/internal/diff"
-	"github.com/alchematik/athanor/internal/differ"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/internal/interpreter"
@@ -22,35 +20,29 @@ import (
 	"github.com/hashicorp/go-hclog"
 )
 
+type Controller interface {
+	Next() []selector.Selector
+	Process(context.Context, selector.Selector) (selector.TreeNodeStatus, error)
+}
+
 func quit() tea.Msg {
 	return quitMsg{}
 }
 
 type quitMsg struct{}
 
-func evaluateCmd(logger hclog.Logger, ctx context.Context, s selector.Selector, differ differ.Differ, q *selector.Queuer) tea.Cmd {
+func evaluateCmd(logger hclog.Logger, ctx context.Context, c Controller, s selector.Selector) tea.Cmd {
 	return func() tea.Msg {
-		res, err := evaluate(ctx, s, differ, q)
+		res, err := c.Process(ctx, s)
 		if err != nil {
 			return displayError(err)
 		}
 
 		return setStatusMsg{
 			selector: s,
-			status:   string(res.Operation()),
+			status:   string(res),
 		}
 	}
-}
-
-func evaluate(ctx context.Context, s selector.Selector, differ differ.Differ, q *selector.Queuer) (diff.Type, error) {
-	res, err := differ.Diff(ctx, s)
-	if err != nil {
-		return nil, err
-	}
-
-	q.Done(s)
-
-	return res, nil
 }
 
 type setStatusMsg struct {
@@ -118,20 +110,20 @@ func translateBlueprintCmd(ctx context.Context, config Config) tea.Cmd {
 	}
 }
 
-func translateBlueprint(ctx context.Context, config Config) (spec.Spec, error) {
+func translateBlueprint(ctx context.Context, config Config) (spec.ComponentBuild, error) {
 	translatorPlugManager := plug.Translator{
 		Dir: config.TranslatorsDir,
 	}
 
 	client, stop, err := translatorPlugManager.Client(config.Translator.Name, config.Translator.Version)
 	if err != nil {
-		return spec.Spec{}, err
+		return spec.ComponentBuild{}, err
 	}
 	defer stop()
 
 	tempFile, err := os.CreateTemp("", "")
 	if err != nil {
-		return spec.Spec{}, err
+		return spec.ComponentBuild{}, err
 	}
 
 	defer os.Remove(tempFile.Name())
@@ -141,22 +133,22 @@ func translateBlueprint(ctx context.Context, config Config) (spec.Spec, error) {
 		OutputPath: tempFile.Name(),
 	})
 	if err != nil {
-		return spec.Spec{}, fmt.Errorf("error translating blueprint: %v", err)
+		return spec.ComponentBuild{}, fmt.Errorf("error translating blueprint: %v", err)
 	}
 
 	blueprintData, err := os.ReadFile(tempFile.Name())
 	if err != nil {
-		return spec.Spec{}, err
+		return spec.ComponentBuild{}, err
 	}
 
 	var blueprint consumerpb.Blueprint
 	if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
-		return spec.Spec{}, fmt.Errorf("error unmarshaling blueprint: %v", err)
+		return spec.ComponentBuild{}, fmt.Errorf("error unmarshaling blueprint: %v", err)
 	}
 
 	bp, err := convertBlueprint(&blueprint)
 	if err != nil {
-		return spec.Spec{}, fmt.Errorf("error converting blueprint: %v", err)
+		return spec.ComponentBuild{}, fmt.Errorf("error converting blueprint: %v", err)
 	}
 
 	in := interpreter.Interpreter{}
@@ -170,18 +162,18 @@ func translateBlueprint(ctx context.Context, config Config) (spec.Spec, error) {
 			Stmts: bp.Stmts,
 		},
 	}); err != nil {
-		return spec.Spec{}, err
+		return spec.ComponentBuild{}, err
 	}
 
-	return s, nil
+	return spec.ComponentBuild{Spec: s}, nil
 
 }
 
 type setSpecMsg struct {
-	spec spec.Spec
+	spec spec.ComponentBuild
 }
 
-func evaluateNext(q *selector.Queuer) tea.Cmd {
+func evaluateNext(q Controller) tea.Cmd {
 	return func() tea.Msg {
 		next := q.Next()
 		return evaluateNextMsg{

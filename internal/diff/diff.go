@@ -260,7 +260,6 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 	switch {
 	case len(from.States) == 0 && len(to.States) > 0:
 		op = OperationCreate
-		depMap = to.DependencyMap
 		for k, v := range to.States {
 			d, err := Diff(state.Nil{}, v)
 			if err != nil {
@@ -281,8 +280,6 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 			diffs[k] = d
 		}
 	default:
-		depMap = map[string][]string{}
-
 		for k, v := range to.States {
 			var fromVal state.Type
 			fromVal, ok := from.States[k]
@@ -295,21 +292,21 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 				return Environment{}, err
 			}
 
-			switch d.Operation() {
-			case OperationCreate, OperationUpdate, OperationUnknown, OperationNoop:
-				depMap[k] = to.DependencyMap[k]
-			case OperationDelete:
-				// This is meant to makes sure that children are deleted before parents.
-				// TODO: Add tests around this behavior and also validate that child resources of the deleted parent
-				// either don't depend on the parent or are also being deleted.
-				children := from.DependencyMap[k]
-				for _, child := range children {
-					depMap[child] = append(depMap[child], k)
-				}
-				depMap[k] = children
-			default:
-				return Environment{}, fmt.Errorf("unsupported operation for environment resource: %v", d.Operation())
-			}
+			// switch d.Operation() {
+			// case OperationCreate, OperationUpdate, OperationUnknown, OperationNoop:
+			// 	depMap[k] = to.DependencyMap[k]
+			// case OperationDelete:
+			// 	// This is meant to makes sure that children are deleted before parents.
+			// 	// TODO: Add tests around this behavior and also validate that child resources of the deleted parent
+			// 	// either don't depend on the parent or are also being deleted.
+			// 	children := from.DependencyMap[k]
+			// 	for _, child := range children {
+			// 		depMap[child] = append(depMap[child], k)
+			// 	}
+			// 	depMap[k] = children
+			// default:
+			// 	return Environment{}, fmt.Errorf("unsupported operation for environment resource: %v", d.Operation())
+			// }
 
 			diffs[k] = d
 		}

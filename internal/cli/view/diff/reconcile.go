@@ -6,15 +6,12 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/cli/view/component"
-	"github.com/alchematik/athanor/internal/diff"
-	internaldiff "github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/reconcile"
 	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/spec"
-	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/charmbracelet/bubbles/help"
 	"github.com/charmbracelet/bubbles/key"
@@ -40,6 +37,8 @@ type Reconcile struct {
 	Differ          differ.Differ
 	API             *api.API
 	Error           error
+
+	Controller *selector.DiffController
 
 	Logger hclog.Logger
 }
@@ -147,53 +146,39 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		r.Config = msg.config
 		return r, translateBlueprintCmd(r.Context, r.Config)
 	case setSpecMsg:
-		r.Spec = msg.spec
-		entries := componentsToEntries(msg.spec.Components)
 		r.DiffTree.Root = &component.TreeNode{
-			Entries: entries,
+			Entries: componentsToEntries(msg.spec.Spec.Components),
 		}
 
-		q := selector.NewQueuer(r.Config.Name, msg.spec)
-		r.DiffQueuer = q
-
-		target := evaluator.NewEvaluator(
-			&api.Unresolved{},
-			r.Spec,
-			state.Environment{
-				States:        map[string]state.Type{},
-				DependencyMap: map[string][]string{},
-			},
-		)
-
-		r.API = &api.API{
-			ProviderPluginManager: plug.NewProvider(r.Config.ProvidersDir, r.Logger),
-		}
+		target := evaluator.NewEvaluator(&api.Unresolved{})
 
 		actual := evaluator.NewEvaluator(
-			r.API,
-			r.Spec,
-			state.Environment{
-				States:        map[string]state.Type{},
-				DependencyMap: map[string][]string{},
+			&api.API{
+				ProviderPluginManager: plug.NewProvider(r.Config.ProvidersDir, r.Logger),
 			},
 		)
-		r.Differ = differ.Differ{
-			Target: target,
-			Actual: actual,
-			Result: diff.Environment{
-				Diffs: map[string]diff.Type{},
-			},
+
+		d := differ.Differ{
 			Lock: &sync.Mutex{},
 		}
-		r.State = "loading"
-		return r, evaluateNext(r.DiffQueuer)
+
+		r.Controller = selector.NewDiffController(
+			r.Logger,
+			msg.spec,
+			target,
+			actual,
+			d,
+		)
+
+		r.State = showStateEvaluating
+		return r, evaluateNext(r.Controller)
 	case evaluateNextMsg:
 		if len(msg.next) == 0 {
 			return r, nil
 		}
 
 		for _, n := range msg.next {
-			cmds = append(cmds, evaluateCmd(r.Logger, r.Context, n, r.Differ, r.DiffQueuer))
+			cmds = append(cmds, evaluateCmd(r.Logger, r.Context, r.Controller, n))
 		}
 		return r, tea.Batch(cmds...)
 	case setStatusMsg:
@@ -213,10 +198,8 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		))
 
-		if msg.selector.Parent == nil {
-			if r.Differ.Result.Diffs[msg.selector.Name].Operation() != diff.OperationEmpty {
-				cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
-			}
+		if msg.selector.Parent == nil && msg.status != selector.TreeNodeStatusEmpty {
+			cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
 		}
 
 		return r, tea.Sequence(cmds...)
@@ -228,11 +211,10 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if r.State == "ready" {
 			switch msg.String() {
 			case "y":
-				e := state.Environment{
-					States:        map[string]state.Type{},
-					DependencyMap: map[string][]string{},
-				}
-				r.Reconciler = reconcile.NewReconciler(r.API, r.Differ.Result, e)
+				// e := state.Environment{
+				// 	States: map[string]state.Type{},
+				// }
+				// r.Reconciler = reconcile.NewReconciler(r.API, r.Differ.Result, e)
 
 				q := selector.NewQueuer(r.Config.Name, r.Spec)
 				r.ReconcileQueuer = q
@@ -251,9 +233,9 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case doneEvaluateSpecMsg:
-		if r.Differ.Result.Diffs[r.Config.Name].Operation() == internaldiff.OperationNoop {
-			return r, tea.Quit
-		}
+		// if r.Differ.Result.Diffs[r.Config.Name].Operation() == internaldiff.OperationNoop {
+		// 	return r, tea.Quit
+		// }
 
 		r.State = "ready"
 	case reconcileNextMsg:
@@ -312,13 +294,14 @@ func (r *Reconcile) reconcileCmd(s selector.Selector) tea.Cmd {
 }
 
 func (r *Reconcile) reconcile(s selector.Selector) (bool, error) {
-	done, err := r.Reconciler.Reconcile(r.Context, s)
-	if err != nil {
-		return false, err
-	}
+	// done, err := r.Reconciler.Reconcile(r.Context, s)
+	// if err != nil {
+	// 	return false, err
+	// }
 
-	r.ReconcileQueuer.Done(s)
-	return done, nil
+	// r.ReconcileQueuer.Done(s)
+	// return done, nil
+	return false, nil
 }
 
 type reconcileNextMsg struct {

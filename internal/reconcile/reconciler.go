@@ -7,7 +7,6 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/diff"
-	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/state"
 )
@@ -42,30 +41,16 @@ func NewReconciler(api ResourceAPI, env diff.Environment, result state.Environme
 	}
 }
 
-func (r *Reconciler) Next() []selector.Selector {
-	r.queueLock.Lock()
-	defer r.queueLock.Unlock()
-
-	out := r.queue
-	r.queue = []selector.Selector{}
-	return out
-}
-
-func (r *Reconciler) Reconcile(ctx context.Context, sel selector.Selector) (bool, error) {
-	e, ok := differ.SelectDiffEnvironment(r.Env, sel)
-	if !ok {
-		return false, fmt.Errorf("cannot find environment with selector: %v", sel)
-	}
-
-	env, ok := selector.SelectEnvironment(r.Result, sel)
-	if !ok {
-		return false, fmt.Errorf("cannot find result environment with selector: %v", sel)
-	}
-
-	current, ok := e.Diffs[sel.Name]
-	if !ok {
-		return false, fmt.Errorf("cannot find diff with selector: %v", sel)
-	}
+func (r *Reconciler) Reconcile(ctx context.Context, env state.Environment, alias string, current diff.Type) (bool, error) {
+	// e, ok := selector.SelectDiffEnvironment(r.Env, sel)
+	// if !ok {
+	// 	return false, fmt.Errorf("cannot find environment with selector: %v", sel)
+	// }
+	//
+	// env, ok := selector.SelectEnvironment(r.Result, sel)
+	// if !ok {
+	// 	return false, fmt.Errorf("cannot find result environment with selector: %v", sel)
+	// }
 
 	switch d := current.(type) {
 	case diff.Resource:
@@ -76,7 +61,7 @@ func (r *Reconciler) Reconcile(ctx context.Context, sel selector.Selector) (bool
 
 		r.queueLock.Lock()
 
-		env.States[sel.Name] = res
+		env.States[alias] = res
 
 		r.queueLock.Unlock()
 
@@ -85,12 +70,12 @@ func (r *Reconciler) Reconcile(ctx context.Context, sel selector.Selector) (bool
 		r.queueLock.Lock()
 		defer r.queueLock.Unlock()
 
-		_, ok := env.States[sel.Name]
+		_, ok := env.States[alias]
 		if ok {
 			return true, nil
 		}
 
-		env.States[sel.Name] = state.Environment{
+		env.States[alias] = state.Environment{
 			States: map[string]state.Type{},
 		}
 
@@ -119,8 +104,7 @@ func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment
 	}
 
 	reconciledEnv := state.Environment{
-		States:        map[string]state.Type{},
-		DependencyMap: d.Dependencies,
+		States: map[string]state.Type{},
 	}
 
 	// TODO: parallelize.
