@@ -193,6 +193,8 @@ func doneEvaluateSpec() tea.Msg {
 type doneEvaluateSpecMsg struct {
 }
 
+type doneReconcilingMsg struct{}
+
 type sorter []*component.TreeNode
 
 func (s sorter) Len() int {

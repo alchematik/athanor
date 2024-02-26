@@ -234,7 +234,19 @@ func (r *ReconcileController) Process(ctx context.Context, sel Selector) (TreeNo
 	}
 
 	if d.Operation() == diff.OperationNoop {
+		if err := r.Done(sel); err != nil {
+			return "", err
+		}
+
 		return TreeNodeStatusEmpty, nil
+	}
+
+	// Finished processing environment because got called a second time.
+	if _, ok := env.States[sel.Name]; ok && d.Operation() != diff.OperationNoop {
+		if err := r.Done(sel); err != nil {
+			return "", err
+		}
+		return TreeNodeStatusDone, nil
 	}
 
 	_, err := r.Reconciler.Reconcile(ctx, env, sel.Name, d)
@@ -249,15 +261,6 @@ func (r *ReconcileController) Process(ctx context.Context, sel Selector) (TreeNo
 
 	build, isBuild := comp.(spec.ComponentBuild)
 	if isBuild {
-		st, ok := env.States[sel.Name].(state.Environment)
-		if !ok {
-			return "", fmt.Errorf("expected environment: %s", sel.Name)
-		}
-
-		if len(st.States) == len(build.Spec.Components) {
-			return TreeNodeStatusDone, nil
-		}
-
 		current, ok := d.(diff.Environment)
 		if !ok {
 			return "", fmt.Errorf("expected %s to be environment", sel.Name)
@@ -289,13 +292,15 @@ func (r *ReconcileController) Process(ctx context.Context, sel Selector) (TreeNo
 		for childAlias := range build.Spec.Components {
 			r.Add(sel, Selector{Name: childAlias, Parent: &sel})
 		}
+
+		return TreeNodeStatusLoading, nil
 	}
 
 	if err := r.Done(sel); err != nil {
 		return "", err
 	}
 
-	return "", nil
+	return TreeNodeStatusDone, nil
 }
 
 func (r *ReconcileController) Add(s Selector, dependencies ...Selector) {
@@ -334,91 +339,6 @@ func (r *ReconcileController) Next() []Selector {
 	}
 
 	return queue
-}
-
-type Queuer struct {
-	queue                  []Selector
-	lock                   *sync.Mutex
-	dependencyToDependents map[Selector][]Selector
-	indegrees              map[Selector]int
-	isSpec                 map[Selector]bool
-}
-
-func NewQueuer(name string, s spec.Spec) *Queuer {
-	q := &Queuer{
-		lock:                   &sync.Mutex{},
-		dependencyToDependents: map[Selector][]Selector{},
-		indegrees:              map[Selector]int{},
-		isSpec:                 map[Selector]bool{},
-	}
-	FromSpec(q, nil, s)
-	q.queue = append(q.queue, Selector{Name: name})
-	return q
-}
-
-func FromSpec(q *Queuer, sel *Selector, s spec.Spec) {
-	for dependent, dependencies := range s.DependencyMap {
-		dependentSel := Selector{
-			Name:   dependent,
-			Parent: sel,
-		}
-
-		if sel != nil {
-			q.dependencyToDependents[*sel] = append(q.dependencyToDependents[*sel], dependentSel)
-			q.indegrees[dependentSel]++
-		}
-
-		for _, d := range dependencies {
-			dependencySel := Selector{
-				Name:   d,
-				Parent: sel,
-			}
-			q.dependencyToDependents[dependencySel] = append(q.dependencyToDependents[dependencySel], dependentSel)
-		}
-
-		if c, ok := s.Components[dependent].(spec.ComponentBuild); ok {
-			FromSpec(q, &dependentSel, c.Spec)
-			q.isSpec[dependentSel] = true
-		}
-	}
-
-	if sel != nil {
-		q.indegrees[*sel] = len(s.DependencyMap)
-	}
-}
-
-func (q *Queuer) Next() []Selector {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	queue := q.queue
-	q.queue = []Selector{}
-	return queue
-}
-
-func (q *Queuer) Done(s Selector) {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
-	dependents := q.dependencyToDependents[s]
-
-	// Add back to be called again.
-	if q.isSpec[s] {
-		q.indegrees[s] = len(dependents)
-		for _, dependent := range dependents {
-			q.dependencyToDependents[dependent] = append(q.dependencyToDependents[dependent], s)
-		}
-	}
-
-	// fmt.Printf("DONE: %v -> %v\n", s, dependents)
-	for _, dependent := range dependents {
-		// fmt.Printf(">>>>>> %v\n", q.indegrees)
-		q.indegrees[dependent]--
-		if q.indegrees[dependent] == 0 {
-			q.queue = append(q.queue, dependent)
-			delete(q.indegrees, dependent)
-		}
-	}
 }
 
 type Selector struct {
