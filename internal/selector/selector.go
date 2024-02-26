@@ -8,6 +8,7 @@ import (
 	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
+	"github.com/alchematik/athanor/internal/reconcile"
 	"github.com/alchematik/athanor/internal/spec"
 	"github.com/alchematik/athanor/internal/state"
 	"github.com/hashicorp/go-hclog"
@@ -186,25 +187,153 @@ func (q *DiffController) Next() []Selector {
 type ReconcileController struct {
 	sync.Mutex
 
+	Spec       spec.ComponentBuild
+	Result     state.Environment
+	Diff       diff.Environment
+	Reconciler *reconcile.Reconciler
+
 	indegrees               map[Selector]int
 	dependentToDependencies map[Selector][]Selector
 	logger                  hclog.Logger
 }
 
+func NewReconcileController(l hclog.Logger, s spec.ComponentBuild, d diff.Environment, r *reconcile.Reconciler) *ReconcileController {
+	c := &ReconcileController{
+		Spec: s,
+		Result: state.Environment{
+			States: map[string]state.Type{},
+		},
+		Diff:                    d,
+		Reconciler:              r,
+		indegrees:               map[Selector]int{},
+		dependentToDependencies: map[Selector][]Selector{},
+		logger:                  l,
+	}
+
+	for alias := range s.Spec.Components {
+		c.Add(Selector{Name: alias})
+	}
+
+	return c
+}
+
 func (r *ReconcileController) Process(ctx context.Context, sel Selector) (TreeNodeStatus, error) {
+	env, ok := SelectEnvironment(r.Result, sel)
+	if !ok {
+		return "", fmt.Errorf("cannot find parent environment: %s", sel.Name)
+	}
+
+	diffEnv, ok := SelectDiffEnvironment(r.Diff, sel)
+	if !ok {
+		return "", fmt.Errorf("cannot find diff environment: %s", sel.Name)
+	}
+
+	d, ok := diffEnv.Diffs[sel.Name]
+	if !ok {
+		return "", fmt.Errorf("cannot find diff: %s", sel.Name)
+	}
+
+	if d.Operation() == diff.OperationNoop {
+		return TreeNodeStatusEmpty, nil
+	}
+
+	_, err := r.Reconciler.Reconcile(ctx, env, sel.Name, d)
+	if err != nil {
+		return "", err
+	}
+
+	comp, ok := SelectComponent(r.Spec, sel)
+	if !ok {
+		return "", fmt.Errorf("cannot find component: %s", sel.Name)
+	}
+
+	build, isBuild := comp.(spec.ComponentBuild)
+	if isBuild {
+		st, ok := env.States[sel.Name].(state.Environment)
+		if !ok {
+			return "", fmt.Errorf("expected environment: %s", sel.Name)
+		}
+
+		if len(st.States) == len(build.Spec.Components) {
+			return TreeNodeStatusDone, nil
+		}
+
+		current, ok := d.(diff.Environment)
+		if !ok {
+			return "", fmt.Errorf("expected %s to be environment", sel.Name)
+		}
+
+		dependentToDependencies := map[Selector][]Selector{}
+		for dependent, dependencies := range build.Spec.DependencyMap {
+			dependentSel := Selector{Name: dependent, Parent: &sel}
+			for _, dependency := range dependencies {
+				dependencySel := Selector{Name: dependency, Parent: &sel}
+				dependentToDependencies[dependencySel] = append(dependentToDependencies[dependencySel], dependentSel)
+			}
+		}
+
+		for alias, dif := range current.Diffs {
+			s := Selector{Name: alias, Parent: &sel}
+			if dif.Operation() == diff.OperationDelete {
+				r.Add(s, dependentToDependencies[s]...)
+			} else {
+				list := make([]Selector, len(build.Spec.DependencyMap[alias]))
+				for i, dep := range build.Spec.DependencyMap[alias] {
+					list[i] = Selector{Name: dep, Parent: &sel}
+				}
+
+				r.Add(s, list...)
+			}
+		}
+
+		for childAlias := range build.Spec.Components {
+			r.Add(sel, Selector{Name: childAlias, Parent: &sel})
+		}
+	}
+
+	if err := r.Done(sel); err != nil {
+		return "", err
+	}
+
 	return "", nil
 }
 
-func (r *ReconcileController) Add(s Selector, depenencies ...Selector) {
+func (r *ReconcileController) Add(s Selector, dependencies ...Selector) {
+	r.Lock()
+	defer r.Unlock()
 
+	for _, d := range dependencies {
+		r.dependentToDependencies[d] = append(r.dependentToDependencies[d], s)
+	}
+
+	r.indegrees[s] += len(dependencies)
 }
 
 func (r *ReconcileController) Done(s Selector) error {
+	r.Lock()
+	defer r.Unlock()
+
+	dependents := r.dependentToDependencies[s]
+	for _, d := range dependents {
+		r.indegrees[d]--
+	}
+
 	return nil
 }
 
 func (r *ReconcileController) Next() []Selector {
-	return nil
+	r.Lock()
+	defer r.Unlock()
+
+	var queue []Selector
+	for sel, indegrees := range r.indegrees {
+		if indegrees == 0 {
+			queue = append(queue, sel)
+			delete(r.indegrees, sel)
+		}
+	}
+
+	return queue
 }
 
 type Queuer struct {
@@ -318,6 +447,28 @@ func SelectEnvironment(env state.Environment, selector Selector) (state.Environm
 	}
 
 	return envSt, true
+}
+
+func SelectState(env state.Environment, sel Selector) (state.Type, bool) {
+	var parent state.Environment
+	if sel.Parent == nil {
+		parent = env
+	} else {
+		s, ok := SelectState(env, *sel.Parent)
+		if !ok {
+			return nil, false
+		}
+
+		e, ok := s.(state.Environment)
+		if !ok {
+			return nil, false
+		}
+
+		parent = e
+	}
+
+	s, ok := parent.States[sel.Name]
+	return s, ok
 }
 
 func SelectComponent(s spec.ComponentBuild, sel Selector) (spec.Component, bool) {

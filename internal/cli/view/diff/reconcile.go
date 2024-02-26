@@ -6,6 +6,7 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/cli/view/component"
+	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
 	plug "github.com/alchematik/athanor/internal/plugin"
@@ -22,23 +23,22 @@ import (
 )
 
 type Reconcile struct {
-	Context         context.Context
-	Config          Config
-	Spec            spec.Spec
-	State           string
-	Input           help.Model
-	InputPath       string
-	Reconciler      *reconcile.Reconciler
-	ReconcileQueuer *selector.Queuer
-	ReconcileTree   *component.TreeModel
-	DiffTree        *component.TreeModel
-	DiffQueuer      *selector.Queuer
-	Spinner         spinner.Model
-	Differ          differ.Differ
-	API             *api.API
-	Error           error
+	Context       context.Context
+	Config        Config
+	Spec          spec.Spec
+	State         string
+	Input         help.Model
+	InputPath     string
+	Reconciler    *reconcile.Reconciler
+	ReconcileTree *component.TreeModel
+	DiffTree      *component.TreeModel
+	Spinner       spinner.Model
+	Differ        differ.Differ
+	API           *api.API
+	Error         error
 
-	Controller *selector.DiffController
+	Controller          *selector.DiffController
+	ReconcileController *selector.ReconcileController
 
 	Logger hclog.Logger
 }
@@ -65,11 +65,13 @@ func NewReconcile(params ShowParams) (*tea.Program, error) {
 		State:   "initializing",
 		DiffTree: &component.TreeModel{
 			Spinner: s,
+			Logger:  logger,
 		},
 		Input:     help.New(),
 		InputPath: params.Path,
 		ReconcileTree: &component.TreeModel{
 			Spinner: s,
+			Logger:  logger,
 		},
 		Spinner: s,
 		Logger:  logger,
@@ -152,11 +154,11 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		target := evaluator.NewEvaluator(&api.Unresolved{})
 
-		actual := evaluator.NewEvaluator(
-			&api.API{
-				ProviderPluginManager: plug.NewProvider(r.Config.ProvidersDir, r.Logger),
-			},
-		)
+		r.API = &api.API{
+			ProviderPluginManager: plug.NewProvider(r.Config.ProvidersDir, r.Logger),
+		}
+
+		actual := evaluator.NewEvaluator(r.API)
 
 		d := differ.Differ{
 			Lock: &sync.Mutex{},
@@ -170,7 +172,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			d,
 		)
 
-		r.State = showStateEvaluating
+		r.State = "loading"
 		return r, evaluateNext(r.Controller)
 	case evaluateNextMsg:
 		if len(msg.next) == 0 {
@@ -182,23 +184,18 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return r, tea.Batch(cmds...)
 	case setStatusMsg:
-		next := r.DiffQueuer.Next()
+		next := r.Controller.Next()
 		cmds = append(cmds, tea.Batch(
 			func() tea.Msg { return evaluateNextMsg{next: next} },
 			func() tea.Msg {
-				// Initial evaluation of a blueprint is empty. Diff status is set later.
-				st := msg.status
-				if st == "" {
-					st = "loading"
-				}
 				return component.UpdateTreeNodeMsg{
 					Selector: msg.selector,
-					Status:   component.TreeNodeStatus(st),
+					Status:   component.TreeNodeStatus(msg.status),
 				}
 			},
 		))
 
-		if msg.selector.Parent == nil && msg.status != selector.TreeNodeStatusEmpty {
+		if msg.selector.Parent == nil && msg.status != string(selector.TreeNodeStatusLoading) {
 			cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
 		}
 
@@ -216,16 +213,23 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// }
 				// r.Reconciler = reconcile.NewReconciler(r.API, r.Differ.Result, e)
 
-				q := selector.NewQueuer(r.Config.Name, r.Spec)
-				r.ReconcileQueuer = q
-				entries := componentsToEntries(r.Spec.Components)
+				r.ReconcileController = selector.NewReconcileController(
+					r.Logger,
+					r.Controller.Spec,
+					r.Controller.Diff,
+					reconcile.NewReconciler(r.API),
+				)
+
+				// q := selector.NewQueuer(r.Config.Name, r.Spec)
+				// r.ReconcileQueuer = q
+				entries := componentsToEntries(r.Controller.Spec.Spec.Components)
 				r.ReconcileTree.Root = &component.TreeNode{
 					Entries: entries,
 				}
 
 				r.State = "reconciling"
 				return r, func() tea.Msg {
-					next := r.ReconcileQueuer.Next()
+					next := r.ReconcileController.Next()
 					return reconcileNextMsg{next: next}
 				}
 			case "n":
@@ -234,8 +238,11 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case doneEvaluateSpecMsg:
 		// if r.Differ.Result.Diffs[r.Config.Name].Operation() == internaldiff.OperationNoop {
-		// 	return r, tea.Quit
 		// }
+
+		if r.Controller.Diff.Diffs[r.Config.Name].Operation() == diff.OperationNoop {
+			return r, tea.Quit
+		}
 
 		r.State = "ready"
 	case reconcileNextMsg:
@@ -256,7 +263,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}, func() tea.Msg {
 			return reconcileNextMsg{
-				next: r.ReconcileQueuer.Next(),
+				next: r.ReconcileController.Next(),
 			}
 		})
 	case displayErrorMsg:
@@ -276,32 +283,16 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (r *Reconcile) reconcileCmd(s selector.Selector) tea.Cmd {
 	return func() tea.Msg {
-		done, err := r.reconcile(s)
+		status, err := r.ReconcileController.Process(r.Context, s)
 		if err != nil {
 			return displayError(err)
 		}
 
-		status := component.TreeNodeStatusLoading
-		if done {
-			status = component.TreeNodeStatusDone
-		}
-
 		return setReconcileStatusMsg{
 			selector: s,
-			status:   status,
+			status:   component.TreeNodeStatus(status),
 		}
 	}
-}
-
-func (r *Reconcile) reconcile(s selector.Selector) (bool, error) {
-	// done, err := r.Reconciler.Reconcile(r.Context, s)
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	// r.ReconcileQueuer.Done(s)
-	// return done, nil
-	return false, nil
 }
 
 type reconcileNextMsg struct {

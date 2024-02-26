@@ -8,11 +8,13 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/hashicorp/go-hclog"
 )
 
 type TreeModel struct {
 	Root    *TreeNode
 	Spinner spinner.Model
+	Logger  hclog.Logger
 }
 
 func (m *TreeModel) Init() tea.Cmd {
@@ -50,6 +52,7 @@ func (m *TreeModel) renderStatusTreeEntry(space int, line string, e *TreeNode) s
 func (m *TreeModel) Update(msg tea.Msg) (*TreeModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case UpdateTreeNodeMsg:
+		m.Logger.Info("UPDATE TREEMODEL", "msg", msg)
 		entry := m.findEntry(msg.Selector)
 		entry.Status = msg.Status
 		return m, nil

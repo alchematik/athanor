@@ -7,16 +7,12 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/diff"
-	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/state"
 )
 
 type Reconciler struct {
 	ResourceAPI ResourceAPI
-	Env         diff.Environment
-	Result      state.Environment
 
-	queue     []selector.Selector
 	queueLock *sync.Mutex
 }
 
@@ -27,21 +23,14 @@ type ResourceAPI interface {
 	UpdateResource(context.Context, state.Resource, []api.Field) (state.Resource, error)
 }
 
-func NewReconciler(api ResourceAPI, env diff.Environment, result state.Environment) *Reconciler {
-	var queue []selector.Selector
-	for alias := range env.Diffs {
-		queue = append(queue, selector.Selector{Name: alias})
-	}
+func NewReconciler(api ResourceAPI) *Reconciler {
 	return &Reconciler{
 		ResourceAPI: api,
-		Env:         env,
-		Result:      result,
 		queueLock:   &sync.Mutex{},
-		queue:       queue,
 	}
 }
 
-func (r *Reconciler) Reconcile(ctx context.Context, env state.Environment, alias string, current diff.Type) (bool, error) {
+func (r *Reconciler) Reconcile(ctx context.Context, env state.Environment, alias string, current diff.Type) (state.Type, error) {
 	// e, ok := selector.SelectDiffEnvironment(r.Env, sel)
 	// if !ok {
 	// 	return false, fmt.Errorf("cannot find environment with selector: %v", sel)
@@ -54,9 +43,9 @@ func (r *Reconciler) Reconcile(ctx context.Context, env state.Environment, alias
 
 	switch d := current.(type) {
 	case diff.Resource:
-		res, err := r.ReconcileResource(ctx, r.Result, d)
+		res, err := r.ReconcileResource(ctx, env, d)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 
 		r.queueLock.Lock()
@@ -65,23 +54,22 @@ func (r *Reconciler) Reconcile(ctx context.Context, env state.Environment, alias
 
 		r.queueLock.Unlock()
 
-		return true, nil
+		return res, nil
 	case diff.Environment:
 		r.queueLock.Lock()
 		defer r.queueLock.Unlock()
 
-		_, ok := env.States[alias]
-		if ok {
-			return true, nil
+		if res, ok := env.States[alias]; ok {
+			return res, nil
 		}
 
 		env.States[alias] = state.Environment{
 			States: map[string]state.Type{},
 		}
 
-		return false, nil
+		return env.States[alias], nil
 	default:
-		return false, fmt.Errorf("unhandled type while reconciling: %T\n", current)
+		return nil, fmt.Errorf("unhandled type while reconciling: %T\n", current)
 	}
 }
 

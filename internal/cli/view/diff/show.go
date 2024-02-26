@@ -80,6 +80,7 @@ func NewShow(params ShowParams) (*tea.Program, error) {
 		InputPath: params.Path,
 		DiffTree: &component.TreeModel{
 			Spinner: s,
+			Logger:  logger,
 		},
 		Logger: logger,
 	}), nil
