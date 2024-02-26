@@ -232,7 +232,6 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		r.State = "ready"
 	case doneReconcilingMsg:
-		r.Logger.Info("QUITTING>>>>>>>>>>>>>>>")
 		return r, tea.Quit
 	case reconcileNextMsg:
 		if len(msg.next) == 0 {
@@ -245,9 +244,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return r, tea.Batch(cmds...)
 	case setReconcileStatusMsg:
-		r.Logger.Info("SET RECONCILE STATUS", "msg", msg, "status", msg.status)
 		if msg.selector.Parent == nil && msg.status != component.TreeNodeStatus(selector.TreeNodeStatusLoading) {
-			r.Logger.Info("DONE>>>>>>>>>>>>>>>>>>")
 			cmds = append(
 				cmds,
 				func() tea.Msg {
