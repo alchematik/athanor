@@ -21,6 +21,17 @@ type ValueProvider struct {
 
 	Name    string
 	Version string
+	Repo    Repo
+}
+
+type Repo interface {
+	isRepo()
+}
+
+type RepoLocal struct {
+	Repo
+
+	Path string
 }
 
 type ValueResource struct {

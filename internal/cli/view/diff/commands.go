@@ -3,14 +3,11 @@ package diff
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"sort"
 
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/cli/view/component"
-	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
-	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/internal/interpreter"
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/selector"
@@ -98,9 +95,9 @@ type displayErrorMsg struct {
 	error error
 }
 
-func translateBlueprintCmd(ctx context.Context, config Config) tea.Cmd {
+func interpretBlueprintCmd(ctx context.Context, config Config) tea.Cmd {
 	return func() tea.Msg {
-		s, err := translateBlueprint(ctx, config)
+		s, err := interpretBlueprint(ctx, config)
 		if err != nil {
 			return displayError(err)
 		}
@@ -110,56 +107,25 @@ func translateBlueprintCmd(ctx context.Context, config Config) tea.Cmd {
 	}
 }
 
-func translateBlueprint(ctx context.Context, config Config) (spec.ComponentBuild, error) {
-	translatorPlugManager := plug.Translator{
-		Dir: config.TranslatorsDir,
+func interpretBlueprint(ctx context.Context, config Config) (spec.ComponentBuild, error) {
+	in := interpreter.Interpreter{
+		Translator: plug.NewTranslator(),
 	}
-
-	client, stop, err := translatorPlugManager.Client(config.Translator.Name, config.Translator.Version)
-	if err != nil {
-		return spec.ComponentBuild{}, err
-	}
-	defer stop()
-
-	tempFile, err := os.CreateTemp("", "")
-	if err != nil {
-		return spec.ComponentBuild{}, err
-	}
-
-	defer os.Remove(tempFile.Name())
-
-	_, err = client.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
-		InputPath:  config.InputPath,
-		OutputPath: tempFile.Name(),
-	})
-	if err != nil {
-		return spec.ComponentBuild{}, fmt.Errorf("error translating blueprint: %v", err)
-	}
-
-	blueprintData, err := os.ReadFile(tempFile.Name())
-	if err != nil {
-		return spec.ComponentBuild{}, err
-	}
-
-	var blueprint consumerpb.Blueprint
-	if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
-		return spec.ComponentBuild{}, fmt.Errorf("error unmarshaling blueprint: %v", err)
-	}
-
-	bp, err := convertBlueprint(&blueprint)
-	if err != nil {
-		return spec.ComponentBuild{}, fmt.Errorf("error converting blueprint: %v", err)
-	}
-
-	in := interpreter.Interpreter{}
 	s := spec.Spec{
 		Components:    map[string]spec.Component{},
 		DependencyMap: map[string][]string{},
 	}
 	if err := in.Interpret(ctx, s, ast.StmtBuild{
 		Alias: config.Name,
-		Blueprint: ast.ExprBlueprint{
-			Stmts: bp.Stmts,
+		Repo: ast.RepoLocal{
+			Path: config.InputPath,
+		},
+		Translator: ast.Translator{
+			Name:    config.Translator.Name,
+			Version: config.Translator.Version,
+			Repo: ast.RepoLocal{
+				Path: config.TranslatorsDir,
+			},
 		},
 	}); err != nil {
 		return spec.ComponentBuild{}, err

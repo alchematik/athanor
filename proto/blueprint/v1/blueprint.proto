@@ -67,6 +67,7 @@ message NilExpr {}
 message ProviderExpr {
   string name = 1;
   string version = 2;
+  Repo repo = 3;
 }
 
 message ResourceExpr {
@@ -80,4 +81,14 @@ message ResourceIdentifierExpr {
   string alias = 1;
   string type = 2;
   Expr value = 3;
+}
+
+message Repo {
+  oneof type {
+    LocalRepo local = 1;
+  }
+}
+
+message LocalRepo {
+  string path = 1;
 }

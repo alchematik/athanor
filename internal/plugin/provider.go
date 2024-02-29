@@ -16,16 +16,14 @@ import (
 )
 
 type Provider struct {
-	Dir    string
 	Logger hclog.Logger
 
 	clients map[string]backendpb.ProviderClient
 	lock    *sync.Mutex
 }
 
-func NewProvider(dir string, logger hclog.Logger) *Provider {
+func NewProvider(logger hclog.Logger) *Provider {
 	return &Provider{
-		Dir:     dir,
 		Logger:  logger,
 		clients: map[string]backendpb.ProviderClient{},
 		lock:    &sync.Mutex{},
@@ -33,7 +31,15 @@ func NewProvider(dir string, logger hclog.Logger) *Provider {
 }
 
 func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, error) {
-	pluginPath := filepath.Join(p.Dir, provider.Name, provider.Version, "provider")
+	var dir string
+	switch r := provider.Repo.(type) {
+	case state.RepoLocal:
+		dir = r.Path
+	default:
+		return nil, fmt.Errorf("invalid repo type: %T", provider.Repo)
+	}
+
+	pluginPath := filepath.Join(dir, provider.Name, provider.Version, "provider")
 
 	p.lock.Lock()
 	c, ok := p.clients[pluginPath]

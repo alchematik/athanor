@@ -12,6 +12,14 @@ import (
 )
 
 func (e Evaluator) providerValue(v spec.ValueProvider) (state.Provider, error) {
+	var repo state.Repo
+	switch r := v.Repo.(type) {
+	case spec.RepoLocal:
+		repo = state.RepoLocal{Path: r.Path}
+	default:
+		return state.Provider{}, fmt.Errorf("invalid repo type: %T", v.Repo)
+	}
+
 	if v.Name == "" {
 		return state.Provider{}, fmt.Errorf("name is required for provider")
 	}
@@ -21,6 +29,7 @@ func (e Evaluator) providerValue(v spec.ValueProvider) (state.Provider, error) {
 	return state.Provider{
 		Name:    v.Name,
 		Version: v.Version,
+		Repo:    repo,
 	}, nil
 }
 

@@ -30,25 +30,34 @@ func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error 
 // }
 
 func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtBuild) error {
+	// stmt.Repo
 	subSpec := spec.Spec{
-		Inputs:        map[string]spec.Value{},
+		// Inputs:        map[string]spec.Value{},
 		DependencyMap: map[string][]string{},
 		Components:    map[string]spec.Component{},
 	}
 
 	var children []string
-	for name, expr := range stmt.Inputs {
-		v, c, err := in.Expr(ctx, s, expr)
-		if err != nil {
-			return err
-		}
+	// TODO: Figure out blueprint inputs.
+	// inputs := map[string]spec.Value{}
+	// for name, expr := range stmt.Inputs {
+	// 	v, c, err := in.Expr(ctx, s, expr)
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	//
+	// 	children = append(children, c...)
+	// 	subSpec.Inputs[name] = v
+	// }
 
-		children = append(children, c...)
-		subSpec.Inputs[name] = v
+	bp, err := in.Translator.Translate(ctx, stmt)
+	if err != nil {
+		return err
 	}
 
 	// TODO: May need to handle children here if allowing inside scope to access outside scope.
-	_, _, err := in.Expr(ctx, subSpec, stmt.Blueprint)
+	// TODO: ast.ExprBlueprint vs ast.Blueprint?
+	_, _, err = in.Expr(ctx, subSpec, ast.ExprBlueprint{Stmts: bp.Stmts})
 	if err != nil {
 		return err
 	}

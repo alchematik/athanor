@@ -142,7 +142,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case configLoadedMsg:
 		r.Config = msg.config
-		return r, translateBlueprintCmd(r.Context, r.Config)
+		return r, interpretBlueprintCmd(r.Context, r.Config)
 	case setSpecMsg:
 		r.DiffTree.Root = &component.TreeNode{
 			Entries: componentsToEntries(msg.spec.Spec.Components),
@@ -151,7 +151,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		target := evaluator.NewEvaluator(&api.Unresolved{})
 
 		r.API = &api.API{
-			ProviderPluginManager: plug.NewProvider(r.Config.ProvidersDir, r.Logger),
+			ProviderPluginManager: plug.NewProvider(r.Logger),
 		}
 
 		actual := evaluator.NewEvaluator(r.API)
