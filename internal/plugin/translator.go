@@ -212,7 +212,7 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 			Expr: ex,
 		}, nil
 	case *consumerpb.Stmt_Build:
-		config, err := convertExpr(s.Build.GetInput())
+		config, err := convertExpr(s.Build.GetConfig())
 		if err != nil {
 			return nil, err
 		}
