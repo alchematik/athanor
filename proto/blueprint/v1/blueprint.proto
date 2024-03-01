@@ -19,8 +19,10 @@ message ResourceStmt {
 
 message BuildStmt {
   string alias = 1;
-  map<string, Expr> inputs = 2;
-  Expr blueprint = 3;
+  Repo repo = 2;
+  Translator translator = 3;
+  Expr config = 4;
+  Expr runtime_config = 5;
 }
 
 message Expr {
@@ -91,4 +93,10 @@ message Repo {
 
 message LocalRepo {
   string path = 1;
+}
+
+message Translator {
+  string name = 1;
+  string version = 2;
+  Repo repo = 3;
 }

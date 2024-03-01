@@ -88,8 +88,35 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 
 	defer os.Remove(tempFile.Name())
 
+	config, err := exprToProto(b.Config)
+	if err != nil {
+		return ast.Blueprint{}, err
+	}
+
+	configData, err := json.Marshal(config)
+	if err != nil {
+		return ast.Blueprint{}, err
+	}
+
+	configTempFile, err := os.CreateTemp("", "")
+	if err != nil {
+		return ast.Blueprint{}, err
+	}
+
+	defer os.ReadFile(configTempFile.Name())
+
+	configFile, err := os.OpenFile(configTempFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+	if err != nil {
+		return ast.Blueprint{}, err
+	}
+
+	if _, err := configFile.Write(configData); err != nil {
+		return ast.Blueprint{}, err
+	}
+
 	if _, err = c.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
 		InputPath:  inputPath,
+		ConfigPath: configFile.Name(),
 		OutputPath: tempFile.Name(),
 	}); err != nil {
 		return ast.Blueprint{}, err
@@ -108,6 +135,7 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 	return convertBlueprint(&blueprint)
 }
 
+// TODO: replace.
 func (t Translator) Client(name, version string) (translatorpb.TranslatorClient, func(), error) {
 	pluginPath := filepath.Join(t.Dir, name, version, "translator")
 
@@ -184,25 +212,14 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 			Expr: ex,
 		}, nil
 	case *consumerpb.Stmt_Build:
-		ex, err := convertExpr(s.Build.GetBlueprint())
+		config, err := convertExpr(s.Build.GetInput())
 		if err != nil {
 			return nil, err
 		}
 
-		inputs := map[string]ast.Expr{}
-		for name, inputExpr := range s.Build.GetInputs() {
-			input, err := convertExpr(inputExpr)
-			if err != nil {
-				return nil, err
-			}
-
-			inputs[name] = input
-		}
-
 		return ast.StmtBuild{
-			Alias:     s.Build.GetAlias(),
-			Blueprint: ex,
-			Inputs:    inputs,
+			Alias:  s.Build.GetAlias(),
+			Config: config,
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid stmt: %T", st.GetType())
@@ -322,5 +339,54 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 		return ast.ExprNil{}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", ex.GetType())
+	}
+}
+
+func exprToProto(expr ast.Expr) (*consumerpb.Expr, error) {
+	switch expr := expr.(type) {
+	case ast.ExprString:
+		return &consumerpb.Expr{
+			Type: &consumerpb.Expr_StringLiteral{
+				StringLiteral: expr.Value,
+			},
+		}, nil
+	case ast.ExprBool:
+		return &consumerpb.Expr{
+			Type: &consumerpb.Expr_BoolLiteral{
+				BoolLiteral: expr.Value,
+			},
+		}, nil
+	case ast.ExprMap:
+		m := map[string]*consumerpb.Expr{}
+		for k, v := range expr.Entries {
+			val, err := exprToProto(v)
+			if err != nil {
+				return nil, err
+			}
+			m[k] = val
+		}
+
+		return &consumerpb.Expr{
+			Type: &consumerpb.Expr_Map{
+				Map: &consumerpb.MapExpr{
+					Entries: m,
+				},
+			},
+		}, nil
+	case ast.ExprList:
+		l := make([]*consumerpb.Expr, len(expr.Elements))
+		return &consumerpb.Expr{
+			Type: &consumerpb.Expr_List{
+				List: &consumerpb.ListExpr{
+					Elements: l,
+				},
+			},
+		}, nil
+	case nil:
+		return &consumerpb.Expr{
+			Type: &consumerpb.Expr_Nil{},
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid expr type: %T", expr)
 	}
 }

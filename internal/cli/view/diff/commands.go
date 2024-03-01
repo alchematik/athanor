@@ -127,6 +127,8 @@ func interpretBlueprint(ctx context.Context, config Config) (spec.ComponentBuild
 				Path: config.TranslatorsDir,
 			},
 		},
+		// TODO: fill in.
+		RuntimeConfig: ast.ExprNil{},
 	}); err != nil {
 		return spec.ComponentBuild{}, err
 	}

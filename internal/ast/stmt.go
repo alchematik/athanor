@@ -26,12 +26,11 @@ type StmtResource struct {
 type StmtBuild struct {
 	Stmt
 
-	Repo       Repo
-	Translator Translator
-
-	Alias     string
-	Inputs    map[string]Expr
-	Blueprint Expr
+	Alias         string
+	Repo          Repo
+	Translator    Translator
+	Config        Expr
+	RuntimeConfig Expr
 }
 
 type Translator struct {
