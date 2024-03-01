@@ -35,12 +35,14 @@ func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtB
 
 	bp, err := in.Translator.Translate(ctx, stmt)
 	if err != nil {
+		fmt.Printf("ERROR TRANSLATE >> %v, %+v\n", err, stmt)
 		return err
 	}
 
 	// TODO: ast.ExprBlueprint vs ast.Blueprint?
 	_, _, err = in.Expr(ctx, subSpec, ast.ExprBlueprint{Stmts: bp.Stmts})
 	if err != nil {
+		fmt.Printf("ERROR BUILD >>>>>>> %v, %v\n", err, stmt.Alias)
 		return err
 	}
 

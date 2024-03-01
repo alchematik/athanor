@@ -128,6 +128,7 @@ func interpretBlueprint(ctx context.Context, config Config) (spec.ComponentBuild
 			},
 		},
 		// TODO: fill in.
+		Config:        ast.ExprNil{},
 		RuntimeConfig: ast.ExprNil{},
 	}); err != nil {
 		return spec.ComponentBuild{}, err
@@ -179,11 +180,11 @@ func (s sorter) Less(i, j int) bool {
 	}
 
 	if s[i].Kind == "blueprint" {
-		return true
+		return false
 	}
 
 	if s[j].Kind == "blueprint" {
-		return false
+		return true
 	}
 
 	return s[i].Kind < s[j].Kind

@@ -52,7 +52,7 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 			},
 			Cmd:              exec.Command("sh", "-c", pluginPath),
 			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-			Logger:           hclog.NewNullLogger(),
+			// Logger:           hclog.NewNullLogger(),
 		})
 
 		dispensor, err := client.Client()
@@ -86,7 +86,7 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 		return ast.Blueprint{}, err
 	}
 
-	defer os.Remove(tempFile.Name())
+	// defer os.Remove(tempFile.Name())
 
 	config, err := exprToProto(b.Config)
 	if err != nil {
@@ -103,7 +103,7 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 		return ast.Blueprint{}, err
 	}
 
-	defer os.ReadFile(configTempFile.Name())
+	// defer os.Remove(configTempFile.Name())
 
 	configFile, err := os.OpenFile(configTempFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
@@ -114,12 +114,16 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 		return ast.Blueprint{}, err
 	}
 
+	// fmt.Printf("INPUT PATH: %v\n", inputPath)
+	// fmt.Printf("CONFIG: %v\n", configTempFile.Name())
+	// fmt.Printf("OUTPUT PATH: %v\n", tempFile.Name())
+
 	if _, err = c.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
 		InputPath:  inputPath,
 		ConfigPath: configFile.Name(),
 		OutputPath: tempFile.Name(),
 	}); err != nil {
-		return ast.Blueprint{}, err
+		return ast.Blueprint{}, fmt.Errorf("error translating blueprint: %v", err)
 	}
 
 	blueprintData, err := os.ReadFile(tempFile.Name())
@@ -217,9 +221,31 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 			return nil, err
 		}
 
+		runtimeConfig, err := convertExpr(s.Build.GetRuntimeConfig())
+		if err != nil {
+			return nil, err
+		}
+
+		repo, err := convertRepo(s.Build.GetRepo())
+		if err != nil {
+			return nil, err
+		}
+
+		translatorRepo, err := convertRepo(s.Build.Translator.GetRepo())
+		if err != nil {
+			return nil, err
+		}
+
 		return ast.StmtBuild{
-			Alias:  s.Build.GetAlias(),
-			Config: config,
+			Alias:         s.Build.GetAlias(),
+			Repo:          repo,
+			Config:        config,
+			RuntimeConfig: runtimeConfig,
+			Translator: ast.Translator{
+				Name:    s.Build.Translator.Name,
+				Version: s.Build.Translator.Version,
+				Repo:    translatorRepo,
+			},
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid stmt: %T", st.GetType())
@@ -241,15 +267,11 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 
 		return ast.ExprBlueprint{Stmts: stmts}, nil
 	case *consumerpb.Expr_Provider:
-		var repo ast.Repo
-		switch r := e.Provider.GetRepo().GetType().(type) {
-		case *consumerpb.Repo_Local:
-			repo = ast.RepoLocal{
-				Path: r.Local.GetPath(),
-			}
-		default:
-			return nil, fmt.Errorf("invalid repo type: %T", e.Provider.GetRepo().GetType())
+		repo, err := convertRepo(e.Provider.GetRepo())
+		if err != nil {
+			return nil, err
 		}
+
 		return ast.ExprProvider{
 			Name:    e.Provider.GetName(),
 			Version: e.Provider.GetVersion(),
@@ -382,11 +404,26 @@ func exprToProto(expr ast.Expr) (*consumerpb.Expr, error) {
 				},
 			},
 		}, nil
+	case ast.ExprNil:
+		return &consumerpb.Expr{
+			Type: &consumerpb.Expr_Nil{},
+		}, nil
 	case nil:
 		return &consumerpb.Expr{
 			Type: &consumerpb.Expr_Nil{},
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr type: %T", expr)
+	}
+}
+
+func convertRepo(r *consumerpb.Repo) (ast.Repo, error) {
+	switch r := r.GetType().(type) {
+	case *consumerpb.Repo_Local:
+		return ast.RepoLocal{
+			Path: r.Local.GetPath(),
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid repo type: %T", r)
 	}
 }

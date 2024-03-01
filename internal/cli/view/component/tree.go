@@ -39,6 +39,9 @@ func (m *TreeModel) renderStatusTreeEntry(space int, line string, e *TreeNode) s
 	out := status + strings.Repeat(" ", space) + line + " " + e.Kind + "/" + e.Name + "\n"
 	for i, v := range e.Entries {
 		line := "├─"
+		if len(v.Entries) > 0 {
+			line = "└─"
+		}
 		if i == len(e.Entries)-1 {
 			line = "└─"
 		}

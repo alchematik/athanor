@@ -40,6 +40,7 @@ func (in Interpreter) Expr(ctx context.Context, b spec.Spec, ex ast.Expr) (spec.
 func (in Interpreter) blueprintExpr(ctx context.Context, s spec.Spec, e ast.ExprBlueprint) (spec.Value, []string, error) {
 	for _, stmt := range e.Stmts {
 		if err := in.Stmt(ctx, s, stmt); err != nil {
+			fmt.Printf("BLUEPRINT ERROR >> %v, %T\n", err, stmt)
 			return nil, nil, err
 		}
 	}
