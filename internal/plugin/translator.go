@@ -19,12 +19,14 @@ import (
 
 type Translator struct {
 	Dir     string
-	clients map[string]translatorpb.TranslatorClient
+	Logger  hclog.Logger
+	clients map[string]*plugin.Client
 }
 
-func NewTranslator() *Translator {
+func NewTranslator(logger hclog.Logger) *Translator {
 	return &Translator{
-		clients: map[string]translatorpb.TranslatorClient{},
+		clients: map[string]*plugin.Client{},
+		Logger:  logger,
 	}
 }
 
@@ -52,25 +54,26 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 			},
 			Cmd:              exec.Command("sh", "-c", pluginPath),
 			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-			// Logger:           hclog.NewNullLogger(),
+			Logger:           t.Logger,
 		})
 
-		dispensor, err := client.Client()
-		if err != nil {
-			return ast.Blueprint{}, err
-		}
+		t.clients[pluginPath] = client
+		c = client
+	}
 
-		rawPlug, err := dispensor.Dispense("translator")
-		if err != nil {
-			return ast.Blueprint{}, err
-		}
+	dispensor, err := c.Client()
+	if err != nil {
+		return ast.Blueprint{}, err
+	}
 
-		c, ok = rawPlug.(translatorpb.TranslatorClient)
-		if !ok {
-			return ast.Blueprint{}, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
-		}
+	rawPlug, err := dispensor.Dispense("translator")
+	if err != nil {
+		return ast.Blueprint{}, err
+	}
 
-		t.clients[pluginPath] = c
+	tc, ok := rawPlug.(translatorpb.TranslatorClient)
+	if !ok {
+		return ast.Blueprint{}, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
 	}
 
 	var inputPath string
@@ -86,7 +89,7 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 		return ast.Blueprint{}, err
 	}
 
-	// defer os.Remove(tempFile.Name())
+	defer os.Remove(tempFile.Name())
 
 	config, err := exprToProto(b.Config)
 	if err != nil {
@@ -103,7 +106,7 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 		return ast.Blueprint{}, err
 	}
 
-	// defer os.Remove(configTempFile.Name())
+	defer os.Remove(configTempFile.Name())
 
 	configFile, err := os.OpenFile(configTempFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
@@ -114,11 +117,7 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 		return ast.Blueprint{}, err
 	}
 
-	// fmt.Printf("INPUT PATH: %v\n", inputPath)
-	// fmt.Printf("CONFIG: %v\n", configTempFile.Name())
-	// fmt.Printf("OUTPUT PATH: %v\n", tempFile.Name())
-
-	if _, err = c.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
+	if _, err = tc.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
 		InputPath:  inputPath,
 		ConfigPath: configFile.Name(),
 		OutputPath: tempFile.Name(),
@@ -137,6 +136,12 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 	}
 
 	return convertBlueprint(&blueprint)
+}
+
+func (t *Translator) Stop() {
+	for _, c := range t.clients {
+		c.Kill()
+	}
 }
 
 // TODO: replace.

@@ -115,7 +115,7 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case configLoadedMsg:
 		v.Config = msg.config
 		v.State = showStateTranslating
-		return v, interpretBlueprintCmd(v.Context, v.Config)
+		return v, interpretBlueprintCmd(v.Context, v.Config, v.Logger)
 	case setSpecMsg:
 		v.DiffTree.Root = &component.TreeNode{
 			Entries: componentsToEntries(msg.spec.Spec.Components),

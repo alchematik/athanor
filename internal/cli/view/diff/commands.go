@@ -95,9 +95,9 @@ type displayErrorMsg struct {
 	error error
 }
 
-func interpretBlueprintCmd(ctx context.Context, config Config) tea.Cmd {
+func interpretBlueprintCmd(ctx context.Context, config Config, logger hclog.Logger) tea.Cmd {
 	return func() tea.Msg {
-		s, err := interpretBlueprint(ctx, config)
+		s, err := interpretBlueprint(ctx, config, logger)
 		if err != nil {
 			return displayError(err)
 		}
@@ -107,9 +107,9 @@ func interpretBlueprintCmd(ctx context.Context, config Config) tea.Cmd {
 	}
 }
 
-func interpretBlueprint(ctx context.Context, config Config) (spec.ComponentBuild, error) {
+func interpretBlueprint(ctx context.Context, config Config, logger hclog.Logger) (spec.ComponentBuild, error) {
 	in := interpreter.Interpreter{
-		Translator: plug.NewTranslator(),
+		Translator: plug.NewTranslator(logger),
 	}
 	s := spec.Spec{
 		Components:    map[string]spec.Component{},
@@ -135,7 +135,6 @@ func interpretBlueprint(ctx context.Context, config Config) (spec.ComponentBuild
 	}
 
 	return spec.ComponentBuild{Spec: s}, nil
-
 }
 
 type setSpecMsg struct {

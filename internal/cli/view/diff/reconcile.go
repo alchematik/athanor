@@ -142,7 +142,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case configLoadedMsg:
 		r.Config = msg.config
-		return r, interpretBlueprintCmd(r.Context, r.Config)
+		return r, interpretBlueprintCmd(r.Context, r.Config, r.Logger)
 	case setSpecMsg:
 		r.DiffTree.Root = &component.TreeNode{
 			Entries: componentsToEntries(msg.spec.Spec.Components),
