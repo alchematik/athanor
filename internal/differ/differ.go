@@ -10,7 +10,7 @@ import (
 )
 
 type Differ struct {
-	Lock *sync.Mutex
+	sync.Mutex
 }
 
 func (d *Differ) Diff(ctx context.Context, e diff.Environment, alias string, target, actual state.Type) (diff.Type, error) {
@@ -20,11 +20,17 @@ func (d *Differ) Diff(ctx context.Context, e diff.Environment, alias string, tar
 	case state.Environment:
 		current, ok := e.Diffs[alias].(diff.Environment)
 		if !ok {
-			d.Lock.Lock()
+			to, ok := target.(state.Environment)
+			if !ok {
+				return nil, fmt.Errorf("expected env diff, got %T", target)
+			}
+			d.Lock()
 			e.Diffs[alias] = diff.Environment{
 				Diffs: map[string]diff.Type{},
+				From:  actual,
+				To:    to,
 			}
-			d.Lock.Unlock()
+			d.Unlock()
 
 			return current, nil
 		}
@@ -51,9 +57,9 @@ func (d *Differ) Diff(ctx context.Context, e diff.Environment, alias string, tar
 		}
 
 		current.DiffOperation = op
-		d.Lock.Lock()
+		d.Lock()
 		e.Diffs[alias] = current
-		d.Lock.Unlock()
+		d.Unlock()
 		return current, nil
 	case state.Resource:
 		var err error
@@ -71,9 +77,9 @@ func (d *Differ) Diff(ctx context.Context, e diff.Environment, alias string, tar
 			return nil, err
 		}
 
-		d.Lock.Lock()
+		d.Lock()
 		e.Diffs[alias] = result
-		d.Lock.Unlock()
+		d.Unlock()
 		return result, nil
 	case nil:
 		switch target := target.(type) {
@@ -83,9 +89,9 @@ func (d *Differ) Diff(ctx context.Context, e diff.Environment, alias string, tar
 				return nil, err
 			}
 
-			d.Lock.Lock()
+			d.Lock()
 			e.Diffs[alias] = result
-			d.Lock.Unlock()
+			d.Unlock()
 			return result, nil
 		default:
 			return nil, fmt.Errorf("unhandled target type for diff: %T", target)
@@ -94,23 +100,3 @@ func (d *Differ) Diff(ctx context.Context, e diff.Environment, alias string, tar
 		return nil, fmt.Errorf("unhandled type for diff: %T", actual)
 	}
 }
-
-// func SelectDiffEnvironment(env diff.Environment, selector selector.Selector) (diff.Environment, bool) {
-// 	if selector.Parent == nil {
-// 		return env, true
-// 	}
-//
-// 	parent, ok := SelectDiffEnvironment(env, *selector.Parent)
-// 	if !ok {
-// 		return diff.Environment{}, false
-// 	}
-//
-// 	d, ok := parent.Diffs[selector.Parent.Name]
-// 	if !ok {
-// 		return diff.Environment{}, false
-// 	}
-//
-// 	sub, ok := d.(diff.Environment)
-//
-// 	return sub, true
-// }

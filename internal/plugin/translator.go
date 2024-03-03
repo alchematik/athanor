@@ -362,6 +362,8 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 		}
 
 		return g, nil
+	case *consumerpb.Expr_GetRuntimeConfig:
+		return ast.ExprGetRuntimeConfig{}, nil
 	case *consumerpb.Expr_Nil:
 		return ast.ExprNil{}, nil
 	default:

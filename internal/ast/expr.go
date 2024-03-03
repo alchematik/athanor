@@ -47,6 +47,10 @@ type ExprGet struct {
 	Object Expr
 }
 
+type ExprGetRuntimeConfig struct {
+	Expr
+}
+
 type ExprProvider struct {
 	Expr
 

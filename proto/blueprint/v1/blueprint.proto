@@ -40,6 +40,7 @@ message Expr {
     ResourceIdentifierExpr resource_identifier = 11;
     BlueprintExpr blueprint = 12;
     FileExpr file = 13;
+    GetRuntimeConfig get_runtime_config = 14;
   }
 }
 
@@ -63,6 +64,8 @@ message GetExpr {
   string name = 1;
   Expr object = 2;
 }
+
+message GetRuntimeConfig {}
 
 message NilExpr {}
 

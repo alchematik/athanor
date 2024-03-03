@@ -2,7 +2,6 @@ package diff
 
 import (
 	"context"
-	"sync"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/cli/view/component"
@@ -156,9 +155,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		actual := evaluator.NewEvaluator(r.API)
 
-		d := differ.Differ{
-			Lock: &sync.Mutex{},
-		}
+		d := &differ.Differ{}
 
 		r.Controller = selector.NewDiffController(
 			r.Logger,
@@ -289,8 +286,6 @@ func (r *Reconcile) reconcileCmd(s selector.Selector) tea.Cmd {
 		if err != nil {
 			return displayError(err)
 		}
-
-		r.Logger.Info("DONE PROCESSING", "sel", s, "status", status)
 
 		return setReconcileStatusMsg{
 			selector: s,

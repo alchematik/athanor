@@ -7,7 +7,8 @@ type Type interface {
 type Environment struct {
 	Type
 
-	States map[string]Type
+	States        map[string]Type
+	RuntimeConfig Type
 }
 
 type Provider struct {
@@ -98,4 +99,8 @@ type Immutable struct {
 	Type
 
 	Value Type
+}
+
+type RuntimeConfig struct {
+	Type
 }

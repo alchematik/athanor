@@ -98,3 +98,7 @@ type ValueResourceRef struct {
 
 	Alias string
 }
+
+type ValueRuntimeConfig struct {
+	Value
+}

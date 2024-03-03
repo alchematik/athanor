@@ -2,7 +2,6 @@ package diff
 
 import (
 	"context"
-	"sync"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	"github.com/alchematik/athanor/internal/cli/view/component"
@@ -47,7 +46,6 @@ type Config struct {
 		Version string `json:"version"`
 	} `json:"translator"`
 	TranslatorsDir string `json:"translators_dir"`
-	ProvidersDir   string `json:"providers_dir"`
 }
 
 type ShowParams struct {
@@ -129,9 +127,7 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		)
 
-		d := differ.Differ{
-			Lock: &sync.Mutex{},
-		}
+		d := &differ.Differ{}
 
 		v.Controller = selector.NewDiffController(
 			v.Logger,

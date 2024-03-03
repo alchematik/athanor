@@ -3,6 +3,7 @@ package reconcile
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
@@ -31,16 +32,6 @@ func NewReconciler(api ResourceAPI) *Reconciler {
 }
 
 func (r *Reconciler) Reconcile(ctx context.Context, env state.Environment, alias string, current diff.Type) (state.Type, error) {
-	// e, ok := selector.SelectDiffEnvironment(r.Env, sel)
-	// if !ok {
-	// 	return false, fmt.Errorf("cannot find environment with selector: %v", sel)
-	// }
-	//
-	// env, ok := selector.SelectEnvironment(r.Result, sel)
-	// if !ok {
-	// 	return false, fmt.Errorf("cannot find result environment with selector: %v", sel)
-	// }
-
 	switch d := current.(type) {
 	case diff.Resource:
 		res, err := r.ReconcileResource(ctx, env, d)
@@ -57,113 +48,74 @@ func (r *Reconciler) Reconcile(ctx context.Context, env state.Environment, alias
 		return res, nil
 	case diff.Environment:
 		r.queueLock.Lock()
-		defer r.queueLock.Unlock()
+		res, ok := env.States[alias]
+		r.queueLock.Unlock()
 
-		if res, ok := env.States[alias]; ok {
+		if ok {
 			return res, nil
 		}
 
-		env.States[alias] = state.Environment{
-			States: map[string]state.Type{},
+		runtimeConfig, err := r.resolve(env, d.To.RuntimeConfig)
+		if err != nil {
+			return nil, err
 		}
 
-		return env.States[alias], nil
+		log.Printf("RUNTIME CONFIG >> %+v, %T\n", runtimeConfig, runtimeConfig)
+
+		res = state.Environment{
+			States:        map[string]state.Type{},
+			RuntimeConfig: runtimeConfig,
+		}
+
+		r.queueLock.Lock()
+		env.States[alias] = res
+		r.queueLock.Unlock()
+
+		return res, nil
 	default:
 		return nil, fmt.Errorf("unhandled type while reconciling: %T\n", current)
 	}
 }
 
-func (r Reconciler) ReconcileEnvironment(ctx context.Context, d diff.Environment) (state.Environment, error) {
-	indegrees := map[string]int{}
-	parentToChildren := map[string][]string{}
-	for child, parents := range d.Dependencies {
-		indegrees[child] = len(parents)
-		for _, parent := range parents {
-			parentToChildren[parent] = append(parentToChildren[parent], child)
+func (r *Reconciler) ReconcileResource(ctx context.Context, env state.Environment, d diff.Resource) (state.Resource, error) {
+	if d.Operation() == diff.OperationUnknown {
+		to, err := r.resolveResource(env, d.To)
+		if err != nil {
+			log.Printf("ERROR RESOLVING RESOURCE >>>> %+v\n", d.To)
+			return state.Resource{}, err
+		}
+
+		updatedDiff, err := diff.Diff(d.From, to)
+		if err != nil {
+			return state.Resource{}, err
+		}
+
+		var ok bool
+		d, ok = updatedDiff.(diff.Resource)
+		if !ok {
+			return state.Resource{}, fmt.Errorf("not a resource diff")
 		}
 	}
 
-	var queue []string
-	for alias, degrees := range indegrees {
-		if degrees == 0 {
-			queue = append(queue, alias)
-			delete(indegrees, alias)
-		}
-	}
-
-	reconciledEnv := state.Environment{
-		States: map[string]state.Type{},
-	}
-
-	// TODO: parallelize.
-	for len(queue) > 0 {
-		var alias string
-		alias, queue = queue[0], queue[1:]
-
-		var reconciled state.Type
-		switch current := d.Diffs[alias].(type) {
-		case diff.Resource:
-			resolved, err := resolve(reconciledEnv, current.To)
-			if err != nil {
-				return state.Environment{}, err
-			}
-
-			resolvedResource, ok := resolved.(state.Resource)
-			if !ok {
-				return state.Environment{}, fmt.Errorf("expected resource, got %T", resolved)
-			}
-
-			updatedDiff, err := diff.Diff(current.From, resolvedResource)
-			if err != nil {
-				return state.Environment{}, err
-			}
-
-			resourceDiff, ok := updatedDiff.(diff.Resource)
-			if !ok {
-				return state.Environment{}, fmt.Errorf("expected resource diff, got %T", updatedDiff)
-			}
-
-			reconciled, err = r.ReconcileResource(ctx, reconciledEnv, resourceDiff)
-			if err != nil {
-				return state.Environment{}, err
-			}
-		case diff.Environment:
-			var err error
-			reconciled, err = r.ReconcileEnvironment(ctx, current)
-			if err != nil {
-				return state.Environment{}, err
-			}
-		}
-
-		reconciledEnv.States[alias] = reconciled
-
-		for _, child := range parentToChildren[alias] {
-			indegrees[child]--
-			if indegrees[child] == 0 {
-				queue = append(queue, child)
-				delete(indegrees, child)
-			}
-		}
-	}
-
-	return reconciledEnv, nil
-}
-
-func (r Reconciler) ReconcileResource(ctx context.Context, env state.Environment, d diff.Resource) (state.Resource, error) {
 	switch d.Operation() {
 	case diff.OperationNoop:
-		return d.To, nil
+		return d.From, nil
 	case diff.OperationCreate:
 		return r.ResourceAPI.CreateResource(ctx, d.To)
 	case diff.OperationDelete:
 		return d.To, r.ResourceAPI.DeleteResource(ctx, d.To)
 	case diff.OperationUpdate:
+		to, err := r.resolveResource(env, d.To)
+		if err != nil {
+			return state.Resource{}, err
+		}
+
 		mask, err := diffToUpdateMask(d.ConfigDiff)
 		if err != nil {
 			return state.Resource{}, err
 		}
 
-		return r.ResourceAPI.UpdateResource(ctx, d.To, mask)
+		return r.ResourceAPI.UpdateResource(ctx, to, mask)
 	default:
 		return state.Resource{}, fmt.Errorf("unsupported operation: %v\n", d.Operation())
 	}
@@ -176,7 +128,7 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 	case diff.Map:
 		var fields []api.Field
 		for k, v := range t.Diffs {
-			// Skip noops .
+			// Skip noops.
 			if v.Operation() == diff.OperationNoop {
 				continue
 			}
@@ -200,6 +152,8 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 	case diff.File:
 		return nil, nil
 	case diff.Immutable:
+		return nil, nil
+	case diff.Unknown:
 		return nil, nil
 	case diff.List:
 		var fields []api.Field
@@ -229,25 +183,49 @@ func diffToUpdateMask(d diff.Type) ([]api.Field, error) {
 	}
 }
 
-func resolve(env state.Environment, res state.Type) (state.Type, error) {
-	switch r := res.(type) {
-	case state.String:
-		return r, nil
-	case state.File:
-		return r, nil
-	case state.Identifier:
-		val, err := resolve(env, r.Value)
-		if err != nil {
-			return nil, err
-		}
+func (r *Reconciler) resolveResource(env state.Environment, res state.Resource) (state.Resource, error) {
+	id, err := r.resolveIdentifier(env, res.Identifier)
+	if err != nil {
+		return state.Resource{}, err
+	}
 
-		return state.Identifier{ResourceType: r.ResourceType, Value: val, Alias: r.Alias}, nil
+	config, err := r.resolve(env, res.Config)
+	if err != nil {
+		return state.Resource{}, err
+	}
+
+	return state.Resource{
+		Provider:   res.Provider,
+		Identifier: id,
+		Config:     config,
+		Attrs:      res.Attrs,
+		Exists:     res.Exists,
+	}, nil
+}
+
+func (r *Reconciler) resolveIdentifier(env state.Environment, res state.Identifier) (state.Identifier, error) {
+	val, err := r.resolve(env, res.Value)
+	if err != nil {
+		return state.Identifier{}, err
+	}
+
+	return state.Identifier{ResourceType: res.ResourceType, Value: val, Alias: res.Alias}, nil
+}
+
+func (r *Reconciler) resolve(env state.Environment, res state.Type) (state.Type, error) {
+	switch res := res.(type) {
+	case state.String:
+		return res, nil
+	case state.File:
+		return res, nil
+	case state.Identifier:
+		return r.resolveIdentifier(env, res)
 	case state.Map:
 		m := state.Map{
 			Entries: map[string]state.Type{},
 		}
-		for k, v := range r.Entries {
-			resolved, err := resolve(env, v)
+		for k, v := range res.Entries {
+			resolved, err := r.resolve(env, v)
 			if err != nil {
 				return nil, err
 			}
@@ -257,9 +235,9 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 
 		return m, nil
 	case state.List:
-		l := state.List{Elements: make([]state.Type, len(r.Elements))}
-		for i, e := range r.Elements {
-			val, err := resolve(env, e)
+		l := state.List{Elements: make([]state.Type, len(res.Elements))}
+		for i, e := range res.Elements {
+			val, err := r.resolve(env, e)
 			if err != nil {
 				return nil, err
 			}
@@ -269,31 +247,24 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 
 		return l, nil
 	case state.ResourceRef:
-		res, ok := env.States[r.Alias]
+		ref, ok := env.States[res.Alias]
 		if !ok {
-			return nil, fmt.Errorf("resolve: no resource with alias %q found", r.Alias)
+			return nil, fmt.Errorf("resolve: no resource with alias %q found", res.Alias)
 		}
 
-		return res, nil
+		return ref, nil
 	case state.Resource:
-		config, err := resolve(env, r.Config)
+		return r.resolveResource(env, res)
+	case state.Immutable:
+		return r.resolve(env, res.Value)
+	case state.Unknown:
+		resolved, err := r.resolve(env, res.Object)
 		if err != nil {
 			return nil, err
 		}
 
-		return state.Resource{
-			Provider:   r.Provider,
-			Identifier: r.Identifier,
-			Config:     config,
-			Attrs:      r.Attrs,
-			Exists:     r.Exists,
-		}, nil
-	case state.Immutable:
-		return resolve(env, r.Value)
-	case state.Unknown:
-		resolved, err := resolve(env, r.Object)
-		if err != nil {
-			return nil, err
+		if res.Name == "" {
+			return resolved, nil
 		}
 
 		var m map[string]state.Type
@@ -304,18 +275,28 @@ func resolve(env state.Environment, res state.Type) (state.Type, error) {
 				"config":     obj.Config,
 				"attrs":      obj.Attrs,
 			}
+		case state.Nil:
+			m = env.States
 		case state.Map:
 			m = obj.Entries
 		default:
-			return nil, fmt.Errorf("value type [%T] has no field %q", resolved, r.Name)
+			return nil, fmt.Errorf("value type [%T] has no field %q", resolved, res.Name)
 		}
 
-		val, ok := m[r.Name]
+		r.queueLock.Lock()
+		val, ok := m[res.Name]
+		r.queueLock.Unlock()
 		if !ok {
-			return nil, fmt.Errorf("property %q not set", r.Name)
+			return nil, fmt.Errorf("property %q not set", res.Name)
 		}
 
 		return val, nil
+	case state.RuntimeConfig:
+		return env.RuntimeConfig, nil
+	case state.Nil:
+		return state.Nil{}, nil
+	// case nil:
+	// 	return state.Nil{}, nil
 	default:
 		return nil, fmt.Errorf("invalid type to resolve: %T", res)
 	}

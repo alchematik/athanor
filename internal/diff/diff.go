@@ -3,6 +3,7 @@ package diff
 import (
 	"fmt"
 	"github.com/alchematik/athanor/internal/state"
+	"log"
 )
 
 type Type interface {
@@ -155,6 +156,7 @@ func Diff(from, to state.Type) (Type, error) {
 
 	switch f := from.(type) {
 	case state.Environment:
+		log.Printf("ENV DIFF >>>>>>> ")
 		if toIsEmpty {
 			return environmentDiff(f, state.Environment{})
 		}
@@ -256,6 +258,7 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 	var op Operation
 	diffs := map[string]Type{}
 	var depMap map[string][]string
+	log.Printf(">>>>>>>>>>>>>>> ENV DIFF: %v, %v\n", from.RuntimeConfig, to.RuntimeConfig)
 
 	switch {
 	case len(from.States) == 0 && len(to.States) > 0:
@@ -292,45 +295,27 @@ func environmentDiff(from, to state.Environment) (Environment, error) {
 				return Environment{}, err
 			}
 
-			// switch d.Operation() {
-			// case OperationCreate, OperationUpdate, OperationUnknown, OperationNoop:
-			// 	depMap[k] = to.DependencyMap[k]
-			// case OperationDelete:
-			// 	// This is meant to makes sure that children are deleted before parents.
-			// 	// TODO: Add tests around this behavior and also validate that child resources of the deleted parent
-			// 	// either don't depend on the parent or are also being deleted.
-			// 	children := from.DependencyMap[k]
-			// 	for _, child := range children {
-			// 		depMap[child] = append(depMap[child], k)
-			// 	}
-			// 	depMap[k] = children
-			// default:
-			// 	return Environment{}, fmt.Errorf("unsupported operation for environment resource: %v", d.Operation())
-			// }
-
 			diffs[k] = d
 		}
 
-		if op == OperationEmpty {
-			var hasUnknown bool
-			var hasUpdate bool
-			for _, d := range diffs {
-				switch d.Operation() {
-				case OperationUnknown:
-					hasUnknown = true
-				case OperationNoop:
-				default:
-					hasUpdate = true
-				}
+		var hasUnknown bool
+		var hasUpdate bool
+		for _, d := range diffs {
+			switch d.Operation() {
+			case OperationUnknown:
+				hasUnknown = true
+			case OperationNoop:
+			default:
+				hasUpdate = true
 			}
+		}
 
-			if hasUpdate {
-				op = OperationUpdate
-			} else if hasUnknown {
-				op = OperationUnknown
-			} else {
-				op = OperationNoop
-			}
+		if hasUpdate {
+			op = OperationUpdate
+		} else if hasUnknown {
+			op = OperationUnknown
+		} else {
+			op = OperationNoop
 		}
 	}
 

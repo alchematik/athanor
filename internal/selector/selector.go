@@ -3,6 +3,7 @@ package selector
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/alchematik/athanor/internal/diff"
@@ -31,7 +32,7 @@ type DiffController struct {
 
 	TargetEvaluator *evaluator.Evaluator
 	ActualEvaluator *evaluator.Evaluator
-	Differ          differ.Differ
+	Differ          *differ.Differ
 	Spec            spec.ComponentBuild
 	TargetEnv       state.Environment
 	ActualEnv       state.Environment
@@ -42,7 +43,7 @@ type DiffController struct {
 	logger                  hclog.Logger
 }
 
-func NewDiffController(logger hclog.Logger, s spec.ComponentBuild, target, actual *evaluator.Evaluator, d differ.Differ) *DiffController {
+func NewDiffController(logger hclog.Logger, s spec.ComponentBuild, target, actual *evaluator.Evaluator, d *differ.Differ) *DiffController {
 	c := &DiffController{
 		ActualEvaluator: actual,
 		ActualEnv: state.Environment{
@@ -104,6 +105,8 @@ func (q *DiffController) Process(ctx context.Context, sel Selector) (TreeNodeSta
 	if err != nil {
 		return "", err
 	}
+
+	log.Printf("DIFF >>>>>>> %v, %+v, %v\n", sel.Name, sel.Parent, d.Operation())
 
 	build, isBuild := comp.(spec.ComponentBuild)
 
@@ -218,6 +221,11 @@ func NewReconcileController(l hclog.Logger, s spec.ComponentBuild, d diff.Enviro
 }
 
 func (r *ReconcileController) Process(ctx context.Context, sel Selector) (TreeNodeStatus, error) {
+	// r.Lock()
+	// for k, v := range r.indegrees {
+	// 	log.Printf("%v -> \n %v\n", k.Name, v)
+	// }
+	// r.Unlock()
 	env, ok := SelectEnvironment(r.Result, sel)
 	if !ok {
 		return "", fmt.Errorf("cannot find parent environment: %s", sel.Name)
@@ -233,16 +241,19 @@ func (r *ReconcileController) Process(ctx context.Context, sel Selector) (TreeNo
 		return "", fmt.Errorf("cannot find diff: %s", sel.Name)
 	}
 
-	if d.Operation() == diff.OperationNoop {
-		if err := r.Done(sel); err != nil {
-			return "", err
-		}
-
-		return TreeNodeStatusEmpty, nil
-	}
+	// if d.Operation() == diff.OperationNoop {
+	// 	if err := r.Done(sel); err != nil {
+	// 		return "", err
+	// 	}
+	//
+	// 	return TreeNodeStatusEmpty, nil
+	// }
 
 	// Finished processing environment because got called a second time.
-	if _, ok := env.States[sel.Name]; ok && d.Operation() != diff.OperationNoop {
+	r.Lock()
+	_, ok = env.States[sel.Name]
+	r.Unlock()
+	if ok && d.Operation() != diff.OperationEmpty {
 		if err := r.Done(sel); err != nil {
 			return "", err
 		}
@@ -298,6 +309,10 @@ func (r *ReconcileController) Process(ctx context.Context, sel Selector) (TreeNo
 
 	if err := r.Done(sel); err != nil {
 		return "", err
+	}
+
+	if d.Operation() == diff.OperationNoop {
+		return TreeNodeStatusEmpty, nil
 	}
 
 	return TreeNodeStatusDone, nil

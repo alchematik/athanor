@@ -232,6 +232,10 @@ func (e Evaluator) Value(ctx context.Context, env state.Environment, val spec.Va
 		return e.unresolvedValue(ctx, env, v)
 	case spec.ValueFile:
 		return e.fileValue(ctx, env, v)
+	case spec.ValueRuntimeConfig:
+		return state.Unknown{
+			Object: state.RuntimeConfig{},
+		}, nil
 	case spec.ValueNil:
 		return state.Nil{}, nil
 	default:

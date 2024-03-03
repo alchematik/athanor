@@ -21,28 +21,25 @@ func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error 
 }
 
 func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtBuild) error {
-	subSpec := spec.Spec{
-		DependencyMap: map[string][]string{},
-		Components:    map[string]spec.Component{},
-	}
-
 	runtimeConfig, children, err := in.Expr(ctx, s, stmt.RuntimeConfig)
 	if err != nil {
 		return err
 	}
 
-	subSpec.RuntimeConfig = runtimeConfig
+	subSpec := spec.Spec{
+		DependencyMap: map[string][]string{},
+		Components:    map[string]spec.Component{},
+		RuntimeConfig: runtimeConfig,
+	}
 
 	bp, err := in.Translator.Translate(ctx, stmt)
 	if err != nil {
-		fmt.Printf("ERROR TRANSLATE >> %v, %+v\n", err, stmt)
 		return err
 	}
 
 	// TODO: ast.ExprBlueprint vs ast.Blueprint?
 	_, _, err = in.Expr(ctx, subSpec, ast.ExprBlueprint{Stmts: bp.Stmts})
 	if err != nil {
-		fmt.Printf("ERROR BUILD >>>>>>> %v, %v\n", err, stmt.Alias)
 		return err
 	}
 
