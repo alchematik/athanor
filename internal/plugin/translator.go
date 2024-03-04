@@ -112,9 +112,7 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 		return ast.Blueprint{}, err
 	}
 
-	log.Printf("CONFIG >>>>>>>>>>>> %v\n", configTempFile.Name())
-	log.Printf("OUTPUT >>>>>>>>>>>> %v\n", tempFile.Name())
-	// defer os.Remove(configTempFile.Name())
+	defer os.Remove(configTempFile.Name())
 
 	configFile, err := os.OpenFile(configTempFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
@@ -137,8 +135,6 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 	if err != nil {
 		return ast.Blueprint{}, err
 	}
-
-	// log.Printf("BLUEPRINT DATA >>>> %v\n", string(blueprintData))
 
 	var blueprint consumerpb.Blueprint
 	if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
