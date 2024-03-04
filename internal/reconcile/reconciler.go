@@ -295,8 +295,6 @@ func (r *Reconciler) resolve(env state.Environment, res state.Type) (state.Type,
 		return env.RuntimeConfig, nil
 	case state.Nil:
 		return state.Nil{}, nil
-	// case nil:
-	// 	return state.Nil{}, nil
 	default:
 		return nil, fmt.Errorf("invalid type to resolve: %T", res)
 	}

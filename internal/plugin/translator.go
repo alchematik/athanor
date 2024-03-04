@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -91,12 +92,17 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 
 	defer os.Remove(tempFile.Name())
 
-	config, err := exprToProto(b.Config)
-	if err != nil {
-		return ast.Blueprint{}, err
+	configs := make([]*consumerpb.Expr, len(b.Config))
+	for i, c := range b.Config {
+		converted, err := exprToProto(c)
+		if err != nil {
+			return ast.Blueprint{}, err
+		}
+
+		configs[i] = converted
 	}
 
-	configData, err := json.Marshal(config)
+	configData, err := json.Marshal(configs)
 	if err != nil {
 		return ast.Blueprint{}, err
 	}
@@ -106,7 +112,9 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 		return ast.Blueprint{}, err
 	}
 
-	defer os.Remove(configTempFile.Name())
+	log.Printf("CONFIG >>>>>>>>>>>> %v\n", configTempFile.Name())
+	log.Printf("OUTPUT >>>>>>>>>>>> %v\n", tempFile.Name())
+	// defer os.Remove(configTempFile.Name())
 
 	configFile, err := os.OpenFile(configTempFile.Name(), os.O_APPEND|os.O_WRONLY, os.ModeAppend)
 	if err != nil {
@@ -129,6 +137,8 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 	if err != nil {
 		return ast.Blueprint{}, err
 	}
+
+	// log.Printf("BLUEPRINT DATA >>>> %v\n", string(blueprintData))
 
 	var blueprint consumerpb.Blueprint
 	if err := json.Unmarshal(blueprintData, &blueprint); err != nil {
@@ -221,9 +231,14 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 			Expr: ex,
 		}, nil
 	case *consumerpb.Stmt_Build:
-		config, err := convertExpr(s.Build.GetConfig())
-		if err != nil {
-			return nil, err
+		configs := make([]ast.Expr, len(s.Build.GetConfig()))
+		for i, c := range s.Build.GetConfig() {
+			config, err := convertExpr(c)
+			if err != nil {
+				return nil, err
+			}
+
+			configs[i] = config
 		}
 
 		runtimeConfig, err := convertExpr(s.Build.GetRuntimeConfig())
@@ -244,7 +259,7 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 		return ast.StmtBuild{
 			Alias:         s.Build.GetAlias(),
 			Repo:          repo,
-			Config:        config,
+			Config:        configs,
 			RuntimeConfig: runtimeConfig,
 			Translator: ast.Translator{
 				Name:    s.Build.Translator.Name,

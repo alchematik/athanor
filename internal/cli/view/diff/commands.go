@@ -128,7 +128,7 @@ func interpretBlueprint(ctx context.Context, config Config, logger hclog.Logger)
 			},
 		},
 		// TODO: fill in.
-		Config:        ast.ExprNil{},
+		Config:        []ast.Expr{},
 		RuntimeConfig: ast.ExprNil{},
 	}); err != nil {
 		return spec.ComponentBuild{}, err

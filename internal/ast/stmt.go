@@ -16,20 +16,13 @@ type StmtResource struct {
 	Expr Expr
 }
 
-// type StmtBlueprint struct {
-// 	Stmt
-//
-// 	Alias string
-// 	Expr  Expr
-// }
-
 type StmtBuild struct {
 	Stmt
 
 	Alias         string
 	Repo          Repo
 	Translator    Translator
-	Config        Expr
+	Config        []Expr
 	RuntimeConfig Expr
 }
 

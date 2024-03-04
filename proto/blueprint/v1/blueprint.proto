@@ -21,7 +21,7 @@ message BuildStmt {
   string alias = 1;
   Repo repo = 2;
   Translator translator = 3;
-  Expr config = 4;
+  repeated Expr config = 4;
   Expr runtime_config = 5;
 }
 
