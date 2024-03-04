@@ -91,11 +91,17 @@ message ResourceIdentifierExpr {
 message Repo {
   oneof type {
     LocalRepo local = 1;
+    GitHubRepo github = 2;
   }
 }
 
 message LocalRepo {
   string path = 1;
+}
+
+message GitHubRepo {
+  string owner = 1;
+  string name = 2;
 }
 
 message Translator {

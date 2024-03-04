@@ -156,7 +156,6 @@ func Diff(from, to state.Type) (Type, error) {
 
 	switch f := from.(type) {
 	case state.Environment:
-		log.Printf("ENV DIFF >>>>>>> ")
 		if toIsEmpty {
 			return environmentDiff(f, state.Environment{})
 		}

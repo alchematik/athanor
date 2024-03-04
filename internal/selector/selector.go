@@ -3,7 +3,6 @@ package selector
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/alchematik/athanor/internal/diff"
@@ -105,8 +104,6 @@ func (q *DiffController) Process(ctx context.Context, sel Selector) (TreeNodeSta
 	if err != nil {
 		return "", err
 	}
-
-	log.Printf("DIFF >>>>>>> %v, %+v, %v\n", sel.Name, sel.Parent, d.Operation())
 
 	build, isBuild := comp.(spec.ComponentBuild)
 

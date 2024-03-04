@@ -69,6 +69,13 @@ type RepoLocal struct {
 	Path string
 }
 
+type RepoGitHub struct {
+	Repo
+
+	Owner string
+	Name  string
+}
+
 type ExprResource struct {
 	Expr
 

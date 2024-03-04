@@ -1047,6 +1047,7 @@ type Repo struct {
 	// Types that are assignable to Type:
 	//
 	//	*Repo_Local
+	//	*Repo_Github
 	Type isRepo_Type `protobuf_oneof:"type"`
 }
 
@@ -1096,6 +1097,13 @@ func (x *Repo) GetLocal() *LocalRepo {
 	return nil
 }
 
+func (x *Repo) GetGithub() *GitHubRepo {
+	if x, ok := x.GetType().(*Repo_Github); ok {
+		return x.Github
+	}
+	return nil
+}
+
 type isRepo_Type interface {
 	isRepo_Type()
 }
@@ -1104,7 +1112,13 @@ type Repo_Local struct {
 	Local *LocalRepo `protobuf:"bytes,1,opt,name=local,proto3,oneof"`
 }
 
+type Repo_Github struct {
+	Github *GitHubRepo `protobuf:"bytes,2,opt,name=github,proto3,oneof"`
+}
+
 func (*Repo_Local) isRepo_Type() {}
+
+func (*Repo_Github) isRepo_Type() {}
 
 type LocalRepo struct {
 	state         protoimpl.MessageState
@@ -1153,6 +1167,61 @@ func (x *LocalRepo) GetPath() string {
 	return ""
 }
 
+type GitHubRepo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	Owner string `protobuf:"bytes,1,opt,name=owner,proto3" json:"owner,omitempty"`
+	Name  string `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+}
+
+func (x *GitHubRepo) Reset() {
+	*x = GitHubRepo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_proto_blueprint_v1_blueprint_proto_msgTypes[17]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *GitHubRepo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GitHubRepo) ProtoMessage() {}
+
+func (x *GitHubRepo) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_blueprint_v1_blueprint_proto_msgTypes[17]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GitHubRepo.ProtoReflect.Descriptor instead.
+func (*GitHubRepo) Descriptor() ([]byte, []int) {
+	return file_proto_blueprint_v1_blueprint_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *GitHubRepo) GetOwner() string {
+	if x != nil {
+		return x.Owner
+	}
+	return ""
+}
+
+func (x *GitHubRepo) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
 type Translator struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1166,7 +1235,7 @@ type Translator struct {
 func (x *Translator) Reset() {
 	*x = Translator{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_proto_blueprint_v1_blueprint_proto_msgTypes[17]
+		mi := &file_proto_blueprint_v1_blueprint_proto_msgTypes[18]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -1179,7 +1248,7 @@ func (x *Translator) String() string {
 func (*Translator) ProtoMessage() {}
 
 func (x *Translator) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_blueprint_v1_blueprint_proto_msgTypes[17]
+	mi := &file_proto_blueprint_v1_blueprint_proto_msgTypes[18]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1192,7 +1261,7 @@ func (x *Translator) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Translator.ProtoReflect.Descriptor instead.
 func (*Translator) Descriptor() ([]byte, []int) {
-	return file_proto_blueprint_v1_blueprint_proto_rawDescGZIP(), []int{17}
+	return file_proto_blueprint_v1_blueprint_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *Translator) GetName() string {
@@ -1385,14 +1454,22 @@ var file_proto_blueprint_v1_blueprint_proto_rawDesc = []byte{
 	0x28, 0x0b, 0x32, 0x25, 0x2e, 0x61, 0x6c, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x74, 0x69, 0x6b, 0x2e,
 	0x61, 0x74, 0x68, 0x61, 0x6e, 0x6f, 0x72, 0x2e, 0x62, 0x6c, 0x75, 0x65, 0x70, 0x72, 0x69, 0x6e,
 	0x74, 0x2e, 0x76, 0x31, 0x2e, 0x45, 0x78, 0x70, 0x72, 0x52, 0x05, 0x76, 0x61, 0x6c, 0x75, 0x65,
-	0x22, 0x52, 0x0a, 0x04, 0x52, 0x65, 0x70, 0x6f, 0x12, 0x42, 0x0a, 0x05, 0x6c, 0x6f, 0x63, 0x61,
-	0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2a, 0x2e, 0x61, 0x6c, 0x63, 0x68, 0x65, 0x6d,
-	0x61, 0x74, 0x69, 0x6b, 0x2e, 0x61, 0x74, 0x68, 0x61, 0x6e, 0x6f, 0x72, 0x2e, 0x62, 0x6c, 0x75,
-	0x65, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x2e, 0x76, 0x31, 0x2e, 0x4c, 0x6f, 0x63, 0x61, 0x6c, 0x52,
-	0x65, 0x70, 0x6f, 0x48, 0x00, 0x52, 0x05, 0x6c, 0x6f, 0x63, 0x61, 0x6c, 0x42, 0x06, 0x0a, 0x04,
-	0x74, 0x79, 0x70, 0x65, 0x22, 0x1f, 0x0a, 0x09, 0x4c, 0x6f, 0x63, 0x61, 0x6c, 0x52, 0x65, 0x70,
-	0x6f, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61, 0x74, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x04, 0x70, 0x61, 0x74, 0x68, 0x22, 0x75, 0x0a, 0x0a, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x6c, 0x61,
+	0x22, 0x99, 0x01, 0x0a, 0x04, 0x52, 0x65, 0x70, 0x6f, 0x12, 0x42, 0x0a, 0x05, 0x6c, 0x6f, 0x63,
+	0x61, 0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2a, 0x2e, 0x61, 0x6c, 0x63, 0x68, 0x65,
+	0x6d, 0x61, 0x74, 0x69, 0x6b, 0x2e, 0x61, 0x74, 0x68, 0x61, 0x6e, 0x6f, 0x72, 0x2e, 0x62, 0x6c,
+	0x75, 0x65, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x2e, 0x76, 0x31, 0x2e, 0x4c, 0x6f, 0x63, 0x61, 0x6c,
+	0x52, 0x65, 0x70, 0x6f, 0x48, 0x00, 0x52, 0x05, 0x6c, 0x6f, 0x63, 0x61, 0x6c, 0x12, 0x45, 0x0a,
+	0x06, 0x67, 0x69, 0x74, 0x68, 0x75, 0x62, 0x18, 0x02, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2b, 0x2e,
+	0x61, 0x6c, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x74, 0x69, 0x6b, 0x2e, 0x61, 0x74, 0x68, 0x61, 0x6e,
+	0x6f, 0x72, 0x2e, 0x62, 0x6c, 0x75, 0x65, 0x70, 0x72, 0x69, 0x6e, 0x74, 0x2e, 0x76, 0x31, 0x2e,
+	0x47, 0x69, 0x74, 0x48, 0x75, 0x62, 0x52, 0x65, 0x70, 0x6f, 0x48, 0x00, 0x52, 0x06, 0x67, 0x69,
+	0x74, 0x68, 0x75, 0x62, 0x42, 0x06, 0x0a, 0x04, 0x74, 0x79, 0x70, 0x65, 0x22, 0x1f, 0x0a, 0x09,
+	0x4c, 0x6f, 0x63, 0x61, 0x6c, 0x52, 0x65, 0x70, 0x6f, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61, 0x74,
+	0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x70, 0x61, 0x74, 0x68, 0x22, 0x36, 0x0a,
+	0x0a, 0x47, 0x69, 0x74, 0x48, 0x75, 0x62, 0x52, 0x65, 0x70, 0x6f, 0x12, 0x14, 0x0a, 0x05, 0x6f,
+	0x77, 0x6e, 0x65, 0x72, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x6f, 0x77, 0x6e, 0x65,
+	0x72, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x04, 0x6e, 0x61, 0x6d, 0x65, 0x22, 0x75, 0x0a, 0x0a, 0x54, 0x72, 0x61, 0x6e, 0x73, 0x6c, 0x61,
 	0x74, 0x6f, 0x72, 0x12, 0x12, 0x0a, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
 	0x09, 0x52, 0x04, 0x6e, 0x61, 0x6d, 0x65, 0x12, 0x18, 0x0a, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69,
 	0x6f, 0x6e, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x07, 0x76, 0x65, 0x72, 0x73, 0x69, 0x6f,
@@ -1433,7 +1510,7 @@ func file_proto_blueprint_v1_blueprint_proto_rawDescGZIP() []byte {
 	return file_proto_blueprint_v1_blueprint_proto_rawDescData
 }
 
-var file_proto_blueprint_v1_blueprint_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_proto_blueprint_v1_blueprint_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_proto_blueprint_v1_blueprint_proto_goTypes = []interface{}{
 	(*Blueprint)(nil),              // 0: alchematik.athanor.blueprint.v1.Blueprint
 	(*Stmt)(nil),                   // 1: alchematik.athanor.blueprint.v1.Stmt
@@ -1452,8 +1529,9 @@ var file_proto_blueprint_v1_blueprint_proto_goTypes = []interface{}{
 	(*ResourceIdentifierExpr)(nil), // 14: alchematik.athanor.blueprint.v1.ResourceIdentifierExpr
 	(*Repo)(nil),                   // 15: alchematik.athanor.blueprint.v1.Repo
 	(*LocalRepo)(nil),              // 16: alchematik.athanor.blueprint.v1.LocalRepo
-	(*Translator)(nil),             // 17: alchematik.athanor.blueprint.v1.Translator
-	nil,                            // 18: alchematik.athanor.blueprint.v1.MapExpr.EntriesEntry
+	(*GitHubRepo)(nil),             // 17: alchematik.athanor.blueprint.v1.GitHubRepo
+	(*Translator)(nil),             // 18: alchematik.athanor.blueprint.v1.Translator
+	nil,                            // 19: alchematik.athanor.blueprint.v1.MapExpr.EntriesEntry
 }
 var file_proto_blueprint_v1_blueprint_proto_depIdxs = []int32{
 	1,  // 0: alchematik.athanor.blueprint.v1.Blueprint.stmts:type_name -> alchematik.athanor.blueprint.v1.Stmt
@@ -1461,7 +1539,7 @@ var file_proto_blueprint_v1_blueprint_proto_depIdxs = []int32{
 	3,  // 2: alchematik.athanor.blueprint.v1.Stmt.build:type_name -> alchematik.athanor.blueprint.v1.BuildStmt
 	4,  // 3: alchematik.athanor.blueprint.v1.ResourceStmt.expr:type_name -> alchematik.athanor.blueprint.v1.Expr
 	15, // 4: alchematik.athanor.blueprint.v1.BuildStmt.repo:type_name -> alchematik.athanor.blueprint.v1.Repo
-	17, // 5: alchematik.athanor.blueprint.v1.BuildStmt.translator:type_name -> alchematik.athanor.blueprint.v1.Translator
+	18, // 5: alchematik.athanor.blueprint.v1.BuildStmt.translator:type_name -> alchematik.athanor.blueprint.v1.Translator
 	4,  // 6: alchematik.athanor.blueprint.v1.BuildStmt.config:type_name -> alchematik.athanor.blueprint.v1.Expr
 	4,  // 7: alchematik.athanor.blueprint.v1.BuildStmt.runtime_config:type_name -> alchematik.athanor.blueprint.v1.Expr
 	6,  // 8: alchematik.athanor.blueprint.v1.Expr.list:type_name -> alchematik.athanor.blueprint.v1.ListExpr
@@ -1476,7 +1554,7 @@ var file_proto_blueprint_v1_blueprint_proto_depIdxs = []int32{
 	10, // 17: alchematik.athanor.blueprint.v1.Expr.get_runtime_config:type_name -> alchematik.athanor.blueprint.v1.GetRuntimeConfig
 	1,  // 18: alchematik.athanor.blueprint.v1.BlueprintExpr.stmts:type_name -> alchematik.athanor.blueprint.v1.Stmt
 	4,  // 19: alchematik.athanor.blueprint.v1.ListExpr.elements:type_name -> alchematik.athanor.blueprint.v1.Expr
-	18, // 20: alchematik.athanor.blueprint.v1.MapExpr.entries:type_name -> alchematik.athanor.blueprint.v1.MapExpr.EntriesEntry
+	19, // 20: alchematik.athanor.blueprint.v1.MapExpr.entries:type_name -> alchematik.athanor.blueprint.v1.MapExpr.EntriesEntry
 	4,  // 21: alchematik.athanor.blueprint.v1.GetExpr.object:type_name -> alchematik.athanor.blueprint.v1.Expr
 	15, // 22: alchematik.athanor.blueprint.v1.ProviderExpr.repo:type_name -> alchematik.athanor.blueprint.v1.Repo
 	4,  // 23: alchematik.athanor.blueprint.v1.ResourceExpr.provider:type_name -> alchematik.athanor.blueprint.v1.Expr
@@ -1485,13 +1563,14 @@ var file_proto_blueprint_v1_blueprint_proto_depIdxs = []int32{
 	4,  // 26: alchematik.athanor.blueprint.v1.ResourceExpr.exists:type_name -> alchematik.athanor.blueprint.v1.Expr
 	4,  // 27: alchematik.athanor.blueprint.v1.ResourceIdentifierExpr.value:type_name -> alchematik.athanor.blueprint.v1.Expr
 	16, // 28: alchematik.athanor.blueprint.v1.Repo.local:type_name -> alchematik.athanor.blueprint.v1.LocalRepo
-	15, // 29: alchematik.athanor.blueprint.v1.Translator.repo:type_name -> alchematik.athanor.blueprint.v1.Repo
-	4,  // 30: alchematik.athanor.blueprint.v1.MapExpr.EntriesEntry.value:type_name -> alchematik.athanor.blueprint.v1.Expr
-	31, // [31:31] is the sub-list for method output_type
-	31, // [31:31] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	17, // 29: alchematik.athanor.blueprint.v1.Repo.github:type_name -> alchematik.athanor.blueprint.v1.GitHubRepo
+	15, // 30: alchematik.athanor.blueprint.v1.Translator.repo:type_name -> alchematik.athanor.blueprint.v1.Repo
+	4,  // 31: alchematik.athanor.blueprint.v1.MapExpr.EntriesEntry.value:type_name -> alchematik.athanor.blueprint.v1.Expr
+	32, // [32:32] is the sub-list for method output_type
+	32, // [32:32] is the sub-list for method input_type
+	32, // [32:32] is the sub-list for extension type_name
+	32, // [32:32] is the sub-list for extension extendee
+	0,  // [0:32] is the sub-list for field type_name
 }
 
 func init() { file_proto_blueprint_v1_blueprint_proto_init() }
@@ -1705,6 +1784,18 @@ func file_proto_blueprint_v1_blueprint_proto_init() {
 			}
 		}
 		file_proto_blueprint_v1_blueprint_proto_msgTypes[17].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*GitHubRepo); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_proto_blueprint_v1_blueprint_proto_msgTypes[18].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*Translator); i {
 			case 0:
 				return &v.state
@@ -1739,6 +1830,7 @@ func file_proto_blueprint_v1_blueprint_proto_init() {
 	}
 	file_proto_blueprint_v1_blueprint_proto_msgTypes[15].OneofWrappers = []interface{}{
 		(*Repo_Local)(nil),
+		(*Repo_Github)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -1746,7 +1838,7 @@ func file_proto_blueprint_v1_blueprint_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_proto_blueprint_v1_blueprint_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   20,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

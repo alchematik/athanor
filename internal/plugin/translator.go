@@ -1,13 +1,20 @@
 package plugin
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"log"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 
 	"github.com/alchematik/athanor/internal/ast"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
@@ -32,10 +39,147 @@ func NewTranslator(logger hclog.Logger) *Translator {
 }
 
 func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Blueprint, error) {
+	name := b.Translator.Name
+	version := b.Translator.Version
 	var dir string
 	switch r := b.Translator.Repo.(type) {
 	case ast.RepoLocal:
 		dir = r.Path
+	case ast.RepoGitHub:
+		dir = filepath.Join(".athanor", "translators")
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return ast.Blueprint{}, err
+		}
+
+		parentPath := filepath.Join(dir, name, version)
+		if err := os.MkdirAll(parentPath, 0755); err != nil {
+			return ast.Blueprint{}, err
+		}
+
+		pluginPath := filepath.Join(parentPath, "translator")
+
+		_, err := os.Stat(pluginPath)
+		if err != nil {
+			if !os.IsNotExist(err) {
+				return ast.Blueprint{}, err
+			}
+
+			artifactName := fmt.Sprintf("%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+			artifactPath := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", r.Owner, r.Name, version, artifactName)
+
+			resp, err := http.Get(artifactPath)
+			if err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			defer resp.Body.Close()
+
+			artifactFile, err := os.Create(filepath.Join(parentPath, artifactName))
+			if err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			if _, err := io.Copy(artifactFile, resp.Body); err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			if _, err := artifactFile.Seek(0, io.SeekStart); err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			buf := bytes.Buffer{}
+			checksumReqPath := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/checksum.txt", r.Owner, r.Name, version)
+			checksumRes, err := http.Get(checksumReqPath)
+			if err != nil {
+				return ast.Blueprint{}, err
+			}
+			_, err = io.Copy(&buf, checksumRes.Body)
+			if err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			checksums := map[string]string{}
+			lines := strings.Split(buf.String(), "\n")
+			for _, line := range lines {
+				if line == "" {
+					continue
+				}
+
+				parts := strings.Split(line, "  ")
+				checksums[parts[1]] = parts[0]
+			}
+
+			hash := sha256.New()
+			if _, err := io.Copy(hash, artifactFile); err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			checksum := fmt.Sprintf("%x", hash.Sum(nil))
+
+			if checksums[artifactName] != checksum {
+				return ast.Blueprint{}, fmt.Errorf("checksums do not match")
+			}
+
+			if _, err := artifactFile.Seek(0, io.SeekStart); err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			gzipReader, err := gzip.NewReader(artifactFile)
+			if err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			defer gzipReader.Close()
+
+			tarFile, err := os.Create(filepath.Join(dir, name, version, "translator.tar"))
+			if err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			defer os.Remove(tarFile.Name())
+
+			_, err = io.Copy(tarFile, gzipReader)
+			if err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			_, err = tarFile.Seek(0, io.SeekStart)
+			if err != nil {
+				return ast.Blueprint{}, err
+			}
+
+			tarReader := tar.NewReader(tarFile)
+			for {
+				hdr, err := tarReader.Next()
+				if err == io.EOF {
+					break
+				}
+
+				if err != nil {
+					return ast.Blueprint{}, err
+				}
+
+				if hdr.Name != "translator" {
+					continue
+				}
+
+				f, err := os.Create(filepath.Join(dir, name, version, hdr.Name))
+				if err != nil {
+					return ast.Blueprint{}, err
+				}
+				defer f.Close()
+
+				if err := f.Chmod(0755); err != nil {
+					return ast.Blueprint{}, err
+				}
+
+				_, err = io.Copy(f, tarReader)
+				if err != nil {
+					return ast.Blueprint{}, err
+				}
+			}
+		}
+
 	default:
 		return ast.Blueprint{}, fmt.Errorf("invalid repo type: %T", b.Translator.Repo)
 	}
@@ -440,6 +584,11 @@ func convertRepo(r *consumerpb.Repo) (ast.Repo, error) {
 	case *consumerpb.Repo_Local:
 		return ast.RepoLocal{
 			Path: r.Local.GetPath(),
+		}, nil
+	case *consumerpb.Repo_Github:
+		return ast.RepoGitHub{
+			Owner: r.Github.GetOwner(),
+			Name:  r.Github.GetName(),
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid repo type: %T", r)
