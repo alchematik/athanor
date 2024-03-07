@@ -5,6 +5,7 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
+	"github.com/alchematik/athanor/internal/cli/view"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
@@ -26,7 +27,7 @@ const (
 
 type Show struct {
 	Context   context.Context
-	Config    Config
+	Config    view.Config
 	State     string
 	InputPath string
 	DiffTree  *component.TreeModel
@@ -36,16 +37,6 @@ type Show struct {
 	Controller *controller.DiffController
 
 	Logger hclog.Logger
-}
-
-type Config struct {
-	Name       string `json:"name"`
-	InputPath  string `json:"input_path"`
-	Translator struct {
-		Name    string `json:"name"`
-		Version string `json:"version"`
-	} `json:"translator"`
-	TranslatorsDir string `json:"translators_dir"`
 }
 
 type ShowParams struct {
@@ -82,7 +73,7 @@ func NewShow(params ShowParams) (*tea.Program, error) {
 }
 
 func (v *Show) Init() tea.Cmd {
-	return tea.Batch(v.Spinner.Tick, loadConfigCmd(v.InputPath))
+	return tea.Batch(v.Spinner.Tick, view.LoadConfigCmd(v.InputPath))
 }
 
 func (v *Show) View() string {
@@ -110,8 +101,8 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return v, nil
 	case doneEvaluateSpecMsg:
 		return v, tea.Quit
-	case configLoadedMsg:
-		v.Config = msg.config
+	case view.ConfigLoadedMsg:
+		v.Config = msg.Config
 		v.State = showStateTranslating
 		return v, interpretBlueprintCmd(v.Context, v.Config, v.Logger)
 	case setSpecMsg:
@@ -168,8 +159,8 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return v, tea.Sequence(cmds...)
-	case displayErrorMsg:
-		v.Error = msg.error
+	case view.DisplayErrorMsg:
+		v.Error = msg.Error
 		v.State = showStateError
 		return v, quit
 	case quitMsg:

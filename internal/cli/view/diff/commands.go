@@ -2,12 +2,12 @@ package diff
 
 import (
 	"context"
-	"encoding/json"
-	"os"
+	"fmt"
 	"sort"
 
 	"github.com/alchematik/athanor/internal/ast"
 	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
+	"github.com/alchematik/athanor/internal/cli/view"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/interpreter"
 	plug "github.com/alchematik/athanor/internal/plugin"
@@ -33,7 +33,7 @@ func evaluateCmd(logger hclog.Logger, ctx context.Context, c Controller, s selec
 	return func() tea.Msg {
 		res, err := c.Process(ctx, s)
 		if err != nil {
-			return displayError(err)
+			return view.DisplayError(err)
 		}
 
 		return setStatusMsg{
@@ -57,50 +57,11 @@ func setStatus(s selector.Selector, status string) tea.Cmd {
 	}
 }
 
-func loadConfigCmd(configPath string) tea.Cmd {
-	return func() tea.Msg {
-		c, err := loadConfig(configPath)
-		if err != nil {
-			return displayError(err)
-		}
-
-		return configLoadedMsg{config: c}
-	}
-}
-
-func loadConfig(configPath string) (Config, error) {
-	f, err := os.ReadFile(configPath)
-	if err != nil {
-		return Config{}, err
-	}
-
-	var c Config
-	if err := json.Unmarshal(f, &c); err != nil {
-		return Config{}, err
-	}
-
-	return c, nil
-}
-
-type configLoadedMsg struct {
-	config Config
-}
-
-func displayError(err error) tea.Msg {
-	return displayErrorMsg{
-		error: err,
-	}
-}
-
-type displayErrorMsg struct {
-	error error
-}
-
-func interpretBlueprintCmd(ctx context.Context, config Config, logger hclog.Logger) tea.Cmd {
+func interpretBlueprintCmd(ctx context.Context, config view.Config, logger hclog.Logger) tea.Cmd {
 	return func() tea.Msg {
 		s, err := interpretBlueprint(ctx, config, logger)
 		if err != nil {
-			return displayError(err)
+			return view.DisplayError(err)
 		}
 		return setSpecMsg{
 			spec: s,
@@ -108,7 +69,7 @@ func interpretBlueprintCmd(ctx context.Context, config Config, logger hclog.Logg
 	}
 }
 
-func interpretBlueprint(ctx context.Context, config Config, logger hclog.Logger) (spec.ComponentBuild, error) {
+func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Logger) (spec.ComponentBuild, error) {
 	in := interpreter.Interpreter{
 		Translator: plug.NewTranslator(logger),
 	}
@@ -116,6 +77,16 @@ func interpretBlueprint(ctx context.Context, config Config, logger hclog.Logger)
 		Components:    map[string]spec.Component{},
 		DependencyMap: map[string][]string{},
 	}
+	var repo ast.Repo
+	switch config.Translator.Repo.Type {
+	case "local":
+		repo = ast.RepoLocal{
+			Path: config.Translator.Repo.Path,
+		}
+	default:
+		return spec.ComponentBuild{}, fmt.Errorf("invalid translator repo type: %s", config.Translator.Repo.Type)
+	}
+
 	if err := in.Interpret(ctx, s, ast.StmtBuild{
 		Alias: config.Name,
 		Repo: ast.RepoLocal{
@@ -124,9 +95,7 @@ func interpretBlueprint(ctx context.Context, config Config, logger hclog.Logger)
 		Translator: ast.Translator{
 			Name:    config.Translator.Name,
 			Version: config.Translator.Version,
-			Repo: ast.RepoLocal{
-				Path: config.TranslatorsDir,
-			},
+			Repo:    repo,
 		},
 		// TODO: fill in.
 		Config:        []ast.Expr{},

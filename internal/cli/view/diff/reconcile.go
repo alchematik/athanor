@@ -5,6 +5,7 @@ import (
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
+	"github.com/alchematik/athanor/internal/cli/view"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/differ"
@@ -23,7 +24,7 @@ import (
 
 type Reconcile struct {
 	Context       context.Context
-	Config        Config
+	Config        view.Config
 	State         string
 	Input         help.Model
 	InputPath     string
@@ -75,7 +76,7 @@ func NewReconcile(params ShowParams) (*tea.Program, error) {
 }
 
 func (r *Reconcile) Init() tea.Cmd {
-	return tea.Batch(r.Spinner.Tick, loadConfigCmd(r.InputPath))
+	return tea.Batch(r.Spinner.Tick, view.LoadConfigCmd(r.InputPath))
 }
 
 func (r *Reconcile) View() string {
@@ -140,8 +141,8 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
-	case configLoadedMsg:
-		r.Config = msg.config
+	case view.ConfigLoadedMsg:
+		r.Config = msg.Config
 		return r, interpretBlueprintCmd(r.Context, r.Config, r.Logger)
 	case setSpecMsg:
 		r.DiffTree.Root = &component.TreeNode{
@@ -266,8 +267,8 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				next: r.ReconcileController.Next(),
 			}
 		})
-	case displayErrorMsg:
-		r.Error = msg.error
+	case view.DisplayErrorMsg:
+		r.Error = msg.Error
 		r.State = "error"
 		return r, quit
 	case quitMsg:
@@ -285,7 +286,7 @@ func (r *Reconcile) reconcileCmd(s selector.Selector) tea.Cmd {
 	return func() tea.Msg {
 		status, err := r.ReconcileController.Process(r.Context, s)
 		if err != nil {
-			return displayError(err)
+			return view.DisplayError(err)
 		}
 
 		return setReconcileStatusMsg{
