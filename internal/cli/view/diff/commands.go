@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/alchematik/athanor/internal/ast"
+	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/interpreter"
 	plug "github.com/alchematik/athanor/internal/plugin"
@@ -19,7 +20,7 @@ import (
 
 type Controller interface {
 	Next() []selector.Selector
-	Process(context.Context, selector.Selector) (selector.TreeNodeStatus, error)
+	Process(context.Context, selector.Selector) (controller.TreeNodeStatus, error)
 }
 
 func quit() tea.Msg {

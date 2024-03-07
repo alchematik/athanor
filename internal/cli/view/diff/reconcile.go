@@ -4,6 +4,7 @@ import (
 	"context"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
+	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/differ"
@@ -32,8 +33,8 @@ type Reconcile struct {
 	API           *api.API
 	Error         error
 
-	Controller          *selector.DiffController
-	ReconcileController *selector.ReconcileController
+	Controller          *controller.DiffController
+	ReconcileController *controller.ReconcileController
 
 	Logger hclog.Logger
 }
@@ -157,7 +158,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		d := &differ.Differ{}
 
-		r.Controller = selector.NewDiffController(
+		r.Controller = controller.NewDiffController(
 			r.Logger,
 			msg.spec,
 			target,
@@ -188,7 +189,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		))
 
-		if msg.selector.Parent == nil && msg.status != string(selector.TreeNodeStatusLoading) {
+		if msg.selector.Parent == nil && msg.status != string(controller.TreeNodeStatusLoading) {
 			cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
 		}
 
@@ -201,7 +202,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if r.State == "ready" {
 			switch msg.String() {
 			case "y":
-				r.ReconcileController = selector.NewReconcileController(
+				r.ReconcileController = controller.NewReconcileController(
 					r.Logger,
 					r.Controller.Spec,
 					r.Controller.Diff,
@@ -241,7 +242,7 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return r, tea.Batch(cmds...)
 	case setReconcileStatusMsg:
-		if msg.selector.Parent == nil && msg.status != component.TreeNodeStatus(selector.TreeNodeStatusLoading) {
+		if msg.selector.Parent == nil && msg.status != component.TreeNodeStatus(controller.TreeNodeStatusLoading) {
 			cmds = append(
 				cmds,
 				func() tea.Msg {

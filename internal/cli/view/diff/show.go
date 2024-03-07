@@ -4,11 +4,11 @@ import (
 	"context"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
+	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
 	plug "github.com/alchematik/athanor/internal/plugin"
-	"github.com/alchematik/athanor/internal/selector"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -33,7 +33,7 @@ type Show struct {
 	Spinner   spinner.Model
 	Error     error
 
-	Controller *selector.DiffController
+	Controller *controller.DiffController
 
 	Logger hclog.Logger
 }
@@ -129,7 +129,7 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		d := &differ.Differ{}
 
-		v.Controller = selector.NewDiffController(
+		v.Controller = controller.NewDiffController(
 			v.Logger,
 			msg.spec,
 			target,
@@ -163,7 +163,7 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 		))
 
-		if msg.selector.Parent == nil && msg.status != string(selector.TreeNodeStatusLoading) {
+		if msg.selector.Parent == nil && msg.status != string(controller.TreeNodeStatusLoading) {
 			cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
 		}
 
