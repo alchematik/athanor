@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/alchematik/athanor/internal/cli/view/deps"
 	diffview "github.com/alchematik/athanor/internal/cli/view/diff"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	plug "github.com/alchematik/athanor/internal/plugin"
@@ -141,6 +142,33 @@ func main() {
 						},
 						Action: func(ctx context.Context, cmd *cli.Command) error {
 							program, err := diffview.NewReconcile(diffview.ShowParams{
+								Context: ctx,
+								Path:    cmd.Args().First(),
+								Debug:   cmd.Bool("debug"),
+							})
+							if err != nil {
+								return err
+							}
+
+							_, err = program.Run()
+							return err
+						},
+					},
+				},
+			},
+			{
+				Name: "deps",
+				Commands: []*cli.Command{
+					{
+						Name: "install",
+						Flags: []cli.Flag{
+							&cli.BoolFlag{
+								Name:  "debug",
+								Usage: "log debug logs",
+							},
+						},
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							program, err := deps.NewInstall(deps.InstallParams{
 								Context: ctx,
 								Path:    cmd.Args().First(),
 								Debug:   cmd.Bool("debug"),
