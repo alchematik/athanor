@@ -30,7 +30,7 @@ type API struct {
 }
 
 func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource, error) {
-	client, err := a.ProviderPluginManager.Client(r.Provider)
+	client, err := a.ProviderPluginManager.Client(ctx, r.Provider)
 	if err != nil {
 		return state.Resource{}, err
 	}
@@ -73,7 +73,7 @@ func (a API) GetResource(ctx context.Context, r state.Resource) (state.Resource,
 }
 
 func (a API) CreateResource(ctx context.Context, r state.Resource) (state.Resource, error) {
-	client, err := a.ProviderPluginManager.Client(r.Provider)
+	client, err := a.ProviderPluginManager.Client(ctx, r.Provider)
 	if err != nil {
 		return state.Resource{}, err
 	}
@@ -117,7 +117,7 @@ func (a API) CreateResource(ctx context.Context, r state.Resource) (state.Resour
 }
 
 func (a API) DeleteResource(ctx context.Context, r state.Resource) error {
-	client, err := a.ProviderPluginManager.Client(r.Provider)
+	client, err := a.ProviderPluginManager.Client(ctx, r.Provider)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (a API) DeleteResource(ctx context.Context, r state.Resource) error {
 }
 
 func (a API) UpdateResource(ctx context.Context, r state.Resource, mask []Field) (state.Resource, error) {
-	client, err := a.ProviderPluginManager.Client(r.Provider)
+	client, err := a.ProviderPluginManager.Client(ctx, r.Provider)
 	if err != nil {
 		return state.Resource{}, err
 	}

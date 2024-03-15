@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"runtime"
 	"sync"
 
+	"github.com/alchematik/athanor/internal/dependency"
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
 	"github.com/alchematik/athanor/internal/repo"
 	"github.com/alchematik/athanor/internal/state"
@@ -18,29 +20,49 @@ import (
 type Provider struct {
 	Logger hclog.Logger
 
-	clients map[string]backendpb.ProviderClient
-	lock    *sync.Mutex
+	clients           map[string]backendpb.ProviderClient
+	lock              *sync.Mutex
+	dependencyManager *dependency.Manager
 }
 
-func NewProvider(logger hclog.Logger) *Provider {
+func NewProvider(logger hclog.Logger, depManager *dependency.Manager) *Provider {
 	return &Provider{
-		Logger:  logger,
-		clients: map[string]backendpb.ProviderClient{},
-		lock:    &sync.Mutex{},
+		Logger:            logger,
+		clients:           map[string]backendpb.ProviderClient{},
+		lock:              &sync.Mutex{},
+		dependencyManager: depManager,
 	}
 }
 
-func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, error) {
-	var path string
-	switch r := provider.Repo.(type) {
+func (p *Provider) Client(ctx context.Context, provider state.Provider) (backendpb.ProviderClient, error) {
+	var src any
+	switch s := provider.Repo.(type) {
 	case repo.Local:
-		path = r.Path
+		src = dependency.SourceLocal{Path: s.Path}
+	case repo.GitHubRelease:
+		src = dependency.SourceGitHubRelease{
+			RepoOwner: s.RepoOwner,
+			RepoName:  s.RepoName,
+			Name:      s.Name,
+		}
 	default:
-		return nil, fmt.Errorf("invalid repo type: %T", provider.Repo)
+		return nil, fmt.Errorf("invalid source type: %T", s)
+	}
+
+	dep := dependency.BinDependency{
+		Type:   "provider",
+		Source: src,
+		OS:     runtime.GOOS,
+		Arch:   runtime.GOARCH,
+	}
+
+	binPath, err := p.dependencyManager.FetchBinDependency(ctx, dep)
+	if err != nil {
+		return nil, err
 	}
 
 	p.lock.Lock()
-	c, ok := p.clients[path]
+	c, ok := p.clients[binPath]
 	p.lock.Unlock()
 	if ok {
 		return c, nil
@@ -55,7 +77,7 @@ func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, er
 		Plugins: map[string]plugin.Plugin{
 			"provider": &ProviderPlugin{},
 		},
-		Cmd:              exec.Command("sh", "-c", path),
+		Cmd:              exec.Command("sh", "-c", binPath),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           p.Logger,
 	})
@@ -76,7 +98,7 @@ func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, er
 	}
 
 	p.lock.Lock()
-	p.clients[path] = plug
+	p.clients[binPath] = plug
 	p.lock.Unlock()
 
 	return plug, nil

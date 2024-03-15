@@ -7,6 +7,7 @@ import (
 	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
 	"github.com/alchematik/athanor/internal/cli/view"
 	"github.com/alchematik/athanor/internal/cli/view/component"
+	"github.com/alchematik/athanor/internal/dependency"
 	"github.com/alchematik/athanor/internal/differ"
 	"github.com/alchematik/athanor/internal/evaluator"
 	plug "github.com/alchematik/athanor/internal/plugin"
@@ -112,9 +113,18 @@ func (v *Show) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		target := evaluator.NewEvaluator(&api.Unresolved{})
 
+		depManager, err := dependency.NewManager(dependency.ManagerParams{
+			LockFilePath: "athanor.lock.json",
+		})
+		if err != nil {
+			return v, func() tea.Msg {
+				return view.DisplayError(err)
+			}
+		}
+
 		actual := evaluator.NewEvaluator(
 			&api.API{
-				ProviderPluginManager: plug.NewProvider(v.Logger),
+				ProviderPluginManager: plug.NewProvider(v.Logger, depManager),
 			},
 		)
 

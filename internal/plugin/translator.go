@@ -63,8 +63,6 @@ func (m *TranslatorManager) Translator(ctx context.Context, s repo.Source, r rep
 		return tr, nil
 	}
 
-	m.logger.Debug("PLUGIN PATH >>", "path", binPath)
-
 	client := plugin.NewClient(&plugin.ClientConfig{
 		HandshakeConfig: plugin.HandshakeConfig{
 			ProtocolVersion:  1,
