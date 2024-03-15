@@ -9,8 +9,10 @@ import (
 	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
 	"github.com/alchematik/athanor/internal/cli/view"
 	"github.com/alchematik/athanor/internal/cli/view/component"
+	"github.com/alchematik/athanor/internal/dependency"
 	"github.com/alchematik/athanor/internal/interpreter"
 	plug "github.com/alchematik/athanor/internal/plugin"
+	"github.com/alchematik/athanor/internal/repo"
 	"github.com/alchematik/athanor/internal/selector"
 	"github.com/alchematik/athanor/internal/spec"
 
@@ -70,17 +72,27 @@ func interpretBlueprintCmd(ctx context.Context, config view.Config, logger hclog
 }
 
 func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Logger) (spec.ComponentBuild, error) {
+	depManager, err := dependency.NewManager(dependency.ManagerParams{
+		LockFilePath: "athanor.lock.json",
+	})
+	if err != nil {
+		return spec.ComponentBuild{}, err
+	}
+
+	tr := plug.NewTranslatorManager(logger, depManager)
+	defer tr.Stop()
+
 	in := interpreter.Interpreter{
-		Translator: plug.NewTranslator(logger),
+		Translator: tr,
 	}
 	s := spec.Spec{
 		Components:    map[string]spec.Component{},
 		DependencyMap: map[string][]string{},
 	}
-	var repo ast.Repo
+	var src repo.Source
 	switch config.Translator.Repo.Type {
 	case "local":
-		repo = ast.RepoLocal{
+		src = repo.Local{
 			Path: config.Translator.Repo.Path,
 		}
 	default:
@@ -88,18 +100,18 @@ func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Lo
 	}
 
 	if err := in.Interpret(ctx, s, ast.StmtBuild{
-		Alias: config.Name,
-		Repo: ast.RepoLocal{
-			Path: config.InputPath,
-		},
 		Translator: ast.Translator{
-			Name:    config.Translator.Name,
-			Version: config.Translator.Version,
-			Repo:    repo,
+			Source: src,
 		},
-		// TODO: fill in.
-		Config:        []ast.Expr{},
-		RuntimeConfig: ast.ExprNil{},
+		Build: ast.ExprBuild{
+			Alias: config.Name,
+			Source: repo.Local{
+				Path: config.InputPath,
+			},
+			// TODO: fill in.
+			Config:        []ast.Expr{},
+			RuntimeConfig: ast.ExprNil{},
+		},
 	}); err != nil {
 		return spec.ComponentBuild{}, err
 	}

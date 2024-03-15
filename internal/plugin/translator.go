@@ -1,233 +1,108 @@
 package plugin
 
 import (
-	"archive/tar"
-	"bytes"
-	"compress/gzip"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
-	"strings"
 
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/dependency"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
+	"github.com/alchematik/athanor/internal/repo"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-plugin"
 	"google.golang.org/grpc"
 )
 
+type TranslatorManager struct {
+	logger            hclog.Logger
+	translators       map[string]*Translator
+	dependencyManager *dependency.Manager
+}
+
+func NewTranslatorManager(logger hclog.Logger, dm *dependency.Manager) *TranslatorManager {
+	return &TranslatorManager{
+		translators:       map[string]*Translator{},
+		logger:            logger,
+		dependencyManager: dm,
+	}
+}
+
+func (m *TranslatorManager) Translator(ctx context.Context, s repo.Source, r repo.Runtime) (*Translator, error) {
+	var src any
+	switch s := s.(type) {
+	case repo.Local:
+		src = dependency.SourceLocal{Path: s.Path}
+	case repo.GitHubRelease:
+		src = dependency.SourceGitHubRelease{
+			RepoOwner: s.RepoOwner,
+			RepoName:  s.RepoName,
+			Name:      s.Name,
+		}
+	default:
+		return nil, fmt.Errorf("invalid source type: %T", s)
+	}
+
+	dep := dependency.BinDependency{
+		Type:   "translator",
+		Source: src,
+		OS:     runtime.GOOS,
+		Arch:   runtime.GOARCH,
+	}
+	binPath, err := m.dependencyManager.FetchBinDependency(ctx, dep)
+	if err != nil {
+		return nil, err
+	}
+
+	if tr, ok := m.translators[binPath]; ok {
+		return tr, nil
+	}
+
+	m.logger.Debug("PLUGIN PATH >>", "path", binPath)
+
+	client := plugin.NewClient(&plugin.ClientConfig{
+		HandshakeConfig: plugin.HandshakeConfig{
+			ProtocolVersion:  1,
+			MagicCookieKey:   "COOKIE",
+			MagicCookieValue: "hi",
+		},
+		Plugins: map[string]plugin.Plugin{
+			"translator": &TranslatorPlugin{},
+		},
+		Cmd:              exec.Command("sh", "-c", binPath),
+		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+		Logger:           m.logger,
+	})
+
+	tr := &Translator{plug: client}
+
+	m.translators[binPath] = tr
+	return tr, nil
+}
+
 type Translator struct {
-	Dir     string
-	Logger  hclog.Logger
-	clients map[string]*plugin.Client
+	plug *plugin.Client
 }
 
-func NewTranslator(logger hclog.Logger) *Translator {
-	return &Translator{
-		clients: map[string]*plugin.Client{},
-		Logger:  logger,
-	}
-}
-
-func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Blueprint, error) {
-	name := b.Translator.Name
-	version := b.Translator.Version
-	var dir string
-	switch r := b.Translator.Repo.(type) {
-	case ast.RepoLocal:
-		dir = r.Path
-	case ast.RepoGitHub:
-		dir = filepath.Join(".athanor", "translators")
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return ast.Blueprint{}, err
-		}
-
-		parentPath := filepath.Join(dir, name, version)
-		if err := os.MkdirAll(parentPath, 0755); err != nil {
-			return ast.Blueprint{}, err
-		}
-
-		pluginPath := filepath.Join(parentPath, "translator")
-
-		_, err := os.Stat(pluginPath)
-		if err != nil {
-			if !os.IsNotExist(err) {
-				return ast.Blueprint{}, err
-			}
-
-			artifactName := fmt.Sprintf("%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
-			artifactPath := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/%s", r.Owner, r.Name, version, artifactName)
-
-			resp, err := http.Get(artifactPath)
-			if err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			defer resp.Body.Close()
-
-			artifactFile, err := os.Create(filepath.Join(parentPath, artifactName))
-			if err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			if _, err := io.Copy(artifactFile, resp.Body); err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			if _, err := artifactFile.Seek(0, io.SeekStart); err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			buf := bytes.Buffer{}
-			checksumReqPath := fmt.Sprintf("https://github.com/%s/%s/releases/download/%s/checksum.txt", r.Owner, r.Name, version)
-			checksumRes, err := http.Get(checksumReqPath)
-			if err != nil {
-				return ast.Blueprint{}, err
-			}
-			_, err = io.Copy(&buf, checksumRes.Body)
-			if err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			checksums := map[string]string{}
-			lines := strings.Split(buf.String(), "\n")
-			for _, line := range lines {
-				if line == "" {
-					continue
-				}
-
-				parts := strings.Split(line, "  ")
-				checksums[parts[1]] = parts[0]
-			}
-
-			hash := sha256.New()
-			if _, err := io.Copy(hash, artifactFile); err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			checksum := fmt.Sprintf("%x", hash.Sum(nil))
-
-			if checksums[artifactName] != checksum {
-				return ast.Blueprint{}, fmt.Errorf("checksums do not match")
-			}
-
-			if _, err := artifactFile.Seek(0, io.SeekStart); err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			gzipReader, err := gzip.NewReader(artifactFile)
-			if err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			defer gzipReader.Close()
-
-			tarFile, err := os.Create(filepath.Join(dir, name, version, "translator.tar"))
-			if err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			defer os.Remove(tarFile.Name())
-
-			_, err = io.Copy(tarFile, gzipReader)
-			if err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			_, err = tarFile.Seek(0, io.SeekStart)
-			if err != nil {
-				return ast.Blueprint{}, err
-			}
-
-			tarReader := tar.NewReader(tarFile)
-			for {
-				hdr, err := tarReader.Next()
-				if err == io.EOF {
-					break
-				}
-
-				if err != nil {
-					return ast.Blueprint{}, err
-				}
-
-				if hdr.Name != "translator" {
-					continue
-				}
-
-				f, err := os.Create(filepath.Join(dir, name, version, hdr.Name))
-				if err != nil {
-					return ast.Blueprint{}, err
-				}
-				defer f.Close()
-
-				if err := f.Chmod(0755); err != nil {
-					return ast.Blueprint{}, err
-				}
-
-				_, err = io.Copy(f, tarReader)
-				if err != nil {
-					return ast.Blueprint{}, err
-				}
-			}
-		}
-
-	default:
-		return ast.Blueprint{}, fmt.Errorf("invalid repo type: %T", b.Translator.Repo)
-	}
-
-	pluginPath := filepath.Join(dir, b.Translator.Name, b.Translator.Version, "translator")
-
-	c, ok := t.clients[pluginPath]
-	if !ok {
-		client := plugin.NewClient(&plugin.ClientConfig{
-			HandshakeConfig: plugin.HandshakeConfig{
-				ProtocolVersion:  1,
-				MagicCookieKey:   "COOKIE",
-				MagicCookieValue: "hi",
-			},
-			Plugins: map[string]plugin.Plugin{
-				"translator": &TranslatorPlugin{},
-			},
-			Cmd:              exec.Command("sh", "-c", pluginPath),
-			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-			Logger:           t.Logger,
-		})
-
-		t.clients[pluginPath] = client
-		c = client
-	}
-
-	dispensor, err := c.Client()
+func (t *Translator) TranslateBlueprint(ctx context.Context, b ast.ExprBuild) (ast.Blueprint, error) {
+	tc, err := t.client()
 	if err != nil {
 		return ast.Blueprint{}, err
 	}
 
-	rawPlug, err := dispensor.Dispense("translator")
-	if err != nil {
-		return ast.Blueprint{}, err
+	// TODO: Should plugin source and blueprint source be different?
+	inputPath := ""
+	switch s := b.Source.(type) {
+	case repo.Local:
+		inputPath = s.Path
 	}
 
-	tc, ok := rawPlug.(translatorpb.TranslatorClient)
-	if !ok {
-		return ast.Blueprint{}, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
-	}
-
-	var inputPath string
-	switch r := b.Repo.(type) {
-	case ast.RepoLocal:
-		inputPath = r.Path
-	default:
-		return ast.Blueprint{}, fmt.Errorf("invalid repo type: %T", b.Repo)
-	}
+	fmt.Printf("TRANSLATING>>> %v\n", inputPath)
 
 	tempFile, err := os.CreateTemp("", "")
 	if err != nil {
@@ -288,46 +163,76 @@ func (t *Translator) Translate(ctx context.Context, b ast.StmtBuild) (ast.Bluepr
 	return convertBlueprint(&blueprint)
 }
 
-func (t *Translator) Stop() {
-	for _, c := range t.clients {
-		c.Kill()
+func (t *Translator) TranslateProviderSchema(ctx context.Context, inputPath, outputPath string) error {
+	client, err := t.client()
+	if err != nil {
+		return err
 	}
-}
 
-// TODO: replace.
-func (t Translator) Client(name, version string) (translatorpb.TranslatorClient, func(), error) {
-	pluginPath := filepath.Join(t.Dir, name, version, "translator")
-
-	client := plugin.NewClient(&plugin.ClientConfig{
-		HandshakeConfig: plugin.HandshakeConfig{
-			ProtocolVersion:  1,
-			MagicCookieKey:   "COOKIE",
-			MagicCookieValue: "hi",
-		},
-		Plugins: map[string]plugin.Plugin{
-			"translator": &TranslatorPlugin{},
-		},
-		Cmd:              exec.Command("sh", "-c", pluginPath),
-		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		Logger:           hclog.NewNullLogger(),
+	_, err = client.TranslateProviderSchema(ctx, &translatorpb.TranslateProviderSchemaRequest{
+		OutputPath: outputPath,
+		InputPath:  inputPath,
 	})
 
-	dispensor, err := client.Client()
+	return err
+}
+
+func (t *Translator) GenerateProviderSDK(ctx context.Context, inputPath, outputPath string, args map[string]string) error {
+	client, err := t.client()
 	if err != nil {
-		return nil, nil, err
+		return err
+	}
+
+	_, err = client.GenerateProviderSDK(ctx, &translatorpb.GenerateProviderSDKRequest{
+		InputPath:  inputPath,
+		OutputPath: outputPath,
+		Args:       args,
+	})
+
+	return err
+}
+
+func (t *Translator) GenerateConsumerSDK(ctx context.Context, inputPath, outputPath string) error {
+	client, err := t.client()
+	if err != nil {
+		return err
+	}
+
+	_, err = client.GenerateConsumerSDK(ctx, &translatorpb.GenerateConsumerSDKRequest{
+		InputPath:  inputPath,
+		OutputPath: outputPath,
+	})
+
+	return err
+}
+
+func (t *Translator) client() (translatorpb.TranslatorClient, error) {
+	dispensor, err := t.plug.Client()
+	if err != nil {
+		return nil, err
 	}
 
 	rawPlug, err := dispensor.Dispense("translator")
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	plug, ok := rawPlug.(translatorpb.TranslatorClient)
+	tc, ok := rawPlug.(translatorpb.TranslatorClient)
 	if !ok {
-		return nil, nil, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
+		return nil, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
 	}
 
-	return plug, client.Kill, nil
+	return tc, nil
+}
+
+func (t *Translator) Stop() {
+	t.plug.Kill()
+}
+
+func (m *TranslatorManager) Stop() {
+	for _, t := range m.translators {
+		t.Stop()
+	}
 }
 
 type TranslatorPlugin struct {
@@ -371,8 +276,8 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 			Expr: ex,
 		}, nil
 	case *consumerpb.Stmt_Build:
-		configs := make([]ast.Expr, len(s.Build.GetConfig()))
-		for i, c := range s.Build.GetConfig() {
+		configs := make([]ast.Expr, len(s.Build.GetBuild().GetConfig()))
+		for i, c := range s.Build.GetBuild().GetConfig() {
 			config, err := convertExpr(c)
 			if err != nil {
 				return nil, err
@@ -381,30 +286,30 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 			configs[i] = config
 		}
 
-		runtimeConfig, err := convertExpr(s.Build.GetRuntimeConfig())
+		runtimeConfig, err := convertExpr(s.Build.GetBuild().GetRuntimeConfig())
 		if err != nil {
 			return nil, err
 		}
 
-		repo, err := convertRepo(s.Build.GetRepo())
+		src, err := convertSource(s.Build.GetBuild().GetSource())
 		if err != nil {
 			return nil, err
 		}
 
-		translatorRepo, err := convertRepo(s.Build.Translator.GetRepo())
+		translatorSource, err := convertSource(s.Build.Translator.GetSource())
 		if err != nil {
 			return nil, err
 		}
 
 		return ast.StmtBuild{
-			Alias:         s.Build.GetAlias(),
-			Repo:          repo,
-			Config:        configs,
-			RuntimeConfig: runtimeConfig,
 			Translator: ast.Translator{
-				Name:    s.Build.Translator.Name,
-				Version: s.Build.Translator.Version,
-				Repo:    translatorRepo,
+				Source: translatorSource,
+			},
+			Build: ast.ExprBuild{
+				Alias:         s.Build.GetBuild().GetAlias(),
+				Config:        configs,
+				RuntimeConfig: runtimeConfig,
+				Source:        src,
 			},
 		}, nil
 	default:
@@ -427,15 +332,14 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 
 		return ast.ExprBlueprint{Stmts: stmts}, nil
 	case *consumerpb.Expr_Provider:
-		repo, err := convertRepo(e.Provider.GetRepo())
+		s, err := convertSource(e.Provider.GetSource())
 		if err != nil {
 			return nil, err
 		}
 
 		return ast.ExprProvider{
-			Name:    e.Provider.GetName(),
-			Version: e.Provider.GetVersion(),
-			Repo:    repo,
+			Name:   e.Provider.GetName(),
+			Source: s,
 		}, nil
 	case *consumerpb.Expr_Resource:
 		provider, err := convertExpr(e.Resource.GetProvider())
@@ -579,18 +483,19 @@ func exprToProto(expr ast.Expr) (*consumerpb.Expr, error) {
 	}
 }
 
-func convertRepo(r *consumerpb.Repo) (ast.Repo, error) {
-	switch r := r.GetType().(type) {
-	case *consumerpb.Repo_Local:
-		return ast.RepoLocal{
-			Path: r.Local.GetPath(),
+func convertSource(src *consumerpb.Source) (repo.Source, error) {
+	switch s := src.GetType().(type) {
+	case *consumerpb.Source_FilePath:
+		return repo.Local{
+			Path: s.FilePath.GetPath(),
 		}, nil
-	case *consumerpb.Repo_Github:
-		return ast.RepoGitHub{
-			Owner: r.Github.GetOwner(),
-			Name:  r.Github.GetName(),
+	case *consumerpb.Source_GitHubRelease:
+		return repo.GitHubRelease{
+			RepoOwner: s.GitHubRelease.GetRepoOwner(),
+			RepoName:  s.GitHubRelease.GetRepoName(),
+			Name:      s.GitHubRelease.GetName(),
 		}, nil
 	default:
-		return nil, fmt.Errorf("invalid repo type: %T", r)
+		return nil, fmt.Errorf("unsupported source: %T", s)
 	}
 }

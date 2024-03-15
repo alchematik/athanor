@@ -1,5 +1,9 @@
 package ast
 
+import (
+	"github.com/alchematik/athanor/internal/repo"
+)
+
 type Expr interface {
 	isExprExpr() bool
 }
@@ -54,26 +58,8 @@ type ExprGetRuntimeConfig struct {
 type ExprProvider struct {
 	Expr
 
-	Name    string
-	Version string
-	Repo    Repo
-}
-
-type Repo interface {
-	isRepo()
-}
-
-type RepoLocal struct {
-	Repo
-
-	Path string
-}
-
-type RepoGitHub struct {
-	Repo
-
-	Owner string
-	Name  string
+	Name   string
+	Source repo.Source
 }
 
 type ExprResource struct {
@@ -91,6 +77,15 @@ type ExprResourceIdentifier struct {
 	Alias        string
 	ResourceType string
 	Value        Expr
+}
+
+type ExprBuild struct {
+	Expr
+
+	Alias         string
+	Source        repo.Source
+	Config        []Expr
+	RuntimeConfig Expr
 }
 
 type ExprNil struct {

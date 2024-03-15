@@ -2,6 +2,7 @@ package view
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,12 +37,12 @@ func LoadConfigCmd(configPath string) tea.Cmd {
 func loadConfig(configPath string) (Config, error) {
 	f, err := os.ReadFile(configPath)
 	if err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("error readin config file: %s", err)
 	}
 
 	var c Config
 	if err := json.Unmarshal(f, &c); err != nil {
-		return Config{}, err
+		return Config{}, fmt.Errorf("error unmarshaling config JSON file: %s", err)
 	}
 
 	return c, nil

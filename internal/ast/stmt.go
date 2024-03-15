@@ -1,13 +1,11 @@
 package ast
 
+import (
+	"github.com/alchematik/athanor/internal/repo"
+)
+
 type Stmt interface {
 	isStmtType()
-}
-
-type StmtProvider struct {
-	Stmt
-
-	Expr Expr
 }
 
 type StmtResource struct {
@@ -19,15 +17,10 @@ type StmtResource struct {
 type StmtBuild struct {
 	Stmt
 
-	Alias         string
-	Repo          Repo
-	Translator    Translator
-	Config        []Expr
-	RuntimeConfig Expr
+	Translator Translator
+	Build      ExprBuild
 }
 
 type Translator struct {
-	Name    string
-	Version string
-	Repo    Repo
+	Source repo.Source
 }

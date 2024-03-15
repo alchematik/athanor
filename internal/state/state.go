@@ -1,5 +1,9 @@
 package state
 
+import (
+	"github.com/alchematik/athanor/internal/repo"
+)
+
 type Type interface {
 	isStateType()
 }
@@ -16,17 +20,7 @@ type Provider struct {
 
 	Name    string
 	Version string
-	Repo    Repo
-}
-
-type Repo interface {
-	isRepo()
-}
-
-type RepoLocal struct {
-	Repo
-
-	Path string
+	Repo    repo.Source
 }
 
 type Resource struct {

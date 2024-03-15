@@ -3,9 +3,11 @@ package interpreter
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"slices"
 
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/repo"
 	"github.com/alchematik/athanor/internal/spec"
 )
 
@@ -21,7 +23,7 @@ func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error 
 }
 
 func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtBuild) error {
-	runtimeConfig, children, err := in.Expr(ctx, s, stmt.RuntimeConfig)
+	runtimeConfig, children, err := in.Expr(ctx, s, stmt.Build.RuntimeConfig)
 	if err != nil {
 		return err
 	}
@@ -32,9 +34,17 @@ func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtB
 		RuntimeConfig: runtimeConfig,
 	}
 
-	bp, err := in.Translator.Translate(ctx, stmt)
+	tr, err := in.Translator.Translator(ctx, stmt.Translator.Source, repo.Runtime{
+		OS:   runtime.GOOS,
+		Arch: runtime.GOARCH,
+	})
 	if err != nil {
-		return err
+		return fmt.Errorf("interpreter: error getting translator: %s", err)
+	}
+
+	bp, err := tr.TranslateBlueprint(ctx, stmt.Build)
+	if err != nil {
+		return fmt.Errorf("interpreter: error translating blueprint: %s", err)
 	}
 
 	// TODO: ast.ExprBlueprint vs ast.Blueprint?
@@ -43,8 +53,9 @@ func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtB
 		return err
 	}
 
-	s.DependencyMap[stmt.Alias] = append(s.DependencyMap[stmt.Alias], children...)
-	s.Components[stmt.Alias] = spec.ComponentBuild{Spec: subSpec}
+	alias := stmt.Build.Alias
+	s.DependencyMap[alias] = append(s.DependencyMap[alias], children...)
+	s.Components[alias] = spec.ComponentBuild{Spec: subSpec}
 
 	return nil
 }

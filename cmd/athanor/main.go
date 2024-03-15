@@ -5,11 +5,12 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+	"runtime"
 
 	"github.com/alchematik/athanor/internal/cli/view/deps"
 	diffview "github.com/alchematik/athanor/internal/cli/view/diff"
-	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	plug "github.com/alchematik/athanor/internal/plugin"
+	"github.com/alchematik/athanor/internal/repo"
 
 	"github.com/urfave/cli/v3"
 )
@@ -55,15 +56,22 @@ func main() {
 								return err
 							}
 
-							translatorPlugManager := plug.Translator{
-								Dir: c.TranslatorsDir,
-							}
+							translatorPlugManager := plug.NewTranslatorManager(nil, nil)
+							defer translatorPlugManager.Stop()
 
-							client, stop, err := translatorPlugManager.Client(c.Translator.Name, c.Translator.Version)
+							tr, err := translatorPlugManager.Translator(
+								ctx,
+								repo.Local{
+									Path: c.TranslatorsDir,
+								},
+								repo.Runtime{
+									OS:   runtime.GOOS,
+									Arch: runtime.GOARCH,
+								},
+							)
 							if err != nil {
 								return err
 							}
-							defer stop()
 
 							tempFile, err := os.CreateTemp("", "")
 							if err != nil {
@@ -72,36 +80,30 @@ func main() {
 
 							defer os.Remove(tempFile.Name())
 
-							_, err = client.TranslateProviderSchema(ctx, &translatorpb.TranslateProviderSchemaRequest{
-								OutputPath: tempFile.Name(),
-								InputPath:  c.InputPath,
-							})
-							if err != nil {
+							if err := tr.TranslateProviderSchema(ctx, c.InputPath, tempFile.Name()); err != nil {
 								return err
 							}
 
-							_, err = client.GenerateProviderSDK(ctx, &translatorpb.GenerateProviderSDKRequest{
-								InputPath:  tempFile.Name(),
-								OutputPath: c.OutputPath,
-								Args:       c.Args,
-							})
-							if err != nil {
+							if err := tr.GenerateProviderSDK(ctx, tempFile.Name(), c.OutputPath, c.Args); err != nil {
 								return err
 							}
 
 							for _, clientSDK := range c.ClientSDK {
-								trans, stop, err := translatorPlugManager.Client(clientSDK.Translator.Name, clientSDK.Translator.Version)
+								t, err := translatorPlugManager.Translator(
+									ctx,
+									repo.Local{
+										Path: c.TranslatorsDir,
+									},
+									repo.Runtime{
+										OS:   runtime.GOOS,
+										Arch: runtime.GOARCH,
+									},
+								)
 								if err != nil {
 									return err
 								}
 
-								defer stop()
-
-								_, err = trans.GenerateConsumerSDK(ctx, &translatorpb.GenerateConsumerSDKRequest{
-									InputPath:  tempFile.Name(),
-									OutputPath: clientSDK.OutputPath,
-								})
-								if err != nil {
+								if err := t.GenerateConsumerSDK(ctx, tempFile.Name(), clientSDK.OutputPath); err != nil {
 									return err
 								}
 							}
@@ -160,6 +162,28 @@ func main() {
 				Name: "deps",
 				Commands: []*cli.Command{
 					{
+						Name: "download",
+						Flags: []cli.Flag{
+							&cli.BoolFlag{
+								Name:  "debug",
+								Usage: "log debug logs",
+							},
+						},
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							program, err := deps.NewInstall(deps.InstallParams{
+								Context: ctx,
+								Path:    cmd.Args().First(),
+								Debug:   cmd.Bool("debug"),
+							})
+							if err != nil {
+								return err
+							}
+
+							_, err = program.Run()
+							return err
+						},
+					},
+					{
 						Name: "install",
 						Flags: []cli.Flag{
 							&cli.BoolFlag{
@@ -172,6 +196,7 @@ func main() {
 								Context: ctx,
 								Path:    cmd.Args().First(),
 								Debug:   cmd.Bool("debug"),
+								Upgrade: true,
 							})
 							if err != nil {
 								return err

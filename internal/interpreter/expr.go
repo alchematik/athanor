@@ -50,19 +50,9 @@ func (in Interpreter) blueprintExpr(ctx context.Context, s spec.Spec, e ast.Expr
 }
 
 func (in Interpreter) provider(ctx context.Context, b spec.Spec, e ast.ExprProvider) (spec.ValueProvider, []string, error) {
-	var repo spec.Repo
-	switch r := e.Repo.(type) {
-	case ast.RepoLocal:
-		repo = spec.RepoLocal{
-			Path: r.Path,
-		}
-	default:
-		return spec.ValueProvider{}, nil, fmt.Errorf("invalid repo type: %T", e.Repo)
-	}
 	return spec.ValueProvider{
-		Name:    e.Name,
-		Version: e.Version,
-		Repo:    repo,
+		Name: e.Name,
+		Repo: e.Source,
 	}, nil, nil
 }
 

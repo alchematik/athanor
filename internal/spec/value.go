@@ -1,5 +1,9 @@
 package spec
 
+import (
+	"github.com/alchematik/athanor/internal/repo"
+)
+
 type Value interface {
 	isValueType()
 }
@@ -19,19 +23,8 @@ type ValueBlueprint struct {
 type ValueProvider struct {
 	Value
 
-	Name    string
-	Version string
-	Repo    Repo
-}
-
-type Repo interface {
-	isRepo()
-}
-
-type RepoLocal struct {
-	Repo
-
-	Path string
+	Name string
+	Repo repo.Source
 }
 
 type ValueResource struct {

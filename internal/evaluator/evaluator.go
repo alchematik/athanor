@@ -3,7 +3,6 @@ package evaluator
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	"github.com/alchematik/athanor/internal/spec"
@@ -58,8 +57,6 @@ func (e *Evaluator) Eval(ctx context.Context, env state.Environment, alias strin
 		if err != nil {
 			return nil, err
 		}
-
-		log.Printf("RUNTIME CONFIG >> %+v\n", runtimeConfig)
 
 		env.States[alias] = state.Environment{
 			States:        map[string]state.Type{},

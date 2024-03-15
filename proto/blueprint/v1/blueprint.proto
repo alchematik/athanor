@@ -18,11 +18,8 @@ message ResourceStmt {
 }
 
 message BuildStmt {
-  string alias = 1;
-  Repo repo = 2;
-  Translator translator = 3;
-  repeated Expr config = 4;
-  Expr runtime_config = 5;
+  Translator translator = 1;
+  BuildExpr build = 2;
 }
 
 message Expr {
@@ -41,6 +38,7 @@ message Expr {
     BlueprintExpr blueprint = 12;
     FileExpr file = 13;
     GetRuntimeConfig get_runtime_config = 14;
+    BuildExpr build = 15;
   }
 }
 
@@ -71,8 +69,7 @@ message NilExpr {}
 
 message ProviderExpr {
   string name = 1;
-  string version = 2;
-  Repo repo = 3;
+  Source source = 3;
 }
 
 message ResourceExpr {
@@ -88,24 +85,31 @@ message ResourceIdentifierExpr {
   Expr value = 3;
 }
 
-message Repo {
-  oneof type {
-    LocalRepo local = 1;
-    GitHubRepo github = 2;
-  }
-}
-
-message LocalRepo {
-  string path = 1;
-}
-
-message GitHubRepo {
-  string owner = 1;
-  string name = 2;
+message BuildExpr {
+  string alias = 1;
+  Source source = 2;
+  repeated Expr config = 4;
+  Expr runtime_config = 5;
 }
 
 message Translator {
   string name = 1;
-  string version = 2;
-  Repo repo = 3;
+  Source source = 3;
+}
+
+message Source {
+  oneof type {
+    FilePathSource file_path = 1;
+    GitHubReleaseSource git_hub_release = 2;
+  }
+}
+
+message FilePathSource {
+  string path = 1;
+}
+
+message GitHubReleaseSource {
+  string repo_owner = 1;
+  string repo_name = 2;
+  string name = 3;
 }

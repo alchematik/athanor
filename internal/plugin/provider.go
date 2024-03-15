@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-	"path/filepath"
 	"sync"
 
 	backendpb "github.com/alchematik/athanor/internal/gen/go/proto/provider/v1"
+	"github.com/alchematik/athanor/internal/repo"
 	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/hashicorp/go-hclog"
@@ -31,18 +31,16 @@ func NewProvider(logger hclog.Logger) *Provider {
 }
 
 func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, error) {
-	var dir string
+	var path string
 	switch r := provider.Repo.(type) {
-	case state.RepoLocal:
-		dir = r.Path
+	case repo.Local:
+		path = r.Path
 	default:
 		return nil, fmt.Errorf("invalid repo type: %T", provider.Repo)
 	}
 
-	pluginPath := filepath.Join(dir, provider.Name, provider.Version, "provider")
-
 	p.lock.Lock()
-	c, ok := p.clients[pluginPath]
+	c, ok := p.clients[path]
 	p.lock.Unlock()
 	if ok {
 		return c, nil
@@ -57,7 +55,7 @@ func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, er
 		Plugins: map[string]plugin.Plugin{
 			"provider": &ProviderPlugin{},
 		},
-		Cmd:              exec.Command("sh", "-c", pluginPath),
+		Cmd:              exec.Command("sh", "-c", path),
 		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
 		Logger:           p.Logger,
 	})
@@ -78,7 +76,7 @@ func (p *Provider) Client(provider state.Provider) (backendpb.ProviderClient, er
 	}
 
 	p.lock.Lock()
-	p.clients[pluginPath] = plug
+	p.clients[path] = plug
 	p.lock.Unlock()
 
 	return plug, nil
