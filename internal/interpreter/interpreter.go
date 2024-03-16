@@ -4,12 +4,14 @@ import (
 	"context"
 
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/dependency"
 	"github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/spec"
 )
 
 type Interpreter struct {
-	Translator *plugin.TranslatorManager
+	PlugManager *plugin.Manager
+	DepManager  *dependency.Manager
 }
 
 func (in Interpreter) Interpret(ctx context.Context, s spec.Spec, build ast.StmtBuild) error {

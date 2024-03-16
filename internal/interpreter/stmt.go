@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/dependency"
 	"github.com/alchematik/athanor/internal/repo"
 	"github.com/alchematik/athanor/internal/spec"
 )
@@ -34,10 +35,32 @@ func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtB
 		RuntimeConfig: runtimeConfig,
 	}
 
-	tr, err := in.Translator.Translator(ctx, stmt.Translator.Source, repo.Runtime{
-		OS:   runtime.GOOS,
-		Arch: runtime.GOARCH,
+	var translatorSrc any
+	switch src := stmt.Translator.Source.(type) {
+	case repo.Local:
+		translatorSrc = dependency.SourceLocal{Path: src.Path}
+	case repo.GitHubRelease:
+		translatorSrc = dependency.SourceGitHubRelease{
+			RepoOwner: src.RepoOwner,
+			RepoName:  src.RepoName,
+			Name:      src.Name,
+		}
+	default:
+		return fmt.Errorf("unsupported source type: %T", stmt.Translator.Source)
+
+	}
+
+	binPath, err := in.DepManager.FetchBinDependency(ctx, dependency.BinDependency{
+		Type:   "translator",
+		Source: translatorSrc,
+		OS:     runtime.GOOS,
+		Arch:   runtime.GOARCH,
 	})
+	if err != nil {
+		return fmt.Errorf("interpreter: error getting translator binary: %s", err)
+	}
+
+	tr, err := in.PlugManager.Translator(binPath)
 	if err != nil {
 		return fmt.Errorf("interpreter: error getting translator: %s", err)
 	}

@@ -3,8 +3,11 @@ package interpreter
 import (
 	"context"
 	"fmt"
+	"runtime"
 
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/dependency"
+	"github.com/alchematik/athanor/internal/repo"
 	"github.com/alchematik/athanor/internal/spec"
 )
 
@@ -50,6 +53,30 @@ func (in Interpreter) blueprintExpr(ctx context.Context, s spec.Spec, e ast.Expr
 }
 
 func (in Interpreter) provider(ctx context.Context, b spec.Spec, e ast.ExprProvider) (spec.ValueProvider, []string, error) {
+	var source any
+	switch src := e.Source.(type) {
+	case repo.Local:
+		source = dependency.SourceLocal{Path: src.Path}
+	case repo.GitHubRelease:
+		source = dependency.SourceGitHubRelease{
+			RepoOwner: src.RepoOwner,
+			RepoName:  src.RepoName,
+			Name:      src.Name,
+		}
+	default:
+		return spec.ValueProvider{}, nil, fmt.Errorf("unuspported source for provider: %T", e.Source)
+	}
+
+	dep := dependency.BinDependency{
+		Type:   "provider",
+		Source: source,
+		OS:     runtime.GOOS,
+		Arch:   runtime.GOARCH,
+	}
+	if _, err := in.DepManager.FetchBinDependency(ctx, dep); err != nil {
+		return spec.ValueProvider{}, nil, err
+	}
+
 	return spec.ValueProvider{
 		Name: e.Name,
 		Repo: e.Source,

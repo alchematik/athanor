@@ -9,6 +9,7 @@ import (
 
 	"github.com/alchematik/athanor/internal/cli/view/deps"
 	diffview "github.com/alchematik/athanor/internal/cli/view/diff"
+	"github.com/alchematik/athanor/internal/dependency"
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/repo"
 
@@ -56,19 +57,27 @@ func main() {
 								return err
 							}
 
-							translatorPlugManager := plug.NewTranslatorManager(nil, nil)
-							defer translatorPlugManager.Stop()
+							plugManager := plug.NewPlugManager(nil)
+							defer plugManager.Stop()
 
-							tr, err := translatorPlugManager.Translator(
+							depManager, err := dependency.NewManager(dependency.ManagerParams{LockFilePath: "athanor.lock.json"})
+							if err != nil {
+								return err
+							}
+
+							binPath, err := depManager.FetchBinDependency(
 								ctx,
-								repo.Local{
-									Path: c.TranslatorsDir,
-								},
-								repo.Runtime{
+								dependency.BinDependency{
+									Type: "translator",
+									Source: repo.Local{
+										Path: c.TranslatorsDir,
+									},
 									OS:   runtime.GOOS,
 									Arch: runtime.GOARCH,
 								},
 							)
+
+							tr, err := plugManager.Translator(binPath)
 							if err != nil {
 								return err
 							}
@@ -89,16 +98,22 @@ func main() {
 							}
 
 							for _, clientSDK := range c.ClientSDK {
-								t, err := translatorPlugManager.Translator(
+								path, err := depManager.FetchBinDependency(
 									ctx,
-									repo.Local{
-										Path: c.TranslatorsDir,
-									},
-									repo.Runtime{
+									dependency.BinDependency{
+										Type: "translator",
+										Source: repo.Local{
+											Path: c.TranslatorsDir,
+										},
 										OS:   runtime.GOOS,
 										Arch: runtime.GOARCH,
 									},
 								)
+								if err != nil {
+									return err
+								}
+
+								t, err := plugManager.Translator(path)
 								if err != nil {
 									return err
 								}

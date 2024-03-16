@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 
 	"github.com/alchematik/athanor/internal/ast"
-	"github.com/alchematik/athanor/internal/dependency"
 	consumerpb "github.com/alchematik/athanor/internal/gen/go/proto/blueprint/v1"
 	translatorpb "github.com/alchematik/athanor/internal/gen/go/proto/translator/v1"
 	"github.com/alchematik/athanor/internal/repo"
@@ -19,88 +17,72 @@ import (
 	"google.golang.org/grpc"
 )
 
-type TranslatorManager struct {
-	logger            hclog.Logger
-	translators       map[string]*Translator
-	dependencyManager *dependency.Manager
-}
-
-func NewTranslatorManager(logger hclog.Logger, dm *dependency.Manager) *TranslatorManager {
-	return &TranslatorManager{
-		translators:       map[string]*Translator{},
-		logger:            logger,
-		dependencyManager: dm,
+func NewPlugManager(logger hclog.Logger) *Manager {
+	return &Manager{
+		plugs:  map[string]*plugin.Client{},
+		logger: logger,
 	}
 }
 
-func (m *TranslatorManager) Translator(ctx context.Context, s repo.Source, r repo.Runtime) (*Translator, error) {
-	var src any
-	switch s := s.(type) {
-	case repo.Local:
-		src = dependency.SourceLocal{Path: s.Path}
-	case repo.GitHubRelease:
-		src = dependency.SourceGitHubRelease{
-			RepoOwner: s.RepoOwner,
-			RepoName:  s.RepoName,
-			Name:      s.Name,
-		}
-	default:
-		return nil, fmt.Errorf("invalid source type: %T", s)
+type Manager struct {
+	plugs  map[string]*plugin.Client
+	logger hclog.Logger
+}
+
+func (m *Manager) Translator(binPath string) (*Translator, error) {
+	plug, ok := m.plugs[binPath]
+	if !ok {
+		plug = plugin.NewClient(&plugin.ClientConfig{
+			HandshakeConfig: plugin.HandshakeConfig{
+				ProtocolVersion:  1,
+				MagicCookieKey:   "COOKIE",
+				MagicCookieValue: "hi",
+			},
+			Plugins: map[string]plugin.Plugin{
+				"translator": &TranslatorPlugin{},
+			},
+			Cmd:              exec.Command("sh", "-c", binPath),
+			AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
+			Logger:           m.logger,
+		})
+		m.plugs[binPath] = plug
 	}
 
-	dep := dependency.BinDependency{
-		Type:   "translator",
-		Source: src,
-		OS:     runtime.GOOS,
-		Arch:   runtime.GOARCH,
-	}
-	binPath, err := m.dependencyManager.FetchBinDependency(ctx, dep)
+	dispensor, err := plug.Client()
 	if err != nil {
 		return nil, err
 	}
 
-	if tr, ok := m.translators[binPath]; ok {
-		return tr, nil
+	rawPlug, err := dispensor.Dispense("translator")
+	if err != nil {
+		return nil, err
 	}
 
-	client := plugin.NewClient(&plugin.ClientConfig{
-		HandshakeConfig: plugin.HandshakeConfig{
-			ProtocolVersion:  1,
-			MagicCookieKey:   "COOKIE",
-			MagicCookieValue: "hi",
-		},
-		Plugins: map[string]plugin.Plugin{
-			"translator": &TranslatorPlugin{},
-		},
-		Cmd:              exec.Command("sh", "-c", binPath),
-		AllowedProtocols: []plugin.Protocol{plugin.ProtocolGRPC},
-		Logger:           m.logger,
-	})
+	tc, ok := rawPlug.(translatorpb.TranslatorClient)
+	if !ok {
+		return nil, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
+	}
 
-	tr := &Translator{plug: client}
+	return &Translator{client: tc}, nil
+}
 
-	m.translators[binPath] = tr
-	return tr, nil
+func (m *Manager) Stop() {
+	for _, p := range m.plugs {
+		p.Kill()
+	}
 }
 
 type Translator struct {
-	plug *plugin.Client
+	client translatorpb.TranslatorClient
 }
 
 func (t *Translator) TranslateBlueprint(ctx context.Context, b ast.ExprBuild) (ast.Blueprint, error) {
-	tc, err := t.client()
-	if err != nil {
-		return ast.Blueprint{}, err
-	}
-
 	// TODO: Should plugin source and blueprint source be different?
 	inputPath := ""
 	switch s := b.Source.(type) {
 	case repo.Local:
 		inputPath = s.Path
 	}
-
-	fmt.Printf("TRANSLATING>>> %v\n", inputPath)
 
 	tempFile, err := os.CreateTemp("", "")
 	if err != nil {
@@ -140,7 +122,7 @@ func (t *Translator) TranslateBlueprint(ctx context.Context, b ast.ExprBuild) (a
 		return ast.Blueprint{}, err
 	}
 
-	if _, err = tc.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
+	if _, err = t.client.TranslateBlueprint(ctx, &translatorpb.TranslateBlueprintRequest{
 		InputPath:  inputPath,
 		ConfigPath: configFile.Name(),
 		OutputPath: tempFile.Name(),
@@ -162,12 +144,7 @@ func (t *Translator) TranslateBlueprint(ctx context.Context, b ast.ExprBuild) (a
 }
 
 func (t *Translator) TranslateProviderSchema(ctx context.Context, inputPath, outputPath string) error {
-	client, err := t.client()
-	if err != nil {
-		return err
-	}
-
-	_, err = client.TranslateProviderSchema(ctx, &translatorpb.TranslateProviderSchemaRequest{
+	_, err := t.client.TranslateProviderSchema(ctx, &translatorpb.TranslateProviderSchemaRequest{
 		OutputPath: outputPath,
 		InputPath:  inputPath,
 	})
@@ -176,12 +153,7 @@ func (t *Translator) TranslateProviderSchema(ctx context.Context, inputPath, out
 }
 
 func (t *Translator) GenerateProviderSDK(ctx context.Context, inputPath, outputPath string, args map[string]string) error {
-	client, err := t.client()
-	if err != nil {
-		return err
-	}
-
-	_, err = client.GenerateProviderSDK(ctx, &translatorpb.GenerateProviderSDKRequest{
+	_, err := t.client.GenerateProviderSDK(ctx, &translatorpb.GenerateProviderSDKRequest{
 		InputPath:  inputPath,
 		OutputPath: outputPath,
 		Args:       args,
@@ -191,46 +163,12 @@ func (t *Translator) GenerateProviderSDK(ctx context.Context, inputPath, outputP
 }
 
 func (t *Translator) GenerateConsumerSDK(ctx context.Context, inputPath, outputPath string) error {
-	client, err := t.client()
-	if err != nil {
-		return err
-	}
-
-	_, err = client.GenerateConsumerSDK(ctx, &translatorpb.GenerateConsumerSDKRequest{
+	_, err := t.client.GenerateConsumerSDK(ctx, &translatorpb.GenerateConsumerSDKRequest{
 		InputPath:  inputPath,
 		OutputPath: outputPath,
 	})
 
 	return err
-}
-
-func (t *Translator) client() (translatorpb.TranslatorClient, error) {
-	dispensor, err := t.plug.Client()
-	if err != nil {
-		return nil, err
-	}
-
-	rawPlug, err := dispensor.Dispense("translator")
-	if err != nil {
-		return nil, err
-	}
-
-	tc, ok := rawPlug.(translatorpb.TranslatorClient)
-	if !ok {
-		return nil, fmt.Errorf("expected TranslatorClient, got %T", rawPlug)
-	}
-
-	return tc, nil
-}
-
-func (t *Translator) Stop() {
-	t.plug.Kill()
-}
-
-func (m *TranslatorManager) Stop() {
-	for _, t := range m.translators {
-		t.Stop()
-	}
 }
 
 type TranslatorPlugin struct {

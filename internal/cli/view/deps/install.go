@@ -86,11 +86,12 @@ func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return view.DisplayError(err)
 			}
 
-			tr := plug.NewTranslatorManager(m.Logger, depManager)
-			defer tr.Stop()
+			plugManager := plug.NewPlugManager(m.Logger)
+			defer plugManager.Stop()
 
 			in := interpreter.Interpreter{
-				Translator: tr,
+				DepManager:  depManager,
+				PlugManager: plugManager,
 			}
 			s := spec.Spec{
 				Components:    map[string]spec.Component{},

@@ -79,11 +79,12 @@ func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Lo
 		return spec.ComponentBuild{}, err
 	}
 
-	tr := plug.NewTranslatorManager(logger, depManager)
-	defer tr.Stop()
+	plugManager := plug.NewPlugManager(logger)
+	defer plugManager.Stop()
 
 	in := interpreter.Interpreter{
-		Translator: tr,
+		DepManager:  depManager,
+		PlugManager: plugManager,
 	}
 	s := spec.Spec{
 		Components:    map[string]spec.Component{},
