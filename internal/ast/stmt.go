@@ -11,7 +11,9 @@ type Stmt interface {
 type StmtResource struct {
 	Stmt
 
-	Expr Expr
+	Exists   Expr
+	Expr     ExprResource
+	Provider ExprProvider
 }
 
 type StmtBuild struct {

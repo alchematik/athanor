@@ -14,7 +14,9 @@ message Stmt {
 }
 
 message ResourceStmt {
-  Expr expr = 1;
+  ResourceExpr resource = 1;
+  ProviderExpr provider = 2;
+  Expr exists = 3;
 }
 
 message BuildStmt {
@@ -73,10 +75,8 @@ message ProviderExpr {
 }
 
 message ResourceExpr {
-  Expr provider = 1;
-  Expr identifier = 2;
-  Expr config = 3;
-  Expr exists = 4;
+  Expr identifier = 1;
+  Expr config = 2;
 }
 
 message ResourceIdentifierExpr {

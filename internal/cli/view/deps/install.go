@@ -3,15 +3,20 @@ package deps
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/cli/view"
+	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/dependency"
 	"github.com/alchematik/athanor/internal/interpreter"
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/repo"
 	"github.com/alchematik/athanor/internal/spec"
+
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/hashicorp/go-hclog"
 )
 
@@ -22,6 +27,10 @@ type Install struct {
 	Config    view.Config
 	Error     error
 	Upgrade   bool
+
+	downloads []string
+	status    map[string]string
+	spinner   spinner.Model
 }
 
 type InstallParams struct {
@@ -43,11 +52,18 @@ func NewInstall(params InstallParams) (*tea.Program, error) {
 			Level:  hclog.Debug,
 		})
 	}
+
+	s := spinner.New()
+	s.Spinner = spinner.MiniDot
+	s.Style = lipgloss.NewStyle().Foreground(component.ColorCyan500)
+
 	return tea.NewProgram(&Install{
 		Context:   params.Context,
 		Logger:    logger,
 		InputPath: params.Path,
 		Upgrade:   params.Upgrade,
+		status:    map[string]string{},
+		spinner:   s,
 	}), nil
 }
 
@@ -60,7 +76,22 @@ func (m *Install) View() string {
 		return m.Error.Error()
 	}
 
-	return "install!"
+	entries := make([]string, len(m.downloads))
+	for i, entry := range m.downloads {
+		status := m.status[entry]
+		var statusDisplay string
+		switch status {
+		case "downloading":
+			statusDisplay = m.spinner.View()
+		case "done":
+			// TODO: Extract component.
+			statusDisplay = lipgloss.NewStyle().Foreground(component.ColorGreen400).Render("✓")
+		}
+
+		entries[i] = fmt.Sprintf("%s %s", statusDisplay, entry)
+	}
+
+	return strings.Join(entries, "\n")
 }
 
 func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -81,6 +112,32 @@ func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				LockFilePath: "athanor.lock.json",
 				FetchRemote:  true,
 				Upgrade:      m.Upgrade,
+				OnDownloadStart: func(s string, src any) {
+					var entry string
+					switch src := src.(type) {
+					case dependency.SourceGitHubRelease:
+						entry = fmt.Sprintf("github.com/%s/%s@%s", src.RepoOwner, src.RepoName, src.Name)
+					}
+
+					if _, ok := m.status[entry]; ok {
+						return
+					}
+
+					// TODO: Make this thread safe.
+					m.downloads = append(m.downloads, entry)
+					m.status[entry] = "downloading"
+				},
+				OnDownloadSuccess: func(s string, src any) {
+					var entry string
+					switch src := src.(type) {
+					case dependency.SourceGitHubRelease:
+						entry = fmt.Sprintf("github.com/%s/%s@%s", src.RepoOwner, src.RepoName, src.Name)
+					}
+
+					// TODO: Make this thread safe.
+					m.downloads = append(m.downloads, entry)
+					m.status[entry] = "done"
+				},
 			})
 			if err != nil {
 				return view.DisplayError(err)
@@ -128,9 +185,16 @@ func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return view.DisplayError(err)
 			}
 
-			return nil
+			return doneMsg{}
 		}
+	case doneMsg:
+		return m, tea.Quit
 	default:
-		return m, nil
+		s, spinMsg := m.spinner.Update(msg)
+		m.spinner = s
+		return m, spinMsg
 	}
+}
+
+type doneMsg struct {
 }

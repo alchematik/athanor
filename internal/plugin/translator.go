@@ -203,13 +203,25 @@ func convertBlueprint(bp *consumerpb.Blueprint) (ast.Blueprint, error) {
 func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 	switch s := st.GetType().(type) {
 	case *consumerpb.Stmt_Resource:
-		ex, err := convertExpr(s.Resource.GetExpr())
+		ex, err := convertResourceExpr(s.Resource.GetResource())
+		if err != nil {
+			return nil, err
+		}
+
+		provider, err := convertProviderExpr(s.Resource.GetProvider())
+		if err != nil {
+			return nil, err
+		}
+
+		exists, err := convertExpr(s.Resource.GetExists())
 		if err != nil {
 			return nil, err
 		}
 
 		return ast.StmtResource{
-			Expr: ex,
+			Exists:   exists,
+			Provider: provider,
+			Expr:     ex,
 		}, nil
 	case *consumerpb.Stmt_Build:
 		configs := make([]ast.Expr, len(s.Build.GetBuild().GetConfig()))
@@ -268,42 +280,9 @@ func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 
 		return ast.ExprBlueprint{Stmts: stmts}, nil
 	case *consumerpb.Expr_Provider:
-		s, err := convertSource(e.Provider.GetSource())
-		if err != nil {
-			return nil, err
-		}
-
-		return ast.ExprProvider{
-			Name:   e.Provider.GetName(),
-			Source: s,
-		}, nil
+		return convertProviderExpr(ex.GetProvider())
 	case *consumerpb.Expr_Resource:
-		provider, err := convertExpr(e.Resource.GetProvider())
-		if err != nil {
-			return nil, err
-		}
-
-		id, err := convertExpr(e.Resource.GetIdentifier())
-		if err != nil {
-			return nil, err
-		}
-
-		config, err := convertExpr(e.Resource.GetConfig())
-		if err != nil {
-			return nil, err
-		}
-
-		exists, err := convertExpr(e.Resource.GetExists())
-		if err != nil {
-			return nil, err
-		}
-
-		return ast.ExprResource{
-			Provider:   provider,
-			Identifier: id,
-			Config:     config,
-			Exists:     exists,
-		}, nil
+		return convertResourceExpr(e.Resource)
 	case *consumerpb.Expr_ResourceIdentifier:
 		val, err := convertExpr(e.ResourceIdentifier.GetValue())
 		if err != nil {
@@ -434,4 +413,33 @@ func convertSource(src *consumerpb.Source) (repo.Source, error) {
 	default:
 		return nil, fmt.Errorf("unsupported source: %T", s)
 	}
+}
+
+func convertResourceExpr(expr *consumerpb.ResourceExpr) (ast.ExprResource, error) {
+	id, err := convertExpr(expr.GetIdentifier())
+	if err != nil {
+		return ast.ExprResource{}, err
+	}
+
+	config, err := convertExpr(expr.GetConfig())
+	if err != nil {
+		return ast.ExprResource{}, err
+	}
+
+	return ast.ExprResource{
+		Identifier: id,
+		Config:     config,
+	}, nil
+}
+
+func convertProviderExpr(expr *consumerpb.ProviderExpr) (ast.ExprProvider, error) {
+	s, err := convertSource(expr.GetSource())
+	if err != nil {
+		return ast.ExprProvider{}, err
+	}
+
+	return ast.ExprProvider{
+		Name:   expr.GetName(),
+		Source: s,
+	}, nil
 }

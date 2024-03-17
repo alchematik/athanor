@@ -84,19 +84,33 @@ func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtB
 }
 
 func (in Interpreter) resourceStmt(ctx context.Context, b spec.Spec, s ast.StmtResource) error {
-	val, children, err := in.Expr(ctx, b, s.Expr)
+	resource, children, err := in.resource(ctx, b, s.Expr)
 	if err != nil {
 		return err
 	}
 
-	resource, ok := val.(spec.ValueResource)
-	if !ok {
-		return fmt.Errorf("expected Resource type, got %T", val)
+	provider, providerChildren, err := in.provider(ctx, b, s.Provider)
+	if err != nil {
+		return err
 	}
+
+	exists, existsChildren, err := in.Expr(ctx, b, s.Exists)
+	if err != nil {
+		return err
+	}
+
+	children = append(children, providerChildren...)
+	children = append(children, existsChildren...)
+
+	// TODO: Probably Put provider and exists on component.
+	resource.Provider = provider
+	resource.Exists = exists
 
 	alias := resource.Identifier.Alias
 	b.DependencyMap[alias] = slices.Compact(append(b.DependencyMap[alias], children...))
-	b.Components[alias] = spec.ComponentResource{Value: resource}
+	b.Components[alias] = spec.ComponentResource{
+		Value: resource,
+	}
 
 	return nil
 }

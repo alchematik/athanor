@@ -28,9 +28,11 @@ type lockFile struct {
 }
 
 type ManagerParams struct {
-	LockFilePath string
-	Upgrade      bool
-	FetchRemote  bool
+	LockFilePath      string
+	Upgrade           bool
+	FetchRemote       bool
+	OnDownloadStart   func(string, any)
+	OnDownloadSuccess func(string, any)
 }
 
 func NewManager(params ManagerParams) (*Manager, error) {
@@ -62,20 +64,24 @@ func NewManager(params ManagerParams) (*Manager, error) {
 	}
 
 	return &Manager{
-		lockFilePath: params.LockFilePath,
-		LockFile:     lf,
-		Upgrade:      params.Upgrade,
-		FetchRemote:  params.FetchRemote,
-		Dir:          ".athanor",
+		lockFilePath:      params.LockFilePath,
+		LockFile:          lf,
+		Upgrade:           params.Upgrade,
+		FetchRemote:       params.FetchRemote,
+		Dir:               ".athanor",
+		onDownloadStart:   params.OnDownloadStart,
+		onDownloadSuccess: params.OnDownloadSuccess,
 	}, nil
 }
 
 type Manager struct {
-	FetchRemote  bool
-	Upgrade      bool
-	LockFile     *LockFile
-	Dir          string
-	lockFilePath string
+	FetchRemote       bool
+	Upgrade           bool
+	LockFile          *LockFile
+	Dir               string
+	lockFilePath      string
+	onDownloadStart   func(string, any)
+	onDownloadSuccess func(string, any)
 }
 
 type BinDependency struct {
@@ -229,6 +235,9 @@ type gitHubReleaseAsset struct {
 }
 
 func (m *Manager) Download(ctx context.Context, dir string, s SourceGitHubRelease, t string) (map[string]string, error) {
+	if m.onDownloadStart != nil {
+		m.onDownloadStart(t, s)
+	}
 	releaseURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", s.RepoOwner, s.RepoName, s.Name)
 
 	releaseResRaw, err := http.Get(releaseURL)
@@ -398,6 +407,10 @@ func (m *Manager) Download(ctx context.Context, dir string, s SourceGitHubReleas
 				return nil, err
 			}
 		}
+	}
+
+	if m.onDownloadSuccess != nil {
+		m.onDownloadSuccess(t, s)
 	}
 
 	return entries, nil

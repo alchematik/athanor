@@ -84,17 +84,7 @@ func (in Interpreter) provider(ctx context.Context, b spec.Spec, e ast.ExprProvi
 }
 
 func (in Interpreter) resource(ctx context.Context, b spec.Spec, e ast.ExprResource) (spec.ValueResource, []string, error) {
-	providerValue, providerChildren, err := in.Expr(ctx, b, e.Provider)
-	if err != nil {
-		return spec.ValueResource{}, nil, err
-	}
-
-	provider, ok := providerValue.(spec.ValueProvider)
-	if !ok {
-		return spec.ValueResource{}, nil, fmt.Errorf("expected Provider type, got %T", providerValue)
-	}
-
-	idVal, idChildren, err := in.Expr(ctx, b, e.Identifier)
+	idVal, children, err := in.Expr(ctx, b, e.Identifier)
 	if err != nil {
 		return spec.ValueResource{}, nil, err
 	}
@@ -109,14 +99,7 @@ func (in Interpreter) resource(ctx context.Context, b spec.Spec, e ast.ExprResou
 		return spec.ValueResource{}, nil, err
 	}
 
-	existsVal, existsChildren, err := in.Expr(ctx, b, e.Exists)
-	if err != nil {
-		return spec.ValueResource{}, nil, err
-	}
-
-	children := append(providerChildren, idChildren...)
 	children = append(children, configChildren...)
-	children = append(children, existsChildren...)
 	var out []string
 	for _, child := range children {
 		// Filter out alias to self.
@@ -128,10 +111,8 @@ func (in Interpreter) resource(ctx context.Context, b spec.Spec, e ast.ExprResou
 	}
 
 	return spec.ValueResource{
-		Provider:   provider,
 		Identifier: id,
 		Config:     configVal,
-		Exists:     existsVal,
 		Attrs: spec.ValueUnresolved{
 			Name: "attrs",
 			Object: spec.ValueResourceRef{
