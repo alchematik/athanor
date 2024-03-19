@@ -12,19 +12,8 @@ import (
 	"github.com/alchematik/athanor/internal/spec"
 )
 
-func (in Interpreter) Stmt(ctx context.Context, b spec.Spec, st ast.Stmt) error {
-	switch s := st.(type) {
-	case ast.StmtResource:
-		return in.resourceStmt(ctx, b, s)
-	case ast.StmtBuild:
-		return in.buildStmt(ctx, b, s)
-	default:
-		return fmt.Errorf("unknown stmt %T", st)
-	}
-}
-
-func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtBuild) error {
-	runtimeConfig, children, err := in.Expr(ctx, s, stmt.Build.RuntimeConfig)
+func (in *Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtBuild) error {
+	runtimeConfig, children, err := in.Expr(ctx, stmt.Build.RuntimeConfig)
 	if err != nil {
 		return err
 	}
@@ -47,7 +36,6 @@ func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtB
 		}
 	default:
 		return fmt.Errorf("unsupported source type: %T", stmt.Translator.Source)
-
 	}
 
 	binPath, err := in.DepManager.FetchBinDependency(ctx, dependency.BinDependency{
@@ -71,30 +59,39 @@ func (in Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.StmtB
 	}
 
 	// TODO: ast.ExprBlueprint vs ast.Blueprint?
-	_, _, err = in.Expr(ctx, subSpec, ast.ExprBlueprint{Stmts: bp.Stmts})
-	if err != nil {
-		return err
-	}
+	// _, _, err = in.Expr(ctx, ast.ExprBlueprint{Stmts: bp.Stmts})
+	// if err != nil {
+	// 	return err
+	// }
 
 	alias := stmt.Build.Alias
+
+	in.Lock()
+	for _, s := range bp.Stmts {
+		in.stmts = append(in.stmts, Stmt{
+			Spec: subSpec,
+			Stmt: s,
+		})
+	}
 	s.DependencyMap[alias] = append(s.DependencyMap[alias], children...)
 	s.Components[alias] = spec.ComponentBuild{Spec: subSpec}
+	in.Unlock()
 
 	return nil
 }
 
-func (in Interpreter) resourceStmt(ctx context.Context, b spec.Spec, s ast.StmtResource) error {
-	resource, children, err := in.resource(ctx, b, s.Expr)
+func (in *Interpreter) resourceStmt(ctx context.Context, b spec.Spec, s ast.StmtResource) error {
+	resource, children, err := in.resource(ctx, s.Expr)
 	if err != nil {
 		return err
 	}
 
-	provider, providerChildren, err := in.provider(ctx, b, s.Provider)
+	provider, providerChildren, err := in.provider(ctx, s.Provider)
 	if err != nil {
 		return err
 	}
 
-	exists, existsChildren, err := in.Expr(ctx, b, s.Exists)
+	exists, existsChildren, err := in.Expr(ctx, s.Exists)
 	if err != nil {
 		return err
 	}
@@ -107,10 +104,12 @@ func (in Interpreter) resourceStmt(ctx context.Context, b spec.Spec, s ast.StmtR
 	resource.Exists = exists
 
 	alias := resource.Identifier.Alias
+	in.Lock()
 	b.DependencyMap[alias] = slices.Compact(append(b.DependencyMap[alias], children...))
 	b.Components[alias] = spec.ComponentResource{
 		Value: resource,
 	}
+	in.Unlock()
 
 	return nil
 }

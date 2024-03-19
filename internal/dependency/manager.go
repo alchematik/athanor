@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 )
 
 type lockFileBin struct {
@@ -28,11 +29,9 @@ type lockFile struct {
 }
 
 type ManagerParams struct {
-	LockFilePath      string
-	Upgrade           bool
-	FetchRemote       bool
-	OnDownloadStart   func(string, any)
-	OnDownloadSuccess func(string, any)
+	LockFilePath string
+	Upgrade      bool
+	FetchRemote  bool
 }
 
 func NewManager(params ManagerParams) (*Manager, error) {
@@ -52,6 +51,7 @@ func NewManager(params ManagerParams) (*Manager, error) {
 		Bins: map[string]LockFileBinEntry{},
 	}
 
+	depLocks := map[string]*sync.Mutex{}
 	for _, e := range rawLockFile.Entries {
 		m := map[string]string{}
 		for _, b := range e.Bins {
@@ -61,27 +61,29 @@ func NewManager(params ManagerParams) (*Manager, error) {
 		lf.Bins[e.ID] = LockFileBinEntry{
 			Bins: m,
 		}
+		depLocks[e.ID] = &sync.Mutex{}
 	}
 
 	return &Manager{
-		lockFilePath:      params.LockFilePath,
-		LockFile:          lf,
-		Upgrade:           params.Upgrade,
-		FetchRemote:       params.FetchRemote,
-		Dir:               ".athanor",
-		onDownloadStart:   params.OnDownloadStart,
-		onDownloadSuccess: params.OnDownloadSuccess,
+		lockFilePath: params.LockFilePath,
+		LockFile:     lf,
+		Upgrade:      params.Upgrade,
+		FetchRemote:  params.FetchRemote,
+		Dir:          ".athanor",
+		lock:         sync.Mutex{},
+		depLocks:     depLocks,
 	}, nil
 }
 
 type Manager struct {
-	FetchRemote       bool
-	Upgrade           bool
-	LockFile          *LockFile
-	Dir               string
-	lockFilePath      string
-	onDownloadStart   func(string, any)
-	onDownloadSuccess func(string, any)
+	FetchRemote  bool
+	Upgrade      bool
+	LockFile     *LockFile
+	Dir          string
+	lockFilePath string
+
+	lock     sync.Mutex
+	depLocks map[string]*sync.Mutex
 }
 
 type BinDependency struct {
@@ -102,6 +104,8 @@ type SourceGitHubRelease struct {
 }
 
 type LockFile struct {
+	sync.RWMutex
+
 	Bins map[string]LockFileBinEntry
 }
 
@@ -143,6 +147,31 @@ func (m *Manager) FlushLockFile() error {
 	return os.WriteFile("athanor.lock.json", resultData, 0755)
 }
 
+func (m *Manager) IsBinDependencyInstalled(d BinDependency) (bool, error) {
+	if _, isLocal := d.Source.(SourceLocal); isLocal {
+		return true, nil
+	}
+
+	release, ok := d.Source.(SourceGitHubRelease)
+	if !ok {
+		return false, fmt.Errorf("unsupported source type: %T", d.Source)
+	}
+
+	id := filepath.Join(d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+	m.LockFile.RLock()
+	_, inLockFile := m.LockFile.Bins[id]
+	m.LockFile.RUnlock()
+	if !inLockFile {
+		return false, nil
+	}
+
+	binName := fmt.Sprintf("%s_%s", d.OS, d.Arch)
+	binDir := filepath.Join(m.Dir, d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+	binPath := filepath.Join(binDir, binName)
+	_, err := os.Stat(binPath)
+	return err == nil, nil
+}
+
 func (m *Manager) FetchBinDependency(ctx context.Context, d BinDependency) (string, error) {
 	if local, isLocal := d.Source.(SourceLocal); isLocal {
 		return local.Path, nil
@@ -154,6 +183,18 @@ func (m *Manager) FetchBinDependency(ctx context.Context, d BinDependency) (stri
 	}
 
 	id := filepath.Join(d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+
+	m.lock.Lock()
+	lock, ok := m.depLocks[id]
+	if !ok {
+		lock = &sync.Mutex{}
+		m.depLocks[id] = lock
+	}
+	m.lock.Unlock()
+
+	lock.Lock()
+	defer lock.Unlock()
+
 	binName := fmt.Sprintf("%s_%s", d.OS, d.Arch)
 	binDir := filepath.Join(m.Dir, d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
 	binPath := filepath.Join(binDir, binName)
@@ -235,9 +276,6 @@ type gitHubReleaseAsset struct {
 }
 
 func (m *Manager) Download(ctx context.Context, dir string, s SourceGitHubRelease, t string) (map[string]string, error) {
-	if m.onDownloadStart != nil {
-		m.onDownloadStart(t, s)
-	}
 	releaseURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", s.RepoOwner, s.RepoName, s.Name)
 
 	releaseResRaw, err := http.Get(releaseURL)
@@ -407,10 +445,6 @@ func (m *Manager) Download(ctx context.Context, dir string, s SourceGitHubReleas
 				return nil, err
 			}
 		}
-	}
-
-	if m.onDownloadSuccess != nil {
-		m.onDownloadSuccess(t, s)
 	}
 
 	return entries, nil

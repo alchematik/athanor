@@ -82,10 +82,6 @@ func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Lo
 	plugManager := plug.NewPlugManager(logger)
 	defer plugManager.Stop()
 
-	in := interpreter.Interpreter{
-		DepManager:  depManager,
-		PlugManager: plugManager,
-	}
 	s := spec.Spec{
 		Components:    map[string]spec.Component{},
 		DependencyMap: map[string][]string{},
@@ -99,8 +95,7 @@ func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Lo
 	default:
 		return spec.ComponentBuild{}, fmt.Errorf("invalid translator repo type: %s", config.Translator.Repo.Type)
 	}
-
-	if err := in.Interpret(ctx, s, ast.StmtBuild{
+	b := ast.StmtBuild{
 		Translator: ast.Translator{
 			Source: src,
 		},
@@ -113,8 +108,18 @@ func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Lo
 			Config:        []ast.Expr{},
 			RuntimeConfig: ast.ExprNil{},
 		},
-	}); err != nil {
-		return spec.ComponentBuild{}, err
+	}
+	in := interpreter.NewInterpreter(plugManager, depManager, s, b)
+
+	next := in.Next()
+	for len(next) > 0 {
+		for _, n := range next {
+			if err := in.Interpret(ctx, n); err != nil {
+				return spec.ComponentBuild{}, err
+			}
+		}
+
+		next = in.Next()
 	}
 
 	return spec.ComponentBuild{Spec: s}, nil
