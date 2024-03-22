@@ -237,38 +237,90 @@ func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				}
 			}
+			// TODO: Let dep manager handle more of the state stuff?
 
-			if _, ok := m.status[entry]; !ok && entry != "" {
-				isInstalled, err := m.depManager.IsBinDependencyInstalled(dep)
-				if err != nil {
-					return m, func() tea.Msg { return view.DisplayError(err) }
-				}
+			if entry == "" {
+				batch = append(batch, func() tea.Msg {
+					if err := m.interpreter.Interpret(m.Context, n); err != nil {
+						return view.DisplayError(err)
+					}
 
-				if !isInstalled {
-					// TODO: is this thread safe?
-					m.downloads = append(m.downloads, entry)
-					m.status[entry] = "downloading"
-				}
+					return nextMsg{}
+				})
+				continue
 			}
 
-			batch = append(batch, func() tea.Msg {
-				if err := m.interpreter.Interpret(m.Context, n); err != nil {
-					return view.DisplayError(err)
-				}
+			batch = append(
+				batch,
+				tea.Sequence(
+					func() tea.Msg {
+						m.depManager.Lock(dep)
+						defer m.depManager.Unlock(dep)
 
-				m.lock.Lock()
-				if _, ok := m.status[entry]; ok {
-					m.status[entry] = "done"
-				}
-				m.lock.Unlock()
+						if _, ok := m.status[entry]; ok {
+							return nil
+						}
 
-				return nextMsg{}
-			})
+						isInLockFile, err := m.depManager.IsBinDependencyInLockFile(dep)
+						if err != nil {
+							return view.DisplayError(err)
+						}
+
+						isDownloaded, err := m.depManager.IsBinDependencyDownloaded(dep)
+						if err != nil {
+							return view.DisplayError(err)
+						}
+
+						if isDownloaded && isInLockFile {
+							return nil
+						}
+
+						if isInLockFile {
+							// TODO: is this thread safe?
+							m.lock.Lock()
+							m.downloads = append(m.downloads, entry)
+							m.status[entry] = "downloading"
+							m.lock.Unlock()
+
+							if err := m.depManager.DownloadBinDependency(m.Context, dep); err != nil {
+								return view.DisplayError(err)
+							}
+
+							m.lock.Lock()
+							m.status[entry] = "done"
+							m.lock.Unlock()
+						} else {
+							if m.Upgrade {
+								m.lock.Lock()
+								m.downloads = append(m.downloads, entry)
+								m.status[entry] = "downloading"
+								m.lock.Unlock()
+
+								if err := m.depManager.InstallBinDependency(m.Context, dep); err != nil {
+									return view.DisplayError(err)
+								}
+
+								m.lock.Lock()
+								m.status[entry] = "done"
+								m.lock.Unlock()
+							} else {
+								view.DisplayError(fmt.Errorf("%s not in lockfile", entry))
+							}
+						}
+
+						return nil
+					},
+					func() tea.Msg {
+						if err := m.interpreter.Interpret(m.Context, n); err != nil {
+							return view.DisplayError(err)
+						}
+
+						return nextMsg{}
+					},
+				),
+			)
+
 		}
-
-		// if len(batch) == 0 {
-		// 	return m, func() tea.Msg { return doneMsg{} }
-		// }
 
 		return m, tea.Batch(batch...)
 	case doneMsg:

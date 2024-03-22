@@ -147,22 +147,70 @@ func (m *Manager) FlushLockFile() error {
 	return os.WriteFile("athanor.lock.json", resultData, 0755)
 }
 
-func (m *Manager) IsBinDependencyInstalled(d BinDependency) (bool, error) {
-	if _, isLocal := d.Source.(SourceLocal); isLocal {
-		return true, nil
+func (m *Manager) Lock(d BinDependency) {
+	release, ok := d.Source.(SourceGitHubRelease)
+	if !ok {
+		return
 	}
 
+	id := filepath.Join(d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+
+	m.lock.Lock()
+	lock, ok := m.depLocks[id]
+	if !ok {
+		lock = &sync.Mutex{}
+		m.depLocks[id] = lock
+	}
+	m.lock.Unlock()
+
+	lock.Lock()
+}
+
+func (m *Manager) Unlock(d BinDependency) {
+	release, ok := d.Source.(SourceGitHubRelease)
+	if !ok {
+		return
+	}
+
+	id := filepath.Join(d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+
+	m.lock.Lock()
+	lock, ok := m.depLocks[id]
+	if !ok {
+		lock = &sync.Mutex{}
+		m.depLocks[id] = lock
+	}
+	m.lock.Unlock()
+
+	lock.Unlock()
+}
+
+func (m *Manager) IsBinDependencyInLockFile(d BinDependency) (bool, error) {
 	release, ok := d.Source.(SourceGitHubRelease)
 	if !ok {
 		return false, fmt.Errorf("unsupported source type: %T", d.Source)
 	}
 
 	id := filepath.Join(d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+	binName := fmt.Sprintf("%s_%s", d.OS, d.Arch)
+
 	m.LockFile.RLock()
-	_, inLockFile := m.LockFile.Bins[id]
-	m.LockFile.RUnlock()
+	defer m.LockFile.RUnlock()
+
+	entry, inLockFile := m.LockFile.Bins[id]
 	if !inLockFile {
 		return false, nil
+	}
+
+	_, present := entry.Bins[binName]
+
+	return present, nil
+}
+
+func (m *Manager) IsBinDependencyDownloaded(d BinDependency) (bool, error) {
+	release, ok := d.Source.(SourceGitHubRelease)
+	if !ok {
+		return false, fmt.Errorf("unsupported source type: %T", d.Source)
 	}
 
 	binName := fmt.Sprintf("%s_%s", d.OS, d.Arch)
@@ -170,6 +218,67 @@ func (m *Manager) IsBinDependencyInstalled(d BinDependency) (bool, error) {
 	binPath := filepath.Join(binDir, binName)
 	_, err := os.Stat(binPath)
 	return err == nil, nil
+}
+
+func (m *Manager) InstallBinDependency(ctx context.Context, d BinDependency) error {
+	release, ok := d.Source.(SourceGitHubRelease)
+	if !ok {
+		return fmt.Errorf("unsupported source type: %T", d.Source)
+	}
+
+	id := filepath.Join(d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+	binDir := filepath.Join(m.Dir, d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+
+	checksums, err := m.Download(ctx, binDir, release, d.Type)
+	if err != nil {
+		return err
+	}
+
+	m.LockFile.Lock()
+	m.LockFile.Bins[id] = LockFileBinEntry{
+		Bins: checksums,
+	}
+	m.LockFile.Unlock()
+
+	return nil
+}
+
+func (m *Manager) DownloadBinDependency(ctx context.Context, d BinDependency) error {
+	release, ok := d.Source.(SourceGitHubRelease)
+	if !ok {
+		return fmt.Errorf("unsupported source type: %T", d.Source)
+	}
+
+	id := filepath.Join(d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+	binName := fmt.Sprintf("%s_%s", d.OS, d.Arch)
+
+	var lockChecksum string
+	entry, ok := m.LockFile.Bins[id]
+	if !ok {
+		return fmt.Errorf("%s not in lockfile", id)
+	}
+
+	lockChecksum, ok = entry.Bins[binName]
+	if !ok {
+		return fmt.Errorf("checksum not found for %s %s", d.OS, d.Arch)
+	}
+
+	binDir := filepath.Join(m.Dir, d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
+	checksums, err := m.Download(ctx, binDir, release, d.Type)
+	if err != nil {
+		return err
+	}
+
+	checksum, ok := checksums[binName]
+	if !ok {
+		return fmt.Errorf("binary for %s %s not downloaded", d.OS, d.Arch)
+	}
+
+	if checksum != lockChecksum {
+		return fmt.Errorf("checksum for %s does not match", id)
+	}
+
+	return nil
 }
 
 func (m *Manager) FetchBinDependency(ctx context.Context, d BinDependency) (string, error) {
@@ -184,83 +293,37 @@ func (m *Manager) FetchBinDependency(ctx context.Context, d BinDependency) (stri
 
 	id := filepath.Join(d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
 
-	m.lock.Lock()
-	lock, ok := m.depLocks[id]
-	if !ok {
-		lock = &sync.Mutex{}
-		m.depLocks[id] = lock
-	}
-	m.lock.Unlock()
-
-	lock.Lock()
-	defer lock.Unlock()
-
 	binName := fmt.Sprintf("%s_%s", d.OS, d.Arch)
 	binDir := filepath.Join(m.Dir, d.Type, "github.com", release.RepoOwner, release.RepoName, release.Name)
 	binPath := filepath.Join(binDir, binName)
 
-	var binExists bool
 	f, err := os.Open(binPath)
-	if err == nil {
-		binExists = true
-	}
-
-	var lockChecksum string
-	entry, ok := m.LockFile.Bins[id]
-	if ok {
-		lockChecksum = entry.Bins[binName]
-	}
-
-	var checksum string
-	if binExists {
-		hash := sha256.New()
-		if _, err := io.Copy(hash, f); err != nil {
-			return "", err
-		}
-
-		checksum = fmt.Sprintf("%x", hash.Sum(nil))
-
-		if checksum == lockChecksum {
-			return binPath, nil
-		}
-	}
-
-	switch {
-	case m.Upgrade:
-		checksums, err := m.Download(ctx, binDir, release, d.Type)
-		if err != nil {
-			return "", err
-		}
-
-		m.LockFile.Bins[id] = LockFileBinEntry{
-			Bins: checksums,
-		}
-	case m.FetchRemote:
-		if lockChecksum == "" {
-			return "", fmt.Errorf("checksum not found for %s", id)
-		}
-
-		checksums, err := m.Download(ctx, binDir, release, d.Type)
-		if err != nil {
-			return "", err
-		}
-
-		checksum, ok = checksums[binName]
-		if !ok {
-			return "", fmt.Errorf("%s not available in downloaded binaries", binName)
-		}
-
-		if lockChecksum != checksum {
-			return "", fmt.Errorf("checksum mismatch for %s", id)
-		}
-	default:
-		if !binExists {
+	if err != nil {
+		if os.IsNotExist(err) {
 			return "", fmt.Errorf("%s not installed", id)
 		}
 
-		if lockChecksum == "" {
-			return "", fmt.Errorf("checksum not found for %s", id)
-		}
+		return "", err
+	}
+
+	entry, ok := m.LockFile.Bins[id]
+	if !ok {
+		return "", fmt.Errorf("%s not in lockfile", id)
+	}
+
+	lockChecksum, ok := entry.Bins[binName]
+	if !ok {
+		return "", fmt.Errorf("checksum for %s not found", id)
+	}
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, f); err != nil {
+		return "", err
+	}
+
+	checksum := fmt.Sprintf("%x", hash.Sum(nil))
+	if checksum != lockChecksum {
+		return "", fmt.Errorf("checksum does not match for %s", id)
 	}
 
 	return binPath, nil
