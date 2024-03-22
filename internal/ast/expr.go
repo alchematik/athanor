@@ -8,12 +8,6 @@ type Expr interface {
 	isExprExpr() bool
 }
 
-type ExprBlueprint struct {
-	Expr
-
-	Stmts []Stmt
-}
-
 type ExprString struct {
 	Expr
 
@@ -58,8 +52,7 @@ type ExprGetRuntimeConfig struct {
 type ExprProvider struct {
 	Expr
 
-	Name   string
-	Source repo.Source
+	Source repo.PluginSource
 }
 
 type ExprResource struct {
@@ -83,7 +76,7 @@ type ExprBuild struct {
 	Expr
 
 	Alias         string
-	Source        repo.Source
+	Source        repo.BlueprintSource
 	Config        []Expr
 	RuntimeConfig Expr
 }

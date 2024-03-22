@@ -12,11 +12,7 @@ import (
 )
 
 func (e Evaluator) providerValue(v spec.ValueProvider) (state.Provider, error) {
-	if v.Name == "" {
-		return state.Provider{}, fmt.Errorf("name is required for provider")
-	}
 	return state.Provider{
-		Name: v.Name,
 		Repo: v.Repo,
 	}, nil
 }

@@ -37,9 +37,9 @@ func NewProvider(logger hclog.Logger, depManager *dependency.Manager) *Provider 
 func (p *Provider) Client(ctx context.Context, provider state.Provider) (backendpb.ProviderClient, error) {
 	var src any
 	switch s := provider.Repo.(type) {
-	case repo.Local:
+	case repo.PluginSourceLocal:
 		src = dependency.SourceLocal{Path: s.Path}
-	case repo.GitHubRelease:
+	case repo.PluginSourceGitHubRelease:
 		src = dependency.SourceGitHubRelease{
 			RepoOwner: s.RepoOwner,
 			RepoName:  s.RepoName,

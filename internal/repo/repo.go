@@ -30,11 +30,11 @@ type LockFile struct {
 	Entries map[string]LockEntry
 }
 
-func (l *LockFile) Append(rootPath string, s Source, p Runtime) error {
+func (l *LockFile) Append(rootPath string, s PluginSource, p Runtime) error {
 	return nil
 }
 
-func (l *LockFile) Compare(rootPath string, s Source, p Runtime) (bool, error) {
+func (l *LockFile) Compare(rootPath string, s PluginSource, p Runtime) (bool, error) {
 	return false, nil
 }
 
@@ -49,20 +49,27 @@ type Runtime struct {
 	Arch string
 }
 
-type Source interface {
+type PluginSource interface {
 }
 
-type Local struct {
+type PluginSourceLocal struct {
 	Path string
 }
 
-type GitHubRelease struct {
+type PluginSourceGitHubRelease struct {
 	RepoOwner string
 	RepoName  string
 	Name      string
 }
 
-func (g GitHubRelease) Download(ctx context.Context, rootDir string, t PluginType) (map[string]LockEntry, error) {
+type BlueprintSource interface {
+}
+
+type BlueprintSourceFilePath struct {
+	Path string
+}
+
+func (g PluginSourceGitHubRelease) Download(ctx context.Context, rootDir string, t PluginType) (map[string]LockEntry, error) {
 	releaseURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/releases/tags/%s", g.RepoOwner, g.RepoName, g.Name)
 
 	releaseResRaw, err := http.Get(releaseURL)

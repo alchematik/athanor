@@ -157,10 +157,10 @@ func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			Components:    map[string]spec.Component{},
 			DependencyMap: map[string][]string{},
 		}
-		var src repo.Source
+		var src repo.PluginSource
 		switch m.Config.Translator.Repo.Type {
 		case "local":
-			src = repo.Local{
+			src = repo.PluginSourceLocal{
 				Path: m.Config.Translator.Repo.Path,
 			}
 		default:
@@ -175,7 +175,7 @@ func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			},
 			Build: ast.ExprBuild{
 				Alias: m.Config.Name,
-				Source: repo.Local{
+				Source: repo.BlueprintSourceFilePath{
 					Path: m.Config.InputPath,
 				},
 				// TODO: fill in.
@@ -208,7 +208,7 @@ func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			switch stmt := n.Stmt.(type) {
 			case ast.StmtBuild:
 				switch src := stmt.Translator.Source.(type) {
-				case repo.GitHubRelease:
+				case repo.PluginSourceGitHubRelease:
 					entry = fmt.Sprintf("github.com/%s/%s@%s", src.RepoOwner, src.RepoName, src.Name)
 					dep = dependency.BinDependency{
 						Type: "translator",
@@ -223,7 +223,7 @@ func (m *Install) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			case ast.StmtResource:
 				switch src := stmt.Provider.Source.(type) {
-				case repo.GitHubRelease:
+				case repo.PluginSourceGitHubRelease:
 					entry = fmt.Sprintf("github.com/%s/%s@%s", src.RepoOwner, src.RepoName, src.Name)
 					dep = dependency.BinDependency{
 						Type: "provider",

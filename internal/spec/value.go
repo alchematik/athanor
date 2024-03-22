@@ -23,8 +23,7 @@ type ValueBlueprint struct {
 type ValueProvider struct {
 	Value
 
-	Name string
-	Repo repo.Source
+	Repo repo.PluginSource
 }
 
 type ValueResource struct {

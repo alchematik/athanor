@@ -18,9 +18,8 @@ type Environment struct {
 type Provider struct {
 	Type
 
-	Name    string
 	Version string
-	Repo    repo.Source
+	Repo    repo.PluginSource
 }
 
 type Resource struct {

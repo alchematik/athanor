@@ -69,7 +69,7 @@ func main() {
 								ctx,
 								dependency.BinDependency{
 									Type: "translator",
-									Source: repo.Local{
+									Source: repo.PluginSourceLocal{
 										Path: c.TranslatorsDir,
 									},
 									OS:   runtime.GOOS,
@@ -102,7 +102,7 @@ func main() {
 									ctx,
 									dependency.BinDependency{
 										Type: "translator",
-										Source: repo.Local{
+										Source: repo.PluginSourceLocal{
 											Path: c.TranslatorsDir,
 										},
 										OS:   runtime.GOOS,

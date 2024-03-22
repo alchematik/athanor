@@ -24,5 +24,5 @@ type StmtBuild struct {
 }
 
 type Translator struct {
-	Source repo.Source
+	Source repo.PluginSource
 }

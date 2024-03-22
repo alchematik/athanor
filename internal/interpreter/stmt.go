@@ -26,9 +26,9 @@ func (in *Interpreter) buildStmt(ctx context.Context, s spec.Spec, stmt ast.Stmt
 
 	var translatorSrc any
 	switch src := stmt.Translator.Source.(type) {
-	case repo.Local:
+	case repo.PluginSourceLocal:
 		translatorSrc = dependency.SourceLocal{Path: src.Path}
-	case repo.GitHubRelease:
+	case repo.PluginSourceGitHubRelease:
 		translatorSrc = dependency.SourceGitHubRelease{
 			RepoOwner: src.RepoOwner,
 			RepoName:  src.RepoName,

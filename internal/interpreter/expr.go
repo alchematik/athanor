@@ -11,15 +11,12 @@ import (
 	"github.com/alchematik/athanor/internal/spec"
 )
 
-func (in Interpreter) Expr(ctx context.Context, ex ast.Expr) (spec.Value, []string, error) {
+func (in *Interpreter) Expr(ctx context.Context, ex ast.Expr) (spec.Value, []string, error) {
 	switch e := ex.(type) {
 	case ast.ExprString:
 		return spec.ValueString{Literal: e.Value}, nil, nil
 	case ast.ExprBool:
 		return spec.ValueBool{Literal: e.Value}, nil, nil
-	case ast.ExprBlueprint:
-		panic("fix blueprint")
-		// return in.blueprintExpr(ctx, b, e)
 	case ast.ExprMap:
 		return in.mapExpr(ctx, e)
 	case ast.ExprProvider:
@@ -45,22 +42,12 @@ func (in Interpreter) Expr(ctx context.Context, ex ast.Expr) (spec.Value, []stri
 	}
 }
 
-// func (in Interpreter) blueprintExpr(ctx context.Context, s spec.Spec, e ast.ExprBlueprint) (spec.Value, []string, error) {
-// 	for _, stmt := range e.Stmts {
-// 		if err := in.Stmt(ctx, s, stmt); err != nil {
-// 			return nil, nil, err
-// 		}
-// 	}
-//
-// 	return nil, nil, nil
-// }
-
-func (in Interpreter) provider(ctx context.Context, e ast.ExprProvider) (spec.ValueProvider, []string, error) {
+func (in *Interpreter) provider(ctx context.Context, e ast.ExprProvider) (spec.ValueProvider, []string, error) {
 	var source any
 	switch src := e.Source.(type) {
-	case repo.Local:
+	case repo.PluginSourceLocal:
 		source = dependency.SourceLocal{Path: src.Path}
-	case repo.GitHubRelease:
+	case repo.PluginSourceGitHubRelease:
 		source = dependency.SourceGitHubRelease{
 			RepoOwner: src.RepoOwner,
 			RepoName:  src.RepoName,
@@ -81,12 +68,11 @@ func (in Interpreter) provider(ctx context.Context, e ast.ExprProvider) (spec.Va
 	}
 
 	return spec.ValueProvider{
-		Name: e.Name,
 		Repo: e.Source,
 	}, nil, nil
 }
 
-func (in Interpreter) resource(ctx context.Context, e ast.ExprResource) (spec.ValueResource, []string, error) {
+func (in *Interpreter) resource(ctx context.Context, e ast.ExprResource) (spec.ValueResource, []string, error) {
 	idVal, children, err := in.Expr(ctx, e.Identifier)
 	if err != nil {
 		return spec.ValueResource{}, nil, err
@@ -125,7 +111,7 @@ func (in Interpreter) resource(ctx context.Context, e ast.ExprResource) (spec.Va
 	}, out, nil
 }
 
-func (in Interpreter) mapExpr(ctx context.Context, e ast.ExprMap) (spec.ValueMap, []string, error) {
+func (in *Interpreter) mapExpr(ctx context.Context, e ast.ExprMap) (spec.ValueMap, []string, error) {
 	m := spec.ValueMap{Entries: map[string]spec.Value{}}
 	var children []string
 	for k, v := range e.Entries {
@@ -143,7 +129,7 @@ func (in Interpreter) mapExpr(ctx context.Context, e ast.ExprMap) (spec.ValueMap
 	return m, children, nil
 }
 
-func (in Interpreter) listExpr(ctx context.Context, e ast.ExprList) (spec.ValueList, []string, error) {
+func (in *Interpreter) listExpr(ctx context.Context, e ast.ExprList) (spec.ValueList, []string, error) {
 	l := spec.ValueList{Elements: make([]spec.Value, len(e.Elements))}
 	var children []string
 	for i, v := range e.Elements {
@@ -159,7 +145,7 @@ func (in Interpreter) listExpr(ctx context.Context, e ast.ExprList) (spec.ValueL
 	return l, children, nil
 }
 
-func (in Interpreter) resourceIdentifierExpr(ctx context.Context, e ast.ExprResourceIdentifier) (spec.ValueResourceIdentifier, []string, error) {
+func (in *Interpreter) resourceIdentifierExpr(ctx context.Context, e ast.ExprResourceIdentifier) (spec.ValueResourceIdentifier, []string, error) {
 	val, children, err := in.Expr(ctx, e.Value)
 	if err != nil {
 		return spec.ValueResourceIdentifier{}, nil, err
@@ -180,7 +166,7 @@ func (in Interpreter) resourceIdentifierExpr(ctx context.Context, e ast.ExprReso
 	}, append(children, e.Alias), nil
 }
 
-func (in Interpreter) getExpr(ctx context.Context, e ast.ExprGet) (spec.ValueUnresolved, []string, error) {
+func (in *Interpreter) getExpr(ctx context.Context, e ast.ExprGet) (spec.ValueUnresolved, []string, error) {
 	objVal, children, err := in.Expr(ctx, e.Object)
 	if err != nil {
 		return spec.ValueUnresolved{}, nil, err

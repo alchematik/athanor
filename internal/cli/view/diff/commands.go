@@ -86,10 +86,10 @@ func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Lo
 		Components:    map[string]spec.Component{},
 		DependencyMap: map[string][]string{},
 	}
-	var src repo.Source
+	var src repo.PluginSource
 	switch config.Translator.Repo.Type {
 	case "local":
-		src = repo.Local{
+		src = repo.PluginSourceLocal{
 			Path: config.Translator.Repo.Path,
 		}
 	default:
@@ -101,7 +101,7 @@ func interpretBlueprint(ctx context.Context, config view.Config, logger hclog.Lo
 		},
 		Build: ast.ExprBuild{
 			Alias: config.Name,
-			Source: repo.Local{
+			Source: repo.BlueprintSourceFilePath{
 				Path: config.InputPath,
 			},
 			// TODO: fill in.

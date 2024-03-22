@@ -37,10 +37,9 @@ message Expr {
     NilExpr nil = 9;
     GetExpr get = 10;
     ResourceIdentifierExpr resource_identifier = 11;
-    BlueprintExpr blueprint = 12;
-    FileExpr file = 13;
-    GetRuntimeConfig get_runtime_config = 14;
-    BuildExpr build = 15;
+    FileExpr file = 12;
+    GetRuntimeConfig get_runtime_config = 13;
+    BuildExpr build = 14;
   }
 }
 
@@ -70,8 +69,7 @@ message GetRuntimeConfig {}
 message NilExpr {}
 
 message ProviderExpr {
-  string name = 1;
-  Source source = 3;
+  PluginSource source = 1;
 }
 
 message ResourceExpr {
@@ -87,29 +85,40 @@ message ResourceIdentifierExpr {
 
 message BuildExpr {
   string alias = 1;
-  Source source = 2;
+  BlueprintSource source = 2;
   repeated Expr config = 4;
   Expr runtime_config = 5;
 }
 
 message Translator {
   string name = 1;
-  Source source = 3;
+  PluginSource source = 3;
 }
 
-message Source {
+message PluginSource {
   oneof type {
-    FilePathSource file_path = 1;
-    GitHubReleaseSource git_hub_release = 2;
+    PluginSourceFilePath file_path = 1;
+    PluginSourceGitHubRelease git_hub_release = 2;
   }
 }
 
-message FilePathSource {
+message PluginSourceFilePath {
   string path = 1;
 }
 
-message GitHubReleaseSource {
+message PluginSourceGitHubRelease {
   string repo_owner = 1;
   string repo_name = 2;
   string name = 3;
 }
+
+message BlueprintSource {
+  oneof type {
+    BlueprintSourceFilePath file_path = 1;
+  }
+}
+
+message BlueprintSourceFilePath {
+  string path = 1;
+}
+

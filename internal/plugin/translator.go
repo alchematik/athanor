@@ -77,11 +77,12 @@ type Translator struct {
 }
 
 func (t *Translator) TranslateBlueprint(ctx context.Context, b ast.ExprBuild) (ast.Blueprint, error) {
-	// TODO: Should plugin source and blueprint source be different?
 	inputPath := ""
 	switch s := b.Source.(type) {
-	case repo.Local:
+	case repo.BlueprintSourceFilePath:
 		inputPath = s.Path
+	default:
+		return ast.Blueprint{}, fmt.Errorf("unsupported blueprint source: %T", s)
 	}
 
 	tempFile, err := os.CreateTemp("", "")
@@ -239,12 +240,12 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 			return nil, err
 		}
 
-		src, err := convertSource(s.Build.GetBuild().GetSource())
+		src, err := convertBlueprintSource(s.Build.GetBuild().GetSource())
 		if err != nil {
 			return nil, err
 		}
 
-		translatorSource, err := convertSource(s.Build.Translator.GetSource())
+		translatorSource, err := convertPluginSource(s.Build.Translator.GetSource())
 		if err != nil {
 			return nil, err
 		}
@@ -267,18 +268,6 @@ func convertStmt(st *consumerpb.Stmt) (ast.Stmt, error) {
 
 func convertExpr(ex *consumerpb.Expr) (ast.Expr, error) {
 	switch e := ex.GetType().(type) {
-	case *consumerpb.Expr_Blueprint:
-		stmts := make([]ast.Stmt, len(e.Blueprint.GetStmts()))
-		for i, s := range e.Blueprint.GetStmts() {
-			converted, err := convertStmt(s)
-			if err != nil {
-				return nil, err
-			}
-
-			stmts[i] = converted
-		}
-
-		return ast.ExprBlueprint{Stmts: stmts}, nil
 	case *consumerpb.Expr_Provider:
 		return convertProviderExpr(ex.GetProvider())
 	case *consumerpb.Expr_Resource:
@@ -398,14 +387,14 @@ func exprToProto(expr ast.Expr) (*consumerpb.Expr, error) {
 	}
 }
 
-func convertSource(src *consumerpb.Source) (repo.Source, error) {
+func convertPluginSource(src *consumerpb.PluginSource) (repo.PluginSource, error) {
 	switch s := src.GetType().(type) {
-	case *consumerpb.Source_FilePath:
-		return repo.Local{
+	case *consumerpb.PluginSource_FilePath:
+		return repo.PluginSourceLocal{
 			Path: s.FilePath.GetPath(),
 		}, nil
-	case *consumerpb.Source_GitHubRelease:
-		return repo.GitHubRelease{
+	case *consumerpb.PluginSource_GitHubRelease:
+		return repo.PluginSourceGitHubRelease{
 			RepoOwner: s.GitHubRelease.GetRepoOwner(),
 			RepoName:  s.GitHubRelease.GetRepoName(),
 			Name:      s.GitHubRelease.GetName(),
@@ -415,6 +404,16 @@ func convertSource(src *consumerpb.Source) (repo.Source, error) {
 	}
 }
 
+func convertBlueprintSource(src *consumerpb.BlueprintSource) (repo.BlueprintSource, error) {
+	switch s := src.GetType().(type) {
+	case *consumerpb.BlueprintSource_FilePath:
+		return repo.BlueprintSourceFilePath{
+			Path: s.FilePath.GetPath(),
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported source: %T", s)
+	}
+}
 func convertResourceExpr(expr *consumerpb.ResourceExpr) (ast.ExprResource, error) {
 	id, err := convertExpr(expr.GetIdentifier())
 	if err != nil {
@@ -433,13 +432,12 @@ func convertResourceExpr(expr *consumerpb.ResourceExpr) (ast.ExprResource, error
 }
 
 func convertProviderExpr(expr *consumerpb.ProviderExpr) (ast.ExprProvider, error) {
-	s, err := convertSource(expr.GetSource())
+	s, err := convertPluginSource(expr.GetSource())
 	if err != nil {
 		return ast.ExprProvider{}, err
 	}
 
 	return ast.ExprProvider{
-		Name:   expr.GetName(),
 		Source: s,
 	}, nil
 }
