@@ -27,6 +27,8 @@ var (
 	ColorOrange500 = lipgloss.Color("#ffa500")
 	ColorOrange600 = lipgloss.Color("#eb9800")
 
+	ColorPurple500 = lipgloss.Color("#a6a6ed")
+
 	Space100 = 1
 	Space200 = 2
 	Space300 = 3

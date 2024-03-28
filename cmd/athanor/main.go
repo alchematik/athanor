@@ -150,6 +150,24 @@ func main() {
 						},
 					},
 					{
+						Name: "detail",
+						Flags: []cli.Flag{
+							&cli.BoolFlag{
+								Name:  "debug",
+								Usage: "log debug logs",
+							},
+						},
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							program, err := diffview.NewDetail(diffview.DetailParams{
+								Context: ctx,
+								Path:    cmd.Args().First(),
+								Debug:   cmd.Bool("debug"),
+							})
+							_, err = program.Run()
+							return err
+						},
+					},
+					{
 						Name: "reconcile",
 						Flags: []cli.Flag{
 							&cli.BoolFlag{

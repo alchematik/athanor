@@ -6,10 +6,10 @@ import (
 	"sort"
 
 	"github.com/alchematik/athanor/internal/ast"
-	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
 	"github.com/alchematik/athanor/internal/cli/view"
 	"github.com/alchematik/athanor/internal/cli/view/component"
 	"github.com/alchematik/athanor/internal/dependency"
+	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/interpreter"
 	plug "github.com/alchematik/athanor/internal/plugin"
 	"github.com/alchematik/athanor/internal/repo"
@@ -22,7 +22,7 @@ import (
 
 type Controller interface {
 	Next() []selector.Selector
-	Process(context.Context, selector.Selector) (controller.TreeNodeStatus, error)
+	Process(context.Context, selector.Selector) (diff.Type, error)
 }
 
 func quit() tea.Msg {
@@ -40,21 +40,21 @@ func evaluateCmd(logger hclog.Logger, ctx context.Context, c Controller, s selec
 
 		return setStatusMsg{
 			selector: s,
-			status:   string(res),
+			diff:     res,
 		}
 	}
 }
 
 type setStatusMsg struct {
 	selector selector.Selector
-	status   string
+	diff     diff.Type
 }
 
-func setStatus(s selector.Selector, status string) tea.Cmd {
+func setStatus(s selector.Selector, status diff.Type) tea.Cmd {
 	return func() tea.Msg {
 		return setStatusMsg{
 			selector: s,
-			status:   status,
+			diff:     status,
 		}
 	}
 }

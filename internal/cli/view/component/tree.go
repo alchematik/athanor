@@ -125,7 +125,7 @@ func (m *TreeModel) renderTreeNodeStatus(s TreeNodeStatus) string {
 	case TreeNodeStatusDone:
 		return lipgloss.NewStyle().Foreground(ColorGreen400).Render("✓")
 	case TreeNodeStatusUnknown:
-		return lipgloss.NewStyle().Foreground(ColorOrange500).Render("?")
+		return lipgloss.NewStyle().Foreground(ColorPurple500).Render("?")
 	default:
 		return " "
 	}

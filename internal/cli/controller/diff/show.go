@@ -69,40 +69,40 @@ func NewDiffController(logger hclog.Logger, s spec.ComponentBuild, target, actua
 	return c
 }
 
-func (q *DiffController) Process(ctx context.Context, sel selector.Selector) (TreeNodeStatus, error) {
+func (q *DiffController) Process(ctx context.Context, sel selector.Selector) (diff.Type, error) {
 	comp, ok := selector.SelectComponent(q.Spec, sel)
 	if !ok {
-		return "", fmt.Errorf("component not found: %s", sel.Name)
+		return nil, fmt.Errorf("component not found: %s", sel.Name)
 	}
 
 	targetEnv, ok := selector.SelectEnvironment(q.TargetEnv, sel)
 	if !ok {
-		return "", fmt.Errorf("environment for selector %s not found", sel.Name)
+		return nil, fmt.Errorf("environment for selector %s not found", sel.Name)
 	}
 
 	target, err := q.TargetEvaluator.Eval(ctx, targetEnv, sel.Name, comp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	actualEnv, ok := selector.SelectEnvironment(q.ActualEnv, sel)
 	if !ok {
-		return "", fmt.Errorf("environment for selector %s not found", sel.Name)
+		return nil, fmt.Errorf("environment for selector %s not found", sel.Name)
 	}
 
 	actual, err := q.ActualEvaluator.Eval(ctx, actualEnv, sel.Name, comp)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	diffEnv, ok := selector.SelectDiffEnvironment(q.Diff, sel)
 	if !ok {
-		return "", fmt.Errorf("diff not found: %s", sel.Name)
+		return nil, fmt.Errorf("diff not found: %s", sel.Name)
 	}
 
 	d, err := q.Differ.Diff(ctx, diffEnv, sel.Name, target, actual)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	build, isBuild := comp.(spec.ComponentBuild)
@@ -123,27 +123,28 @@ func (q *DiffController) Process(ctx context.Context, sel selector.Selector) (Tr
 			q.Add(sel, selector.Selector{Name: child, Parent: &sel})
 		}
 
-		return TreeNodeStatusLoading, nil
+		return nil, nil
 	}
 
 	if err := q.Done(sel); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	switch d.Operation() {
-	case diff.OperationNoop:
-		return TreeNodeStatusEmpty, nil
-	case diff.OperationCreate:
-		return TreeNodeStatusCreate, nil
-	case diff.OperationUpdate:
-		return TreeNodeStatusUpdate, nil
-	case diff.OperationDelete:
-		return TreeNodeStatusDelete, nil
-	case diff.OperationUnknown:
-		return TreeNodeStatusUnknown, nil
-	default:
-		return "", fmt.Errorf("unhandled diff operation: %s", d.Operation())
-	}
+	return d, nil
+	// switch d.Operation() {
+	// case diff.OperationNoop:
+	// 	return TreeNodeStatusEmpty, nil
+	// case diff.OperationCreate:
+	// 	return TreeNodeStatusCreate, nil
+	// case diff.OperationUpdate:
+	// 	return TreeNodeStatusUpdate, nil
+	// case diff.OperationDelete:
+	// 	return TreeNodeStatusDelete, nil
+	// case diff.OperationUnknown:
+	// 	return TreeNodeStatusUnknown, nil
+	// default:
+	// 	return "", fmt.Errorf("unhandled diff operation: %s", d.Operation())
+	// }
 }
 
 func (q *DiffController) Add(s selector.Selector, dependencies ...selector.Selector) {

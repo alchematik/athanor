@@ -3,7 +3,6 @@ package reconcile
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
@@ -60,8 +59,6 @@ func (r *Reconciler) Reconcile(ctx context.Context, env state.Environment, alias
 			return nil, err
 		}
 
-		log.Printf("RUNTIME CONFIG >> %+v, %T\n", runtimeConfig, runtimeConfig)
-
 		res = state.Environment{
 			States:        map[string]state.Type{},
 			RuntimeConfig: runtimeConfig,
@@ -81,7 +78,6 @@ func (r *Reconciler) ReconcileResource(ctx context.Context, env state.Environmen
 	if d.Operation() == diff.OperationUnknown {
 		to, err := r.resolveResource(env, d.To)
 		if err != nil {
-			log.Printf("ERROR RESOLVING RESOURCE >>>> %+v\n", d.To)
 			return state.Resource{}, err
 		}
 
@@ -247,7 +243,9 @@ func (r *Reconciler) resolve(env state.Environment, res state.Type) (state.Type,
 
 		return l, nil
 	case state.ResourceRef:
+		r.queueLock.Lock()
 		ref, ok := env.States[res.Alias]
+		r.queueLock.Unlock()
 		if !ok {
 			return nil, fmt.Errorf("resolve: no resource with alias %q found", res.Alias)
 		}

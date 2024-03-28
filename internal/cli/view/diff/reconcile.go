@@ -2,6 +2,7 @@ package diff
 
 import (
 	"context"
+	"fmt"
 
 	api "github.com/alchematik/athanor/internal/api/resource"
 	controller "github.com/alchematik/athanor/internal/cli/controller/diff"
@@ -193,14 +194,37 @@ func (r *Reconcile) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, tea.Batch(
 			func() tea.Msg { return evaluateNextMsg{next: next} },
 			func() tea.Msg {
-				return component.UpdateTreeNodeMsg{
-					Selector: msg.selector,
-					Status:   component.TreeNodeStatus(msg.status),
+				if msg.diff == nil {
+					return component.UpdateTreeNodeMsg{
+						Selector: msg.selector,
+						Status:   component.TreeNodeStatusLoading,
+					}
+				} else {
+					var status component.TreeNodeStatus
+					switch msg.diff.Operation() {
+					case diff.OperationNoop:
+						status = component.TreeNodeStatusEmpty
+					case diff.OperationCreate:
+						status = component.TreeNodeStatusCreate
+					case diff.OperationUpdate:
+						status = component.TreeNodeStatusUpdate
+					case diff.OperationDelete:
+						status = component.TreeNodeStatusDelete
+					case diff.OperationUnknown:
+						status = component.TreeNodeStatusUnknown
+					default:
+						return view.DisplayErrorMsg{Error: fmt.Errorf("invalid diff: %v", msg.diff.Operation())}
+					}
+
+					return component.UpdateTreeNodeMsg{
+						Selector: msg.selector,
+						Status:   status,
+					}
 				}
 			},
 		))
 
-		if msg.selector.Parent == nil && msg.status != string(controller.TreeNodeStatusLoading) {
+		if msg.selector.Parent == nil && msg.diff != nil {
 			cmds = append(cmds, func() tea.Msg { return doneEvaluateSpec() })
 		}
 
