@@ -179,3 +179,87 @@ func TestIteratorConcurrent(t *testing.T) {
 
 	<-done
 }
+
+func TestIteratorRevisit(t *testing.T) {
+	/*
+	   a
+	   |--------> b ---> e
+	   |---> c ---^
+	   └---> d ---> f
+	*/
+
+	g := dag.NewGraph()
+	require.NoError(t, g.AddEdge("a", "b"))
+	require.NoError(t, g.AddEdge("b", "e"))
+	require.NoError(t, g.AddEdge("a", "c"))
+	require.NoError(t, g.AddEdge("c", "b"))
+	require.NoError(t, g.AddEdge("a", "d"))
+	require.NoError(t, g.AddEdge("d", "f"))
+
+	iter := dag.InitIterator(g)
+	next := iter.Next()
+	require.Equal(t, []string{"a"}, next)
+	require.False(t, iter.Visited("a"))
+	require.NoError(t, iter.Start("a"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"c", "d"}, next)
+	require.False(t, iter.Visited("c"))
+	require.False(t, iter.Visited("d"))
+	require.NoError(t, iter.Start("c"))
+	require.NoError(t, iter.Start("d"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"b", "f"}, next)
+	require.False(t, iter.Visited("b"))
+	require.False(t, iter.Visited("f"))
+	require.NoError(t, iter.Start("b"))
+	require.NoError(t, iter.Start("f"))
+
+	// Re-start "c".
+	require.NoError(t, iter.Start("c"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"e", "f"}, next)
+	require.False(t, iter.Visited("e"))
+	require.True(t, iter.Visited("f"))
+	require.NoError(t, iter.Start("e"))
+	require.NoError(t, iter.Done("f"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"e", "d"}, next)
+	require.True(t, iter.Visited("e"))
+	require.True(t, iter.Visited("d"))
+	require.NoError(t, iter.Done("e"))
+	require.NoError(t, iter.Done("d"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"b"}, next)
+	require.False(t, iter.Visited("b"))
+	require.NoError(t, iter.Start("b"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"e"}, next)
+	require.False(t, iter.Visited("e"))
+	require.NoError(t, iter.Start("e"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"e"}, next)
+	require.True(t, iter.Visited("e"))
+	require.NoError(t, iter.Done("e"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"b"}, next)
+	require.True(t, iter.Visited("b"))
+	require.NoError(t, iter.Done("b"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"c"}, next)
+	require.True(t, iter.Visited("c"))
+	require.NoError(t, iter.Done("c"))
+
+	next = iter.Next()
+	require.ElementsMatch(t, []string{"a"}, next)
+	require.True(t, iter.Visited("a"))
+	require.NoError(t, iter.Done("a"))
+}

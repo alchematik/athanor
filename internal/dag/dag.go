@@ -92,11 +92,7 @@ func (iter *Iterator) Next() []string {
 }
 
 func (iter *Iterator) Start(node string) error {
-	if iter.Visited(node) {
-		return fmt.Errorf("%q already visited", node)
-	}
-
-	iter.visitNode(node)
+	iter.visitNode(node, true)
 
 	forward := iter.forwardEdges(node)
 
@@ -106,6 +102,11 @@ func (iter *Iterator) Start(node string) error {
 	}
 
 	for _, e := range forward.Values() {
+		// Reset forward edges to not visited so they get processed again.
+		if iter.Visited(e) {
+			iter.visitNode(e, false)
+		}
+
 		deps := iter.dependencies(e)
 		deps.Remove(node)
 
@@ -168,11 +169,11 @@ func (iter *Iterator) backwardEdges(node string) *StringSet {
 	return iter.graph.backwardEdges[node]
 }
 
-func (iter *Iterator) visitNode(node string) {
+func (iter *Iterator) visitNode(node string, visited bool) {
 	iter.Lock()
 	defer iter.Unlock()
 
-	iter.visited[node] = true
+	iter.visited[node] = visited
 }
 
 func (iter *Iterator) dependencies(node string) *StringSet {
