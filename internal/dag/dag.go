@@ -1,7 +1,7 @@
 package dag
 
 import (
-	"errors"
+	// "errors"
 	"fmt"
 	"sync"
 )
@@ -19,9 +19,9 @@ type Graph struct {
 }
 
 func (g *Graph) AddEdge(from, to string) error {
-	if from == "" || to == "" {
-		return errors.New("node names must not be empty")
-	}
+	// if from == "" || to == "" {
+	// 	return errors.New("node names must not be empty")
+	// }
 
 	forward, ok := g.forwardEdges[from]
 	if !ok {
