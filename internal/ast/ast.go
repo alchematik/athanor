@@ -49,7 +49,7 @@ func (c *Converter) ConvertBuildStmt(ctx Context, build external.DeclareBuild) (
 		return StmtBuild{}, err
 	}
 
-	runtimeInput, err := ConvertMapExpr(ctx, build.Name, build.Runtimeinput)
+	runtimeInput, err := ConvertMapExpr[map[string]any](ctx, build.Name, build.Runtimeinput)
 	if err != nil {
 		return StmtBuild{}, fmt.Errorf("converting runtime input: %s", err)
 	}
@@ -57,7 +57,7 @@ func (c *Converter) ConvertBuildStmt(ctx Context, build external.DeclareBuild) (
 	c.Logger.Info("converting blueprint >>", "blueprint", blueprint)
 
 	var stmts []Stmt
-	subCtx := ctx.SubContext(build.Name)
+	subCtx := ctx.NewSubContext(build.Name)
 	for _, stmt := range blueprint.Stmts {
 		c.Logger.Info("converting statement >>>>>>>>>", "stmt", stmt)
 		s, err := c.ConvertStmt(subCtx, stmt)
@@ -111,6 +111,14 @@ type StmtWatcher struct {
 	Value any
 }
 
+type Expr[T any] interface {
+	Eval(Context) (T, error)
+}
+
+type ExprAny interface {
+	Eval(Context) (any, error)
+}
+
 type ExprBool interface {
 	Eval(Context) (bool, error)
 }
@@ -143,36 +151,47 @@ type ExprBlueprintSource interface {
 	// Convert()
 }
 
+// TODO: rename this to "Scope"
 type Context interface {
 	SetResource(StmtResource)
 	SetBuild(StmtBuild)
 	SetVars(map[string]any)
-	SubContext(string) Context
+	NewSubContext(string) Context
 	DAG() *dag.Graph
+	Resources() []string
+	Builds() []string
+	SubContext(string) Context
 }
 
-func NewContext() *ContextImpl {
+func NewContext(name string) *ContextImpl {
 	return &ContextImpl{
-		components: map[string]Stmt{},
-		dag:        dag.NewGraph(),
+		name:      name,
+		resources: map[string]string{},
+		builds:    map[string]string{},
+		dag:       dag.NewGraph(),
+		sub:       map[string]Context{},
 	}
 }
 
 type ContextImpl struct {
-	name       string
-	components map[string]Stmt
-	dag        *dag.Graph
+	name      string
+	resources map[string]string
+	builds    map[string]string
+	sub       map[string]Context
+	dag       *dag.Graph
 }
 
 func (c *ContextImpl) SetResource(stmt StmtResource) {
 	id := strings.Join([]string{c.name, stmt.Name}, ".")
-	c.components[id] = stmt
+	c.resources[stmt.Name] = id
+	c.dag.AddNode(id, stmt)
 	c.dag.AddEdge(c.name, id)
 }
 
 func (c *ContextImpl) SetBuild(stmt StmtBuild) {
 	id := strings.Join([]string{c.name, stmt.Name}, ".")
-	c.components[id] = stmt
+	c.builds[stmt.Name] = id
+	c.dag.AddNode(id, stmt)
 	c.dag.AddEdge(c.name, id)
 }
 
@@ -180,14 +199,36 @@ func (c *ContextImpl) SetVars(vars map[string]any) {
 
 }
 
-func (c *ContextImpl) SubContext(name string) Context {
-	sub := &ContextImpl{
-		name:       name,
-		components: c.components,
-		dag:        c.dag,
-	}
+func (c *ContextImpl) NewSubContext(name string) Context {
+	id := strings.Join([]string{c.name, name}, ".")
+	sub := NewContext(id)
+	sub.dag = c.dag
+	sub.name = id
+	c.sub[name] = sub
 
 	return sub
+}
+
+func (c *ContextImpl) Resources() []string {
+	keys := make([]string, 0, len(c.resources))
+	for k := range c.resources {
+		keys = append(keys, k)
+	}
+
+	return keys
+}
+
+func (c *ContextImpl) Builds() []string {
+	keys := make([]string, 0, len(c.builds))
+	for k := range c.builds {
+		keys = append(keys, k)
+	}
+
+	return keys
+}
+
+func (c *ContextImpl) SubContext(name string) Context {
+	return c.sub[name]
 }
 
 func (c *ContextImpl) DAG() *dag.Graph {

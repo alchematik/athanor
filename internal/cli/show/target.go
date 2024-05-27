@@ -8,12 +8,12 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	// "os"
 
 	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/ast"
-	"github.com/alchematik/athanor/internal/dag"
 
 	"github.com/bytecodealliance/wasmtime-go/v20"
 	tea "github.com/charmbracelet/bubbletea"
@@ -121,12 +121,6 @@ type interpreter struct {
 }
 
 func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, input map[string]any) (external_ast.Blueprint, error) {
-	it.logger.Info("INTERPRETING BLUEPRINT", "file", source.LocalFile.Path)
-	// data, err := os.ReadFile(source.LocalFile.Path)
-	// if err != nil {
-	// 	return ast.Blueprint{}, err
-	// }
-
 	engine := wasmtime.NewEngine()
 	module, err := wasmtime.NewModuleFromFile(engine, source.LocalFile.Path)
 	if err != nil {
@@ -144,8 +138,7 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 	if err != nil {
 		return external_ast.Blueprint{}, err
 	}
-
-	it.logger.Info("TEMP DIR >>>>>", "dir", dir)
+	defer os.RemoveAll(dir)
 
 	if err := wasiConfig.PreopenDir(dir, "/"); err != nil {
 		return external_ast.Blueprint{}, err
@@ -163,10 +156,8 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 	_, err = nom.Call(store)
 	if err != nil {
 		var wasmtimeError *wasmtime.Error
-		it.logger.Info("GOT ERROR >>>", "err", err)
 		if errors.As(err, &wasmtimeError) {
 			st, ok := wasmtimeError.ExitStatus()
-			it.logger.Info("WASM ERROR >>>", "code", st, "ok", ok)
 			if ok && st != 0 {
 				return external_ast.Blueprint{}, fmt.Errorf("non-0 exit status: %d", st)
 			}
@@ -174,8 +165,6 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 			return external_ast.Blueprint{}, err
 		}
 	}
-
-	it.logger.Info("GUESS IT WAS NOTHING, reading file", "path", filepath.Join(dir, "blueprint.json"))
 
 	data, err := os.ReadFile(filepath.Join(dir, "blueprint.json"))
 	if err != nil {
@@ -191,14 +180,15 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 }
 
 func (s *Init) Init() tea.Cmd {
-	s.context = ast.NewContext()
+	s.context = ast.NewContext("")
+
 	f := func() tea.Msg {
 		c := ast.Converter{
 			Logger:               s.logger,
 			BlueprintInterpreter: &interpreter{logger: s.logger},
 		}
 		b := external_ast.DeclareBuild{
-			Name: "",
+			Name: "Build",
 			Runtimeinput: external_ast.Expr{
 				Value: external_ast.MapCollection{
 					Value: map[string]external_ast.Expr{},
@@ -218,26 +208,20 @@ func (s *Init) Init() tea.Cmd {
 }
 
 func (s *Init) View() string {
-	g := s.context.DAG()
-	iter := dag.InitIterator(g)
+	return render(0, s.context)
+}
+
+func render(space int, scope ast.Context) string {
 	var out string
-	nodes := iter.Next()
-	for len(nodes) > 0 {
-		s.logger.Info("nodes!!", "nodes", nodes)
-		for _, n := range nodes {
-			if iter.Visited(n) {
-				iter.Done(n)
-				continue
-			}
-
-			iter.Start(n)
-			out += n + "\n"
-		}
-
-		nodes = iter.Next()
+	for _, name := range scope.Resources() {
+		out += strings.Repeat(" ", space) + name + "\n"
+	}
+	for _, name := range scope.Builds() {
+		out += strings.Repeat(" ", space) + name + "\n"
+		out += render(space+2, scope.SubContext(name))
 	}
 
-	return out + "!"
+	return out
 }
 
 func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -250,7 +234,6 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		return s, nil
 	case string:
-		s.logger.Info("done converting!!", "graph", s.context.DAG())
 		// if msg == "done" {
 		// 	next := &Quit{logger: s.logger}
 		// 	return next, next.Init()

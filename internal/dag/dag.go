@@ -4,18 +4,22 @@ import (
 	// "errors"
 	"fmt"
 	"sync"
+
+	"github.com/alchematik/athanor/internal/set"
 )
 
 func NewGraph() *Graph {
 	return &Graph{
-		forwardEdges:  map[string]*StringSet{},
-		backwardEdges: map[string]*StringSet{},
+		forwardEdges:  map[string]*set.Set[string]{},
+		backwardEdges: map[string]*set.Set[string]{},
+		nodes:         map[string]any{},
 	}
 }
 
 type Graph struct {
-	forwardEdges  map[string]*StringSet
-	backwardEdges map[string]*StringSet
+	forwardEdges  map[string]*set.Set[string]
+	backwardEdges map[string]*set.Set[string]
+	nodes         map[string]any
 }
 
 func (g *Graph) AddEdge(from, to string) error {
@@ -25,41 +29,45 @@ func (g *Graph) AddEdge(from, to string) error {
 
 	forward, ok := g.forwardEdges[from]
 	if !ok {
-		forward = NewStringSet()
+		forward = set.NewSet[string]()
 		g.forwardEdges[from] = forward
 	}
 	forward.Add(to)
 
 	backward, ok := g.backwardEdges[to]
 	if !ok {
-		backward = NewStringSet()
+		backward = set.NewSet[string]()
 		g.backwardEdges[to] = backward
 	}
 	backward.Add(from)
 
 	// Add empty value to make sure from has a backward edge.
 	if _, ok := g.backwardEdges[from]; !ok {
-		g.backwardEdges[from] = NewStringSet()
+		g.backwardEdges[from] = set.NewSet[string]()
 	}
 	if _, ok := g.forwardEdges[to]; !ok {
-		g.forwardEdges[to] = NewStringSet()
+		g.forwardEdges[to] = set.NewSet[string]()
 	}
 
 	return nil
+}
+
+func (g *Graph) AddNode(name string, contents any) {
+	g.nodes[name] = contents
 }
 
 type Iterator struct {
 	sync.Mutex
 
 	graph   *Graph
-	next    *StringSet
+	next    *set.Set[string]
 	visited map[string]bool
-	deps    map[string]*StringSet
+	deps    map[string]*set.Set[string]
 }
 
 func InitIterator(g *Graph) *Iterator {
-	next := NewStringSet()
-	deps := map[string]*StringSet{}
+	next := set.NewSet[string]()
+	deps := map[string]*set.Set[string]{}
 	for n, edges := range g.backwardEdges {
 		deps[n] = edges.Clone()
 
@@ -86,7 +94,7 @@ func (iter *Iterator) Next() []string {
 		nextNodes = append(nextNodes, n)
 	}
 
-	iter.next = NewStringSet()
+	iter.next = set.NewSet[string]()
 
 	return nextNodes
 }
@@ -155,14 +163,14 @@ func (iter *Iterator) addNext(node string) {
 	iter.next.Add(node)
 }
 
-func (iter *Iterator) forwardEdges(node string) *StringSet {
+func (iter *Iterator) forwardEdges(node string) *set.Set[string] {
 	iter.Lock()
 	defer iter.Unlock()
 
 	return iter.graph.forwardEdges[node]
 }
 
-func (iter *Iterator) backwardEdges(node string) *StringSet {
+func (iter *Iterator) backwardEdges(node string) *set.Set[string] {
 	iter.Lock()
 	defer iter.Unlock()
 
@@ -176,72 +184,15 @@ func (iter *Iterator) visitNode(node string, visited bool) {
 	iter.visited[node] = visited
 }
 
-func (iter *Iterator) dependencies(node string) *StringSet {
+func (iter *Iterator) dependencies(node string) *set.Set[string] {
 	iter.Lock()
 	defer iter.Unlock()
 
 	deps, ok := iter.deps[node]
 	if !ok {
-		deps = NewStringSet()
+		deps = set.NewSet[string]()
 		iter.deps[node] = deps
 	}
 
 	return deps
-}
-
-func NewStringSet() *StringSet {
-	return &StringSet{
-		values: map[string]struct{}{},
-	}
-}
-
-type StringSet struct {
-	sync.Mutex
-
-	values map[string]struct{}
-}
-
-func (s *StringSet) Add(val string) {
-	s.Lock()
-	defer s.Unlock()
-
-	s.values[val] = struct{}{}
-}
-
-func (s *StringSet) Remove(val string) {
-	s.Lock()
-	defer s.Unlock()
-
-	delete(s.values, val)
-}
-
-func (s *StringSet) Clone() *StringSet {
-	s.Lock()
-	defer s.Unlock()
-
-	dest := NewStringSet()
-	for k := range s.values {
-		dest.Add(k)
-	}
-
-	return dest
-}
-
-func (s *StringSet) Len() int {
-	s.Lock()
-	defer s.Unlock()
-
-	return len(s.values)
-}
-
-func (s *StringSet) Values() []string {
-	s.Lock()
-	defer s.Unlock()
-
-	vals := make([]string, 0, len(s.values))
-	for v := range s.values {
-		vals = append(vals, v)
-	}
-
-	return vals
 }

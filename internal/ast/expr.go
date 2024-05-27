@@ -6,51 +6,161 @@ import (
 	external "github.com/alchematik/athanor/ast"
 )
 
-func ConvertExpr(ctx Context, name string, expr external.Expr) (any, error) {
+func ConvertAnyExpr(ctx Context, name string, expr external.Expr) (Expr[any], error) {
 	switch expr.Value.(type) {
 	case external.StringLiteral:
-		return ConvertStringExpr(ctx, name, expr)
+		return ConvertStringExpr[any](ctx, name, expr)
 	case external.BoolLiteral:
-		return ConvertBoolExpr(ctx, name, expr)
-	case external.MapCollection:
-		return ConvertMapExpr(ctx, name, expr)
-	case external.Resource:
-		return ConvertResourceExpr(ctx, name, expr)
+		return ConvertBoolExpr[any](ctx, name, expr)
+	// case external.MapCollection:
+	// 	return ConvertMapExpr(ctx, name, expr)
+	// case external.Resource:
+	// 	return ConvertResourceExpr(ctx, name, expr)
 	// case external.LocalFile:
 	// return ConvertFileExpr(expr)
+	case external.MapCollection:
+		return ConvertMapExpr[any](ctx, name, expr)
+	case external.Resource:
+		return ResourceExpr[any]{
+			// Exists:
+
+		}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", expr.Value)
 	}
 }
 
-func ConvertStringExpr(ctx Context, name string, expr external.Expr) (ExprString, error) {
+func ConvertStringExpr[T any | string](ctx Context, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.StringLiteral:
-		return StringLiteral(value.Value), nil
+		var val T
+		switch v := any(&val).(type) {
+		case *string:
+			*v = value.Value
+		case *any:
+			*v = value.Value
+		default:
+			return nil, fmt.Errorf("unsupported string type: %T", val)
+		}
+		return Literal[T]{Value: val}, nil
 	default:
 		return nil, fmt.Errorf("invalid bool expr: %T", expr)
 	}
 }
 
-func ConvertBoolExpr(ctx Context, name string, expr external.Expr) (ExprBool, error) {
+type Literal[T any] struct {
+	Value T
+}
+
+func (l Literal[T]) Eval(_ Context) (T, error) {
+	return l.Value, nil
+}
+
+type Map[T any] struct {
+	Value map[Expr[string]]Expr[any]
+}
+
+func (m Map[T]) Eval(ctx Context) (T, error) {
+	out := map[string]any{}
+	var val T
+	for k, v := range m.Value {
+		outKey, err := k.Eval(ctx)
+		if err != nil {
+			return val, err
+		}
+
+		outVal, err := v.Eval(ctx)
+		if err != nil {
+			return val, err
+		}
+
+		out[outKey] = outVal
+	}
+
+	switch v := any(&val).(type) {
+	case *any:
+		*v = out
+	case *map[string]any:
+		*v = out
+	}
+
+	return val, nil
+}
+
+type ResourceExpr[T any | Resource] struct {
+	Exists     Expr[bool]
+	Identifier Expr[any]
+	Config     Expr[any]
+}
+
+func (r ResourceExpr[T]) Eval(ctx Context) (T, error) {
+	var out T
+
+	e, err := r.Exists.Eval(ctx)
+	if err != nil {
+		return out, err
+	}
+
+	id, err := r.Identifier.Eval(ctx)
+	if err != nil {
+		return out, err
+	}
+
+	c, err := r.Config.Eval(ctx)
+	if err != nil {
+		return out, err
+	}
+
+	resource := Resource{
+		Exists:     e,
+		Identifier: id,
+		Config:     c,
+	}
+
+	switch o := any(&out).(type) {
+	case *Resource:
+		*o = resource
+	case *any:
+		*o = resource
+	}
+
+	return out, nil
+}
+
+func ConvertBoolExpr[T any | bool](ctx Context, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.BoolLiteral:
-		return BoolLiteral(value.Value), nil
+		var val T
+		switch v := any(&value).(type) {
+		case *bool:
+			*v = value.Value
+		case *any:
+			*v = value.Value
+		}
+		return Literal[T]{Value: val}, nil
 	default:
 		return nil, fmt.Errorf("invalid bool expr: %T", expr)
 	}
 }
 
-func ConvertMapExpr(ctx Context, name string, expr external.Expr) (ExprMap, error) {
+func ConvertMapExpr[T any | map[string]any](ctx Context, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.MapCollection:
-		m := MapCollection{}
+		m := Map[T]{
+			Value: map[Expr[string]]Expr[any]{},
+		}
 		for k, v := range value.Value {
-			e, err := ConvertExpr(ctx, name, v)
+			key, err := ConvertStringExpr[string](ctx, name, external.Expr{Value: external.StringLiteral{Value: k}})
 			if err != nil {
 				return nil, err
 			}
-			m[k] = e
+
+			val, err := ConvertAnyExpr(ctx, name, v)
+			if err != nil {
+				return nil, err
+			}
+
+			m.Value[key] = val
 		}
 		return m, nil
 	default:
@@ -58,31 +168,31 @@ func ConvertMapExpr(ctx Context, name string, expr external.Expr) (ExprMap, erro
 	}
 }
 
-func ConvertResourceExpr(ctx Context, name string, expr external.Expr) (ExprResource, error) {
+func ConvertResourceExpr(ctx Context, name string, expr external.Expr) (Expr[Resource], error) {
 	switch value := expr.Value.(type) {
 	case external.Resource:
-		identifier, err := ConvertExpr(ctx, name, value.Identifier)
+		identifier, err := ConvertAnyExpr(ctx, name, value.Identifier)
 		if err != nil {
 			return nil, err
 		}
 
-		config, err := ConvertExpr(ctx, name, value.Config)
+		config, err := ConvertAnyExpr(ctx, name, value.Config)
 		if err != nil {
 			return nil, err
 		}
 
-		exists, err := ConvertBoolExpr(ctx, name, value.Exists)
+		exists, err := ConvertBoolExpr[bool](ctx, name, value.Exists)
 		if err != nil {
 			return nil, err
 		}
 
-		return Resource{
+		return ResourceExpr[Resource]{
 			Identifier: identifier,
 			Config:     config,
 			Exists:     exists,
 		}, nil
 	case external.GetResource:
-		from, err := ConvertExpr(ctx, name, value.From)
+		from, err := ConvertAnyExpr(ctx, name, value.From)
 		if err != nil {
 			return nil, err
 		}
@@ -93,35 +203,27 @@ func ConvertResourceExpr(ctx Context, name string, expr external.Expr) (ExprReso
 	}
 }
 
-// func ConvertLocalFileExpr(expr any)
+type MapCollection map[string]ExprAny
 
-type StringLiteral string
+func (m MapCollection) Eval(ctx Context) (map[string]any, error) {
+	out := map[string]any{}
+	for k, v := range m {
+		o, err := v.Eval(ctx)
+		if err != nil {
+			return nil, err
+		}
 
-func (s StringLiteral) Eval(_ Context) (string, error) {
-	return string(s), nil
-}
+		out[k] = o
+	}
 
-type BoolLiteral bool
-
-func (b BoolLiteral) Eval(_ Context) (bool, error) {
-	return bool(b), nil
-}
-
-type MapCollection map[string]any
-
-func (m MapCollection) Eval(_ Context) (map[string]any, error) {
-	return m, nil
+	return out, nil
 }
 
 type Resource struct {
-	Provider   ExprProvider
-	Exists     ExprBool
+	Provider   Provider
+	Exists     bool
 	Identifier any
 	Config     any
-}
-
-func (r Resource) Eval(_ Context) (Resource, error) {
-	return r, nil
 }
 
 type Provider struct {
