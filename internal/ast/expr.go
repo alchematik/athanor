@@ -6,7 +6,7 @@ import (
 	external "github.com/alchematik/athanor/ast"
 )
 
-func ConvertAnyExpr(scope Scope, name string, expr external.Expr) (Expr[any], error) {
+func ConvertAnyExpr(scope *Scope, name string, expr external.Expr) (Expr[any], error) {
 	switch expr.Value.(type) {
 	case external.StringLiteral:
 		return ConvertStringExpr[any](scope, name, expr)
@@ -30,7 +30,7 @@ func ConvertAnyExpr(scope Scope, name string, expr external.Expr) (Expr[any], er
 	}
 }
 
-func ConvertStringExpr[T any | string](scope Scope, name string, expr external.Expr) (Expr[T], error) {
+func ConvertStringExpr[T any | string](scope *Scope, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.StringLiteral:
 		var val T
@@ -52,7 +52,7 @@ type Literal[T any] struct {
 	Value T
 }
 
-func (l Literal[T]) Eval(_ Scope) (T, error) {
+func (l Literal[T]) Eval(_ *Scope) (T, error) {
 	return l.Value, nil
 }
 
@@ -60,7 +60,7 @@ type Map[T any] struct {
 	Value map[Expr[string]]Expr[any]
 }
 
-func (m Map[T]) Eval(scope Scope) (T, error) {
+func (m Map[T]) Eval(scope *Scope) (T, error) {
 	out := map[string]any{}
 	var val T
 	for k, v := range m.Value {
@@ -93,7 +93,7 @@ type ResourceExpr[T any | Resource] struct {
 	Config     Expr[any]
 }
 
-func (r ResourceExpr[T]) Eval(scope Scope) (T, error) {
+func (r ResourceExpr[T]) Eval(scope *Scope) (T, error) {
 	var out T
 
 	e, err := r.Exists.Eval(scope)
@@ -127,7 +127,7 @@ func (r ResourceExpr[T]) Eval(scope Scope) (T, error) {
 	return out, nil
 }
 
-func ConvertBoolExpr[T any | bool](scope Scope, name string, expr external.Expr) (Expr[T], error) {
+func ConvertBoolExpr[T any | bool](scope *Scope, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.BoolLiteral:
 		var val T
@@ -143,7 +143,7 @@ func ConvertBoolExpr[T any | bool](scope Scope, name string, expr external.Expr)
 	}
 }
 
-func ConvertMapExpr[T any | map[string]any](scope Scope, name string, expr external.Expr) (Expr[T], error) {
+func ConvertMapExpr[T any | map[string]any](scope *Scope, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.MapCollection:
 		m := Map[T]{
@@ -168,7 +168,7 @@ func ConvertMapExpr[T any | map[string]any](scope Scope, name string, expr exter
 	}
 }
 
-func ConvertResourceExpr(scope Scope, name string, expr external.Expr) (Expr[Resource], error) {
+func ConvertResourceExpr(scope *Scope, name string, expr external.Expr) (Expr[Resource], error) {
 	switch value := expr.Value.(type) {
 	case external.Resource:
 		identifier, err := ConvertAnyExpr(scope, name, value.Identifier)
@@ -205,7 +205,7 @@ func ConvertResourceExpr(scope Scope, name string, expr external.Expr) (Expr[Res
 
 type MapCollection map[string]ExprAny
 
-func (m MapCollection) Eval(scope Scope) (map[string]any, error) {
+func (m MapCollection) Eval(scope *Scope) (map[string]any, error) {
 	out := map[string]any{}
 	for k, v := range m {
 		o, err := v.Eval(scope)
@@ -236,7 +236,7 @@ type GetResource struct {
 	From any
 }
 
-func (g GetResource) Eval(scope Scope) (Resource, error) {
+func (g GetResource) Eval(scope *Scope) (Resource, error) {
 	// TODO: Handle "from".
 	// return scope.GetResource(g.Name)
 	return Resource{}, nil
@@ -247,7 +247,7 @@ type Build struct {
 	Blueprint    Blueprint
 }
 
-func (b Build) Eval(scope Scope) (Build, error) {
+func (b Build) Eval(scope *Scope) (Build, error) {
 	return b, nil
 }
 
