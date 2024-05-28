@@ -113,7 +113,7 @@ type Init struct {
 	logger     *slog.Logger
 	inputPath  string
 	configPath string
-	context    ast.Context
+	context    ast.Scope
 }
 
 type interpreter struct {
@@ -180,7 +180,7 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 }
 
 func (s *Init) Init() tea.Cmd {
-	s.context = ast.NewContext("")
+	s.context = ast.NewScope("")
 
 	f := func() tea.Msg {
 		c := ast.Converter{
@@ -211,7 +211,7 @@ func (s *Init) View() string {
 	return render(0, s.context)
 }
 
-func render(space int, scope ast.Context) string {
+func render(space int, scope ast.Scope) string {
 	var out string
 	for _, name := range scope.Resources() {
 		out += strings.Repeat(" ", space) + name + "\n"

@@ -6,20 +6,20 @@ import (
 	external "github.com/alchematik/athanor/ast"
 )
 
-func ConvertAnyExpr(ctx Context, name string, expr external.Expr) (Expr[any], error) {
+func ConvertAnyExpr(scope Scope, name string, expr external.Expr) (Expr[any], error) {
 	switch expr.Value.(type) {
 	case external.StringLiteral:
-		return ConvertStringExpr[any](ctx, name, expr)
+		return ConvertStringExpr[any](scope, name, expr)
 	case external.BoolLiteral:
-		return ConvertBoolExpr[any](ctx, name, expr)
+		return ConvertBoolExpr[any](scope, name, expr)
 	// case external.MapCollection:
-	// 	return ConvertMapExpr(ctx, name, expr)
+	// 	return ConvertMapExpr(scope, name, expr)
 	// case external.Resource:
-	// 	return ConvertResourceExpr(ctx, name, expr)
+	// 	return ConvertResourceExpr(scope, name, expr)
 	// case external.LocalFile:
 	// return ConvertFileExpr(expr)
 	case external.MapCollection:
-		return ConvertMapExpr[any](ctx, name, expr)
+		return ConvertMapExpr[any](scope, name, expr)
 	case external.Resource:
 		return ResourceExpr[any]{
 			// Exists:
@@ -30,7 +30,7 @@ func ConvertAnyExpr(ctx Context, name string, expr external.Expr) (Expr[any], er
 	}
 }
 
-func ConvertStringExpr[T any | string](ctx Context, name string, expr external.Expr) (Expr[T], error) {
+func ConvertStringExpr[T any | string](scope Scope, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.StringLiteral:
 		var val T
@@ -52,7 +52,7 @@ type Literal[T any] struct {
 	Value T
 }
 
-func (l Literal[T]) Eval(_ Context) (T, error) {
+func (l Literal[T]) Eval(_ Scope) (T, error) {
 	return l.Value, nil
 }
 
@@ -60,16 +60,16 @@ type Map[T any] struct {
 	Value map[Expr[string]]Expr[any]
 }
 
-func (m Map[T]) Eval(ctx Context) (T, error) {
+func (m Map[T]) Eval(scope Scope) (T, error) {
 	out := map[string]any{}
 	var val T
 	for k, v := range m.Value {
-		outKey, err := k.Eval(ctx)
+		outKey, err := k.Eval(scope)
 		if err != nil {
 			return val, err
 		}
 
-		outVal, err := v.Eval(ctx)
+		outVal, err := v.Eval(scope)
 		if err != nil {
 			return val, err
 		}
@@ -93,20 +93,20 @@ type ResourceExpr[T any | Resource] struct {
 	Config     Expr[any]
 }
 
-func (r ResourceExpr[T]) Eval(ctx Context) (T, error) {
+func (r ResourceExpr[T]) Eval(scope Scope) (T, error) {
 	var out T
 
-	e, err := r.Exists.Eval(ctx)
+	e, err := r.Exists.Eval(scope)
 	if err != nil {
 		return out, err
 	}
 
-	id, err := r.Identifier.Eval(ctx)
+	id, err := r.Identifier.Eval(scope)
 	if err != nil {
 		return out, err
 	}
 
-	c, err := r.Config.Eval(ctx)
+	c, err := r.Config.Eval(scope)
 	if err != nil {
 		return out, err
 	}
@@ -127,7 +127,7 @@ func (r ResourceExpr[T]) Eval(ctx Context) (T, error) {
 	return out, nil
 }
 
-func ConvertBoolExpr[T any | bool](ctx Context, name string, expr external.Expr) (Expr[T], error) {
+func ConvertBoolExpr[T any | bool](scope Scope, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.BoolLiteral:
 		var val T
@@ -143,19 +143,19 @@ func ConvertBoolExpr[T any | bool](ctx Context, name string, expr external.Expr)
 	}
 }
 
-func ConvertMapExpr[T any | map[string]any](ctx Context, name string, expr external.Expr) (Expr[T], error) {
+func ConvertMapExpr[T any | map[string]any](scope Scope, name string, expr external.Expr) (Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.MapCollection:
 		m := Map[T]{
 			Value: map[Expr[string]]Expr[any]{},
 		}
 		for k, v := range value.Value {
-			key, err := ConvertStringExpr[string](ctx, name, external.Expr{Value: external.StringLiteral{Value: k}})
+			key, err := ConvertStringExpr[string](scope, name, external.Expr{Value: external.StringLiteral{Value: k}})
 			if err != nil {
 				return nil, err
 			}
 
-			val, err := ConvertAnyExpr(ctx, name, v)
+			val, err := ConvertAnyExpr(scope, name, v)
 			if err != nil {
 				return nil, err
 			}
@@ -168,20 +168,20 @@ func ConvertMapExpr[T any | map[string]any](ctx Context, name string, expr exter
 	}
 }
 
-func ConvertResourceExpr(ctx Context, name string, expr external.Expr) (Expr[Resource], error) {
+func ConvertResourceExpr(scope Scope, name string, expr external.Expr) (Expr[Resource], error) {
 	switch value := expr.Value.(type) {
 	case external.Resource:
-		identifier, err := ConvertAnyExpr(ctx, name, value.Identifier)
+		identifier, err := ConvertAnyExpr(scope, name, value.Identifier)
 		if err != nil {
 			return nil, err
 		}
 
-		config, err := ConvertAnyExpr(ctx, name, value.Config)
+		config, err := ConvertAnyExpr(scope, name, value.Config)
 		if err != nil {
 			return nil, err
 		}
 
-		exists, err := ConvertBoolExpr[bool](ctx, name, value.Exists)
+		exists, err := ConvertBoolExpr[bool](scope, name, value.Exists)
 		if err != nil {
 			return nil, err
 		}
@@ -192,7 +192,7 @@ func ConvertResourceExpr(ctx Context, name string, expr external.Expr) (Expr[Res
 			Exists:     exists,
 		}, nil
 	case external.GetResource:
-		from, err := ConvertAnyExpr(ctx, name, value.From)
+		from, err := ConvertAnyExpr(scope, name, value.From)
 		if err != nil {
 			return nil, err
 		}
@@ -205,10 +205,10 @@ func ConvertResourceExpr(ctx Context, name string, expr external.Expr) (Expr[Res
 
 type MapCollection map[string]ExprAny
 
-func (m MapCollection) Eval(ctx Context) (map[string]any, error) {
+func (m MapCollection) Eval(scope Scope) (map[string]any, error) {
 	out := map[string]any{}
 	for k, v := range m {
-		o, err := v.Eval(ctx)
+		o, err := v.Eval(scope)
 		if err != nil {
 			return nil, err
 		}
@@ -227,6 +227,8 @@ type Resource struct {
 }
 
 type Provider struct {
+	Name    string
+	Version string
 }
 
 type GetResource struct {
@@ -234,9 +236,9 @@ type GetResource struct {
 	From any
 }
 
-func (g GetResource) Eval(ctx Context) (Resource, error) {
+func (g GetResource) Eval(scope Scope) (Resource, error) {
 	// TODO: Handle "from".
-	// return ctx.GetResource(g.Name)
+	// return scope.GetResource(g.Name)
 	return Resource{}, nil
 }
 
@@ -245,7 +247,7 @@ type Build struct {
 	Blueprint    Blueprint
 }
 
-func (b Build) Eval(ctx Context) (Build, error) {
+func (b Build) Eval(scope Scope) (Build, error) {
 	return b, nil
 }
 

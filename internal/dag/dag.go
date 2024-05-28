@@ -12,14 +12,12 @@ func NewGraph() *Graph {
 	return &Graph{
 		forwardEdges:  map[string]*set.Set[string]{},
 		backwardEdges: map[string]*set.Set[string]{},
-		nodes:         map[string]any{},
 	}
 }
 
 type Graph struct {
 	forwardEdges  map[string]*set.Set[string]
 	backwardEdges map[string]*set.Set[string]
-	nodes         map[string]any
 }
 
 func (g *Graph) AddEdge(from, to string) error {
@@ -50,10 +48,6 @@ func (g *Graph) AddEdge(from, to string) error {
 	}
 
 	return nil
-}
-
-func (g *Graph) AddNode(name string, contents any) {
-	g.nodes[name] = contents
 }
 
 type Iterator struct {
