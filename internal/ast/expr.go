@@ -203,7 +203,7 @@ func ConvertResourceExpr(scope *Scope, name string, expr external.Expr) (Expr[Re
 	}
 }
 
-type MapCollection map[string]ExprAny
+type MapCollection map[string]Expr[any]
 
 func (m MapCollection) Eval(scope *Scope) (map[string]any, error) {
 	out := map[string]any{}
@@ -243,7 +243,7 @@ func (g GetResource) Eval(scope *Scope) (Resource, error) {
 }
 
 type Build struct {
-	RuntimeInput ExprMap
+	RuntimeInput Expr[map[string]any]
 	Blueprint    Blueprint
 }
 

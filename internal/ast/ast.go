@@ -99,7 +99,7 @@ func (s StmtBuild) Eval(*Scope) error {
 
 type StmtResource struct {
 	Name     string
-	Resource ExprResource
+	Resource Expr[Resource]
 }
 
 func (s StmtResource) Eval(*Scope) error {
@@ -113,42 +113,6 @@ type StmtWatcher struct {
 
 type Expr[T any] interface {
 	Eval(*Scope) (T, error)
-}
-
-type ExprAny interface {
-	Eval(*Scope) (any, error)
-}
-
-type ExprBool interface {
-	Eval(*Scope) (bool, error)
-}
-
-type ExprString interface {
-	Eval(*Scope) (string, error)
-}
-
-type ExprResource interface {
-	Eval(*Scope) (Resource, error)
-}
-
-type ExprProvider interface {
-	Eval(*Scope) (Provider, error)
-}
-
-type ExprBuild interface {
-	Eval(*Scope) (Build, error)
-}
-
-type ExprMap interface {
-	Eval(*Scope) (map[string]any, error)
-}
-
-type ExprBlueprint interface {
-	Eval(*Scope) (Blueprint, error)
-}
-
-type ExprBlueprintSource interface {
-	// Convert()
 }
 
 func NewScope(name string) *Scope {
