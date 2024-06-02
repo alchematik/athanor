@@ -94,18 +94,18 @@ func ConvertResourceExpr(scope *ast.Scope, name string, expr external.Expr) (ast
 	}
 }
 
-func (c *Converter) ConvertStmt(scope *ast.Scope, stmt external.Stmt) (ast.Stmt, error) {
+func (c *Converter) ConvertStmt(g *ast.Global, scope *ast.Scope, stmt external.Stmt) (ast.Stmt, error) {
 	switch stmt := stmt.Value.(type) {
 	case external.DeclareBuild:
-		return c.ConvertBuildStmt(scope, stmt)
+		return c.ConvertBuildStmt(g, scope, stmt)
 	case external.DeclareResource:
-		return c.ConvertResourceStmt(scope, stmt)
+		return c.ConvertResourceStmt(g, scope, stmt)
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
 }
 
-func (c *Converter) ConvertResourceStmt(scope *ast.Scope, stmt external.DeclareResource) (ast.StmtResource, error) {
+func (c *Converter) ConvertResourceStmt(g *ast.Global, scope *ast.Scope, stmt external.DeclareResource) (ast.StmtResource, error) {
 	resource, err := ConvertResourceExpr(scope, stmt.Name, stmt.Resource)
 	if err != nil {
 		return ast.StmtResource{}, err
@@ -115,11 +115,13 @@ func (c *Converter) ConvertResourceStmt(scope *ast.Scope, stmt external.DeclareR
 		Name:     stmt.Name,
 		Resource: resource,
 	}
-	scope.SetResource(r)
+	resourceID := g.ComponentID(stmt.Name)
+	scope.SetResource(resourceID, stmt.Name)
+	g.SetEvaluable(resourceID, r)
 	return r, nil
 }
 
-func (c *Converter) ConvertBuildStmt(scope *ast.Scope, build external.DeclareBuild) (ast.StmtBuild, error) {
+func (c *Converter) ConvertBuildStmt(g *ast.Global, scope *ast.Scope, build external.DeclareBuild) (ast.StmtBuild, error) {
 	blueprint, err := c.BlueprintInterpreter.InterpretBlueprint(build.BlueprintSource, build.Input)
 	if err != nil {
 		return ast.StmtBuild{}, err
@@ -130,15 +132,14 @@ func (c *Converter) ConvertBuildStmt(scope *ast.Scope, build external.DeclareBui
 		return ast.StmtBuild{}, fmt.Errorf("converting runtime input: %s", err)
 	}
 
-	c.Logger.Info("converting blueprint >>", "blueprint", blueprint)
+	buildID := g.ComponentID(build.Name)
 
 	var stmts []ast.Stmt
-	subScope := scope.NewSubScope(build.Name)
+	subScope := scope.SetBuild(buildID, build.Name)
+	subG := g.Sub(build.Name)
 	for _, stmt := range blueprint.Stmts {
-		c.Logger.Info("converting statement >>>>>>>>>", "stmt", stmt)
-		s, err := c.ConvertStmt(subScope, stmt)
+		s, err := c.ConvertStmt(subG, subScope, stmt)
 		if err != nil {
-			c.Logger.Info(">>>>>>>>>>>>>>>>>>>>>", "err", err)
 			return ast.StmtBuild{}, err
 		}
 
@@ -155,7 +156,7 @@ func (c *Converter) ConvertBuildStmt(scope *ast.Scope, build external.DeclareBui
 		},
 	}
 
-	scope.SetBuild(b)
+	g.SetEvaluable(buildID, b)
 
 	return b, nil
 }

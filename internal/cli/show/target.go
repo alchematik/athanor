@@ -115,6 +115,7 @@ type Init struct {
 	inputPath  string
 	configPath string
 	scope      *ast.Scope
+	global     *ast.Global
 }
 
 type interpreter struct {
@@ -182,6 +183,7 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 
 func (s *Init) Init() tea.Cmd {
 	s.scope = ast.NewScope("")
+	s.global = ast.NewGlobal()
 
 	return func() tea.Msg {
 		c := convert.Converter{
@@ -201,7 +203,7 @@ func (s *Init) Init() tea.Cmd {
 				},
 			},
 		}
-		if _, err := c.ConvertBuildStmt(s.scope, b); err != nil {
+		if _, err := c.ConvertBuildStmt(s.global, s.scope, b); err != nil {
 			return errorMsg{error: err}
 		}
 
@@ -218,9 +220,9 @@ func render(space int, scope *ast.Scope) string {
 	for _, name := range scope.Resources() {
 		out += strings.Repeat(" ", space) + name + "\n"
 	}
-	for _, name := range scope.Builds() {
-		out += strings.Repeat(" ", space) + name + "\n"
-		out += render(space+2, scope.SubContext(name))
+	for _, b := range scope.Builds() {
+		out += strings.Repeat(" ", space) + b.Name() + "\n"
+		out += render(space+2, b)
 	}
 
 	return out

@@ -1,77 +1,93 @@
 package ast
 
 import (
-	"strings"
+	"fmt"
 
 	"github.com/alchematik/athanor/internal/dag"
+	"github.com/alchematik/athanor/internal/state"
 )
 
 func NewScope(name string) *Scope {
 	return &Scope{
 		name:      name,
 		resources: map[string]string{},
-		builds:    map[string]string{},
-		dag:       dag.NewGraph(),
 		sub:       map[string]*Scope{},
 	}
 }
 
+type Evaluable interface {
+	Eval(*state.State) error
+}
+
+func NewGlobal() *Global {
+	return &Global{
+		components: map[string]Evaluable{},
+		dag:        dag.NewGraph(),
+	}
+}
+
+type Global struct {
+	id string
+
+	components map[string]Evaluable
+
+	dag *dag.Graph
+}
+
+func (g *Global) ComponentID(name string) string {
+	return fmt.Sprintf("%s.%s", g.id, name)
+}
+
+func (g *Global) SetEvaluable(id string, e Evaluable) string {
+	g.components[id] = e
+	g.dag.AddEdge(g.id, id)
+	return id
+}
+
+func (g *Global) Sub(name string) *Global {
+	return &Global{
+		id:         fmt.Sprintf("%s.%s", g.id, name),
+		components: g.components,
+		dag:        g.dag,
+	}
+}
+
 type Scope struct {
-	name      string
+	name string
+	// id -> name?
 	resources map[string]string
-	builds    map[string]string
 	sub       map[string]*Scope
-	dag       *dag.Graph
 }
 
-func (c *Scope) SetResource(stmt StmtResource) {
-	id := strings.Join([]string{c.name, stmt.Name}, ".")
-	c.resources[stmt.Name] = id
-	c.dag.AddEdge(c.name, id)
+func (c *Scope) Name() string {
+	return c.name
 }
 
-func (c *Scope) SetBuild(stmt StmtBuild) {
-	id := strings.Join([]string{c.name, stmt.Name}, ".")
-	c.builds[stmt.Name] = id
-	c.dag.AddEdge(c.name, id)
+func (c *Scope) SetResource(id, name string) {
+	c.resources[id] = name
 }
 
-func (c *Scope) SetVars(vars map[string]any) {
-
-}
-
-func (c *Scope) NewSubScope(name string) *Scope {
-	id := strings.Join([]string{c.name, name}, ".")
-	sub := NewScope(id)
-	sub.dag = c.dag
-	sub.name = id
+func (c *Scope) SetBuild(id, name string) *Scope {
+	sub := NewScope(name)
 	c.sub[name] = sub
 
 	return sub
 }
 
 func (c *Scope) Resources() []string {
-	keys := make([]string, 0, len(c.resources))
-	for k := range c.resources {
-		keys = append(keys, k)
+	names := make([]string, 0, len(c.resources))
+	for _, v := range c.resources {
+		names = append(names, v)
 	}
 
-	return keys
+	return names
 }
 
-func (c *Scope) Builds() []string {
-	keys := make([]string, 0, len(c.builds))
-	for k := range c.builds {
-		keys = append(keys, k)
+func (c *Scope) Builds() []*Scope {
+	builds := make([]*Scope, 0, len(c.sub))
+	for _, b := range c.sub {
+		builds = append(builds, b)
 	}
 
-	return keys
-}
-
-func (c *Scope) SubContext(name string) *Scope {
-	return c.sub[name]
-}
-
-func (c *Scope) DAG() *dag.Graph {
-	return c.dag
+	return builds
 }

@@ -15,3 +15,6 @@ type Provider struct {
 	Name    string
 	Version string
 }
+
+type Build struct {
+}
