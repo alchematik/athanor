@@ -10,10 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	// "os"
-
 	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/convert"
 
 	"github.com/bytecodealliance/wasmtime-go/v20"
 	tea "github.com/charmbracelet/bubbletea"
@@ -82,7 +81,7 @@ type Quit struct {
 
 func (s *Quit) Init() tea.Cmd {
 	return func() tea.Msg {
-		return quitMsg{}
+		return "quit"
 	}
 }
 
@@ -94,20 +93,22 @@ func (s *Quit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return s, tea.Quit
 }
 
-/*
+type ErrorModel struct {
+	logger *slog.Logger
+	error  error
+}
 
-- Evaluate top level build node
-	- Read input WASI file
-	- Red config file if specified
-	- Run wasi file
-		- Will output file
-- Read output file
-- EvaluateAST
-	- Build up dependency graph.
-	- Produce environment
-- Display environment
+func (e *ErrorModel) Init() tea.Cmd {
+	return tea.Printf("error: %s", e.error)
+}
 
-*/
+func (e *ErrorModel) View() string {
+	return e.error.Error()
+}
+
+func (e *ErrorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return e, tea.Quit
+}
 
 type Init struct {
 	logger     *slog.Logger
@@ -182,8 +183,8 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 func (s *Init) Init() tea.Cmd {
 	s.scope = ast.NewScope("")
 
-	f := func() tea.Msg {
-		c := ast.Converter{
+	return func() tea.Msg {
+		c := convert.Converter{
 			Logger:               s.logger,
 			BlueprintInterpreter: &interpreter{logger: s.logger},
 		}
@@ -200,11 +201,12 @@ func (s *Init) Init() tea.Cmd {
 				},
 			},
 		}
-		_, err := c.ConvertBuildStmt(s.scope, b)
-		s.logger.Info("done converting", "error", err)
+		if _, err := c.ConvertBuildStmt(s.scope, b); err != nil {
+			return errorMsg{error: err}
+		}
+
 		return "done"
 	}
-	return f
 }
 
 func (s *Init) View() string {
@@ -233,6 +235,9 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return s, nil
+	case errorMsg:
+		next := &ErrorModel{logger: s.logger, error: msg.error}
+		return next, next.Init()
 	case string:
 		// if msg == "done" {
 		// 	next := &Quit{logger: s.logger}
@@ -245,4 +250,6 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-type quitMsg struct{}
+type errorMsg struct {
+	error error
+}
