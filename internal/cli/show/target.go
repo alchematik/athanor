@@ -13,6 +13,7 @@ import (
 	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/convert"
+	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/bytecodealliance/wasmtime-go/v20"
 	tea "github.com/charmbracelet/bubbletea"
@@ -114,8 +115,8 @@ type Init struct {
 	logger     *slog.Logger
 	inputPath  string
 	configPath string
-	scope      *ast.Scope
 	global     *ast.Global
+	state      state.State
 }
 
 type interpreter struct {
@@ -182,8 +183,11 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 }
 
 func (s *Init) Init() tea.Cmd {
-	s.scope = ast.NewScope("")
 	s.global = ast.NewGlobal()
+	s.state = state.State{
+		Resources: map[string]state.Resource{},
+		Builds:    map[string]state.Build{},
+	}
 
 	return func() tea.Msg {
 		c := convert.Converter{
@@ -203,7 +207,7 @@ func (s *Init) Init() tea.Cmd {
 				},
 			},
 		}
-		if _, err := c.ConvertBuildStmt(s.global, s.scope, b); err != nil {
+		if _, err := c.ConvertBuildStmt(s.state, s.global, b); err != nil {
 			return errorMsg{error: err}
 		}
 
@@ -212,17 +216,20 @@ func (s *Init) Init() tea.Cmd {
 }
 
 func (s *Init) View() string {
-	return render(0, s.scope)
+	return render(0, s.state, s.global.Scope)
 }
 
-func render(space int, scope *ast.Scope) string {
+func render(space int, s state.State, scope *ast.Scope) string {
 	var out string
-	for _, name := range scope.Resources() {
-		out += strings.Repeat(" ", space) + name + "\n"
+	for _, id := range scope.Resources() {
+		r := s.Resources[id]
+		out += strings.Repeat(" ", space) + r.Name + "\n"
 	}
-	for _, b := range scope.Builds() {
-		out += strings.Repeat(" ", space) + b.Name() + "\n"
-		out += render(space+2, b)
+	for _, id := range scope.Builds() {
+		b := s.Builds[id]
+		out += strings.Repeat(" ", space) + b.Name + "\n"
+		sub := scope.Sub(id)
+		out += render(space+2, s, sub)
 	}
 
 	return out

@@ -18,7 +18,7 @@ type BlueprintInterpreter interface {
 	InterpretBlueprint(source external.BlueprintSource, input map[string]any) (external.Blueprint, error)
 }
 
-func ConvertBoolExpr[T any | bool](scope *ast.Scope, name string, expr external.Expr) (ast.Expr[T], error) {
+func ConvertBoolExpr[T any | bool](name string, expr external.Expr) (ast.Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.BoolLiteral:
 		var val T
@@ -34,19 +34,19 @@ func ConvertBoolExpr[T any | bool](scope *ast.Scope, name string, expr external.
 	}
 }
 
-func ConvertMapExpr[T any | map[string]any](scope *ast.Scope, name string, expr external.Expr) (ast.Expr[T], error) {
+func ConvertMapExpr[T any | map[string]any](name string, expr external.Expr) (ast.Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.MapCollection:
 		m := ast.Map[T]{
 			Value: map[ast.Expr[string]]ast.Expr[any]{},
 		}
 		for k, v := range value.Value {
-			key, err := ConvertStringExpr[string](scope, name, external.Expr{Value: external.StringLiteral{Value: k}})
+			key, err := ConvertStringExpr[string](name, external.Expr{Value: external.StringLiteral{Value: k}})
 			if err != nil {
 				return nil, err
 			}
 
-			val, err := ConvertAnyExpr(scope, name, v)
+			val, err := ConvertAnyExpr(name, v)
 			if err != nil {
 				return nil, err
 			}
@@ -59,20 +59,20 @@ func ConvertMapExpr[T any | map[string]any](scope *ast.Scope, name string, expr 
 	}
 }
 
-func ConvertResourceExpr(scope *ast.Scope, name string, expr external.Expr) (ast.Expr[state.Resource], error) {
+func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resource], error) {
 	switch value := expr.Value.(type) {
 	case external.Resource:
-		identifier, err := ConvertAnyExpr(scope, name, value.Identifier)
+		identifier, err := ConvertAnyExpr(name, value.Identifier)
 		if err != nil {
 			return nil, err
 		}
 
-		config, err := ConvertAnyExpr(scope, name, value.Config)
+		config, err := ConvertAnyExpr(name, value.Config)
 		if err != nil {
 			return nil, err
 		}
 
-		exists, err := ConvertBoolExpr[bool](scope, name, value.Exists)
+		exists, err := ConvertBoolExpr[bool](name, value.Exists)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +83,7 @@ func ConvertResourceExpr(scope *ast.Scope, name string, expr external.Expr) (ast
 			Exists:     exists,
 		}, nil
 	case external.GetResource:
-		from, err := ConvertAnyExpr(scope, name, value.From)
+		from, err := ConvertAnyExpr(name, value.From)
 		if err != nil {
 			return nil, err
 		}
@@ -94,19 +94,19 @@ func ConvertResourceExpr(scope *ast.Scope, name string, expr external.Expr) (ast
 	}
 }
 
-func (c *Converter) ConvertStmt(g *ast.Global, scope *ast.Scope, stmt external.Stmt) (ast.Stmt, error) {
+func (c *Converter) ConvertStmt(s state.State, g *ast.Global, stmt external.Stmt) (ast.Stmt, error) {
 	switch stmt := stmt.Value.(type) {
 	case external.DeclareBuild:
-		return c.ConvertBuildStmt(g, scope, stmt)
+		return c.ConvertBuildStmt(s, g, stmt)
 	case external.DeclareResource:
-		return c.ConvertResourceStmt(g, scope, stmt)
+		return c.ConvertResourceStmt(s, g, stmt)
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
 }
 
-func (c *Converter) ConvertResourceStmt(g *ast.Global, scope *ast.Scope, stmt external.DeclareResource) (ast.StmtResource, error) {
-	resource, err := ConvertResourceExpr(scope, stmt.Name, stmt.Resource)
+func (c *Converter) ConvertResourceStmt(s state.State, g *ast.Global, stmt external.DeclareResource) (ast.StmtResource, error) {
+	resource, err := ConvertResourceExpr(stmt.Name, stmt.Resource)
 	if err != nil {
 		return ast.StmtResource{}, err
 	}
@@ -116,18 +116,20 @@ func (c *Converter) ConvertResourceStmt(g *ast.Global, scope *ast.Scope, stmt ex
 		Resource: resource,
 	}
 	resourceID := g.ComponentID(stmt.Name)
-	scope.SetResource(resourceID, stmt.Name)
-	g.SetEvaluable(resourceID, r)
+	g.SetResource(resourceID, r)
+	s.Resources[resourceID] = state.Resource{
+		Name: stmt.Name,
+	}
 	return r, nil
 }
 
-func (c *Converter) ConvertBuildStmt(g *ast.Global, scope *ast.Scope, build external.DeclareBuild) (ast.StmtBuild, error) {
+func (c *Converter) ConvertBuildStmt(s state.State, g *ast.Global, build external.DeclareBuild) (ast.StmtBuild, error) {
 	blueprint, err := c.BlueprintInterpreter.InterpretBlueprint(build.BlueprintSource, build.Input)
 	if err != nil {
 		return ast.StmtBuild{}, err
 	}
 
-	runtimeInput, err := ConvertMapExpr[map[string]any](scope, build.Name, build.Runtimeinput)
+	runtimeInput, err := ConvertMapExpr[map[string]any](build.Name, build.Runtimeinput)
 	if err != nil {
 		return ast.StmtBuild{}, fmt.Errorf("converting runtime input: %s", err)
 	}
@@ -135,10 +137,9 @@ func (c *Converter) ConvertBuildStmt(g *ast.Global, scope *ast.Scope, build exte
 	buildID := g.ComponentID(build.Name)
 
 	var stmts []ast.Stmt
-	subScope := scope.SetBuild(buildID, build.Name)
 	subG := g.Sub(build.Name)
 	for _, stmt := range blueprint.Stmts {
-		s, err := c.ConvertStmt(subG, subScope, stmt)
+		s, err := c.ConvertStmt(s, subG, stmt)
 		if err != nil {
 			return ast.StmtBuild{}, err
 		}
@@ -157,16 +158,19 @@ func (c *Converter) ConvertBuildStmt(g *ast.Global, scope *ast.Scope, build exte
 	}
 
 	g.SetEvaluable(buildID, b)
+	s.Builds[buildID] = state.Build{
+		Name: build.Name,
+	}
 
 	return b, nil
 }
 
-func ConvertAnyExpr(scope *ast.Scope, name string, expr external.Expr) (ast.Expr[any], error) {
+func ConvertAnyExpr(name string, expr external.Expr) (ast.Expr[any], error) {
 	switch expr.Value.(type) {
 	case external.StringLiteral:
-		return ConvertStringExpr[any](scope, name, expr)
+		return ConvertStringExpr[any](name, expr)
 	case external.BoolLiteral:
-		return ConvertBoolExpr[any](scope, name, expr)
+		return ConvertBoolExpr[any](name, expr)
 	// case external.MapCollection:
 	// 	return ConvertMapExpr(scope, name, expr)
 	// case external.Resource:
@@ -174,7 +178,7 @@ func ConvertAnyExpr(scope *ast.Scope, name string, expr external.Expr) (ast.Expr
 	// case external.LocalFile:
 	// return ConvertFileExpr(expr)
 	case external.MapCollection:
-		return ConvertMapExpr[any](scope, name, expr)
+		return ConvertMapExpr[any](name, expr)
 	case external.Resource:
 		return ast.ResourceExpr[any]{
 			// Exists:
@@ -185,7 +189,7 @@ func ConvertAnyExpr(scope *ast.Scope, name string, expr external.Expr) (ast.Expr
 	}
 }
 
-func ConvertStringExpr[T any | string](scope *ast.Scope, name string, expr external.Expr) (ast.Expr[T], error) {
+func ConvertStringExpr[T any | string](name string, expr external.Expr) (ast.Expr[T], error) {
 	switch value := expr.Value.(type) {
 	case external.StringLiteral:
 		var val T

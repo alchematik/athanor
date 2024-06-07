@@ -5,7 +5,7 @@ import (
 )
 
 type Stmt interface {
-	Eval(*state.State) error
+	Eval(string, *state.State) error
 }
 
 type StmtBuild struct {
@@ -13,7 +13,7 @@ type StmtBuild struct {
 	Build Build
 }
 
-func (s StmtBuild) Eval(*state.State) error {
+func (stmt StmtBuild) Eval(string, *state.State) error {
 	return nil
 }
 
@@ -22,7 +22,13 @@ type StmtResource struct {
 	Resource Expr[state.Resource]
 }
 
-func (s StmtResource) Eval(*state.State) error {
+func (stmt StmtResource) Eval(id string, s *state.State) error {
+	r, err := stmt.Resource.Eval(s)
+	if err != nil {
+		return err
+	}
+
+	s.Resources[id] = r
 	return nil
 }
 

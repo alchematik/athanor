@@ -2,9 +2,11 @@ package state
 
 type State struct {
 	Resources map[string]Resource
+	Builds    map[string]Build
 }
 
 type Resource struct {
+	Name       string
 	Provider   Provider
 	Exists     bool
 	Identifier any
@@ -17,4 +19,5 @@ type Provider struct {
 }
 
 type Build struct {
+	Name string
 }
