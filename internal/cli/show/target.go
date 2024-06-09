@@ -13,6 +13,8 @@ import (
 	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/convert"
+	"github.com/alchematik/athanor/internal/dag"
+	"github.com/alchematik/athanor/internal/eval"
 	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/bytecodealliance/wasmtime-go/v20"
@@ -116,7 +118,7 @@ type Init struct {
 	inputPath  string
 	configPath string
 	global     *ast.Global
-	state      state.State
+	state      *state.State
 }
 
 type interpreter struct {
@@ -184,9 +186,9 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 
 func (s *Init) Init() tea.Cmd {
 	s.global = ast.NewGlobal()
-	s.state = state.State{
-		Resources: map[string]state.Resource{},
-		Builds:    map[string]state.Build{},
+	s.state = &state.State{
+		Resources: map[string]*state.ResourceState{},
+		Builds:    map[string]*state.BuildState{},
 	}
 
 	return func() tea.Msg {
@@ -219,15 +221,29 @@ func (s *Init) View() string {
 	return render(0, s.state, s.global.Scope)
 }
 
-func render(space int, s state.State, scope *ast.Scope) string {
+func render(space int, s *state.State, scope *ast.Scope) string {
 	var out string
 	for _, id := range scope.Resources() {
-		r := s.Resources[id]
-		out += strings.Repeat(" ", space) + r.Name + "\n"
+		rs, ok := s.ResourceState(id)
+		if !ok {
+			panic("resource not in state: " + id)
+		}
+
+		r := rs.GetResource()
+		status := rs.GetStatus()
+
+		out += ">>" + status + " " + strings.Repeat(" ", space) + r.Name + "\n"
 	}
 	for _, id := range scope.Builds() {
-		b := s.Builds[id]
-		out += strings.Repeat(" ", space) + b.Name + "\n"
+		bs, ok := s.BuildState(id)
+		if !ok {
+			panic("build not in state: " + id)
+		}
+
+		b := bs.GetBuild()
+		status := bs.GetStatus()
+
+		out += ">>" + status + " " + strings.Repeat(" ", space) + b.Name + "\n"
 		sub := scope.Sub(id)
 		out += render(space+2, s, sub)
 	}
@@ -248,15 +264,95 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		next := &ErrorModel{logger: s.logger, error: msg.error}
 		return next, next.Init()
 	case string:
-		// if msg == "done" {
-		// 	next := &Quit{logger: s.logger}
-		// 	return next, next.Init()
-		// }
+		iter := dag.InitIterator(s.global.DAG())
+		next := &EvalModel{
+			logger:    s.logger,
+			state:     state.NewGlobal(s.state, nil),
+			iter:      iter,
+			evaluator: eval.NewTargetEvaluator(iter),
+			scope:     s.global,
+		}
+		next.evaluator.Logger = s.logger
 
-		return s, nil
+		return next, next.Init()
 	default:
 		return s, nil
 	}
+}
+
+type EvalModel struct {
+	evaluator *eval.TargetEvaluator
+	state     *state.Global
+	logger    *slog.Logger
+	scope     *ast.Global
+	iter      *dag.Iterator
+}
+
+func (m *EvalModel) Init() tea.Cmd {
+	ids := m.evaluator.Next()
+	cmds := make([]tea.Cmd, len(ids))
+	for i, id := range ids {
+		cmds[i] = func() tea.Msg { return evalMsg{id: id} }
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
+			next := &Quit{logger: m.logger}
+			return next, next.Init()
+		}
+
+		return m, nil
+	case errorMsg:
+		next := &ErrorModel{logger: m.logger, error: msg.error}
+		return next, next.Init()
+	case evalMsg:
+		return m, func() tea.Msg {
+			comp, ok := m.scope.Component(msg.id)
+			if !ok {
+				return errorMsg{error: fmt.Errorf("component not found: %s", msg.id)}
+			}
+
+			err := m.evaluator.Eval(m.state, comp)
+			if err != nil {
+				return errorMsg{error: err}
+			}
+
+			next := m.evaluator.Next()
+
+			return nextMsg{next: next}
+		}
+	case nextMsg:
+		if len(msg.next) == 0 {
+			return m, func() tea.Msg { return "done" }
+		}
+		cmds := make([]tea.Cmd, len(msg.next))
+		for i, id := range msg.next {
+			cmds[i] = func() tea.Msg { return evalMsg{id: id} }
+		}
+
+		return m, tea.Batch(cmds...)
+	case string:
+		m.logger.Info("done")
+		return m, nil
+	default:
+		return m, nil
+	}
+}
+
+func (m *EvalModel) View() string {
+	return render(0, m.state.Target(), m.scope.Scope)
+}
+
+type evalMsg struct {
+	id string
+}
+
+type nextMsg struct {
+	next []string
 }
 
 type errorMsg struct {

@@ -78,6 +78,7 @@ func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resour
 		}
 
 		return ast.ResourceExpr[state.Resource]{
+			Name:       name,
 			Identifier: identifier,
 			Config:     config,
 			Exists:     exists,
@@ -94,7 +95,7 @@ func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resour
 	}
 }
 
-func (c *Converter) ConvertStmt(s state.State, g *ast.Global, stmt external.Stmt) (ast.Stmt, error) {
+func (c *Converter) ConvertStmt(s *state.State, g *ast.Global, stmt external.Stmt) (any, error) {
 	switch stmt := stmt.Value.(type) {
 	case external.DeclareBuild:
 		return c.ConvertBuildStmt(s, g, stmt)
@@ -105,25 +106,30 @@ func (c *Converter) ConvertStmt(s state.State, g *ast.Global, stmt external.Stmt
 	}
 }
 
-func (c *Converter) ConvertResourceStmt(s state.State, g *ast.Global, stmt external.DeclareResource) (ast.StmtResource, error) {
+func (c *Converter) ConvertResourceStmt(s *state.State, g *ast.Global, stmt external.DeclareResource) (ast.StmtResource, error) {
 	resource, err := ConvertResourceExpr(stmt.Name, stmt.Resource)
 	if err != nil {
 		return ast.StmtResource{}, err
 	}
 
+	resourceID := g.ComponentID(stmt.Name)
 	r := ast.StmtResource{
+		ID:       resourceID,
 		Name:     stmt.Name,
 		Resource: resource,
 	}
-	resourceID := g.ComponentID(stmt.Name)
+
+	// g.SetEvaluable(resourceID, r)
 	g.SetResource(resourceID, r)
-	s.Resources[resourceID] = state.Resource{
-		Name: stmt.Name,
+	s.Resources[resourceID] = &state.ResourceState{
+		Resource: state.Resource{
+			Name: stmt.Name,
+		},
 	}
 	return r, nil
 }
 
-func (c *Converter) ConvertBuildStmt(s state.State, g *ast.Global, build external.DeclareBuild) (ast.StmtBuild, error) {
+func (c *Converter) ConvertBuildStmt(s *state.State, g *ast.Global, build external.DeclareBuild) (ast.StmtBuild, error) {
 	blueprint, err := c.BlueprintInterpreter.InterpretBlueprint(build.BlueprintSource, build.Input)
 	if err != nil {
 		return ast.StmtBuild{}, err
@@ -136,7 +142,7 @@ func (c *Converter) ConvertBuildStmt(s state.State, g *ast.Global, build externa
 
 	buildID := g.ComponentID(build.Name)
 
-	var stmts []ast.Stmt
+	var stmts []any
 	subG := g.Sub(build.Name)
 	for _, stmt := range blueprint.Stmts {
 		s, err := c.ConvertStmt(s, subG, stmt)
@@ -148,18 +154,17 @@ func (c *Converter) ConvertBuildStmt(s state.State, g *ast.Global, build externa
 	}
 
 	b := ast.StmtBuild{
-		Name: build.Name,
-		Build: ast.Build{
-			RuntimeInput: runtimeInput,
-			Blueprint: ast.Blueprint{
-				Stmts: stmts,
-			},
-		},
+		ID:           buildID,
+		Name:         build.Name,
+		RuntimeInput: runtimeInput,
+		Stmts:        stmts,
 	}
 
 	g.SetEvaluable(buildID, b)
-	s.Builds[buildID] = state.Build{
-		Name: build.Name,
+	s.Builds[buildID] = &state.BuildState{
+		Build: state.Build{
+			Name: build.Name,
+		},
 	}
 
 	return b, nil

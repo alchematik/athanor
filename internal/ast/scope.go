@@ -35,20 +35,31 @@ func (g *Global) ComponentID(name string) string {
 
 func (g *Global) SetEvaluable(id string, e any) string {
 	g.components[id] = e
+	if g.id == "" {
+		return ""
+	}
 	g.dag.AddEdge(g.id, id)
 	return id
 }
 
 func (g *Global) SetResource(id string, e any) {
 	g.components[id] = e
+	if g.id == "" {
+		return
+	}
 	g.dag.AddEdge(g.id, id)
 	g.Scope.resources.Add(id)
 }
 
-func (g *Global) SetBuild(id string, e any) {
-	g.components[id] = e
-	g.dag.AddEdge(g.id, id)
+func (g *Global) Component(id string) (any, bool) {
+	comp, ok := g.components[id]
+	return comp, ok
 }
+
+// func (g *Global) SetBuild(id string, e any) {
+// 	g.components[id] = e
+// 	g.dag.AddEdge(g.id, id)
+// }
 
 func (g *Global) Sub(name string) *Global {
 	subID := fmt.Sprintf("%s.%s", g.id, name)
@@ -60,6 +71,10 @@ func (g *Global) Sub(name string) *Global {
 		dag:        g.dag,
 		Scope:      subScope,
 	}
+}
+
+func (g *Global) DAG() *dag.Graph {
+	return g.dag
 }
 
 type Scope struct {

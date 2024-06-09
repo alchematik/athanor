@@ -44,6 +44,7 @@ func (m Map[T]) Eval(s *state.State) (T, error) {
 }
 
 type ResourceExpr[T any | state.Resource] struct {
+	Name       string
 	Exists     Expr[bool]
 	Identifier Expr[any]
 	Config     Expr[any]
@@ -68,6 +69,7 @@ func (r ResourceExpr[T]) Eval(s *state.State) (T, error) {
 	}
 
 	resource := state.Resource{
+		Name:       r.Name,
 		Exists:     e,
 		Identifier: id,
 		Config:     c,
@@ -106,23 +108,11 @@ type GetResource struct {
 
 func (g GetResource) Eval(s *state.State) (state.Resource, error) {
 	// TODO: Handle "from".
-	// return scope.GetResource(g.Name)
-	return state.Resource{}, nil
-}
-
-type Build struct {
-	RuntimeInput Expr[map[string]any]
-	Blueprint    Blueprint
-}
-
-func (b Build) Eval(scope *Scope) (Build, error) {
-	return b, nil
+	return state.Resource{
+		Name: g.Name,
+	}, nil
 }
 
 type LocalFile struct {
 	Path string
-}
-
-type Blueprint struct {
-	Stmts []Stmt
 }
