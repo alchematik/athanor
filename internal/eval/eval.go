@@ -50,6 +50,14 @@ func (e *TargetEvaluator) Eval(g *state.Global, stmt any) error {
 		}
 
 		current.ToDone(r)
+		var action state.ComponentAction
+		if r.Exists {
+			action = state.ComponentActionCreate
+		} else {
+			action = state.ComponentActionDelete
+		}
+		current.SetComponentAction(action)
+
 		return nil
 	case ast.StmtBuild:
 		s := g.Target()

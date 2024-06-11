@@ -32,6 +32,21 @@ type State struct {
 	Builds    map[string]*BuildState
 }
 
+type EvalState struct {
+	State string
+	Error error
+}
+
+type ComponentAction string
+
+const (
+	ComponentActionEmpty   = ""
+	ComponentActionCreate  = "create"
+	ComponentActionDelete  = "delete"
+	ComponentActionUpdate  = "update"
+	ComponentActionUnknown = "unknown"
+)
+
 func (s *State) ResourceState(id string) (*ResourceState, bool) {
 	s.Lock()
 	defer s.Unlock()
@@ -51,9 +66,10 @@ func (s *State) BuildState(id string) (*BuildState, bool) {
 type ResourceState struct {
 	sync.Mutex
 
-	Status   string
-	Resource Resource
-	Error    error
+	ComponentAction ComponentAction
+	EvalState       EvalState
+	Resource        Resource
+	Error           error
 }
 
 func (r *ResourceState) GetResource() Resource {
@@ -63,26 +79,40 @@ func (r *ResourceState) GetResource() Resource {
 	return r.Resource
 }
 
-func (r *ResourceState) GetStatus() string {
+func (r *ResourceState) GetEvalState() EvalState {
 	r.Lock()
 	defer r.Unlock()
 
-	return r.Status
+	return r.EvalState
+}
+
+func (r *ResourceState) GetComponentAction() ComponentAction {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.ComponentAction
+}
+
+func (r *ResourceState) SetComponentAction(a ComponentAction) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.ComponentAction = a
 }
 
 func (r *ResourceState) ToError(err error) {
 	r.Lock()
 	defer r.Unlock()
 
-	r.Status = "error"
-	r.Error = err
+	r.EvalState.State = "error"
+	r.EvalState.Error = err
 }
 
 func (r *ResourceState) ToDone(resource Resource) {
 	r.Lock()
 	defer r.Unlock()
 
-	r.Status = "done"
+	r.EvalState.State = "done"
 	r.Resource = resource
 }
 
@@ -90,7 +120,7 @@ func (r *ResourceState) ToEvaluating() {
 	r.Lock()
 	defer r.Unlock()
 
-	r.Status = "evaluating"
+	r.EvalState.State = "evaluating"
 }
 
 type Resource struct {
@@ -109,9 +139,10 @@ type Provider struct {
 type BuildState struct {
 	sync.Mutex
 
-	Status string
-	Build  Build
-	Error  error
+	ComponentAction ComponentAction
+	EvalState       EvalState
+	Build           Build
+	Error           error
 }
 
 func (b *BuildState) GetBuild() Build {
@@ -121,33 +152,47 @@ func (b *BuildState) GetBuild() Build {
 	return b.Build
 }
 
-func (b *BuildState) GetStatus() string {
+func (b *BuildState) GetEvalState() EvalState {
 	b.Lock()
 	defer b.Unlock()
 
-	return b.Status
+	return b.EvalState
+}
+
+func (b *BuildState) GetComponentAction() ComponentAction {
+	b.Lock()
+	defer b.Unlock()
+
+	return b.ComponentAction
+}
+
+func (b *BuildState) SetComponentAction(a ComponentAction) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.ComponentAction = a
 }
 
 func (b *BuildState) ToError(err error) {
 	b.Lock()
 	defer b.Unlock()
 
-	b.Status = "error"
-	b.Error = err
+	b.EvalState.State = "error"
+	b.EvalState.Error = err
 }
 
 func (b *BuildState) ToDone() {
 	b.Lock()
 	defer b.Unlock()
 
-	b.Status = "done"
+	b.EvalState.State = "done"
 }
 
 func (b *BuildState) ToEvaluating() {
 	b.Lock()
 	defer b.Unlock()
 
-	b.Status = "evaluating"
+	b.EvalState.State = "evaluating"
 }
 
 type Build struct {

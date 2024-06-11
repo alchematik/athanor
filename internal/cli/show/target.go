@@ -213,6 +213,8 @@ func (s *Init) Init() tea.Cmd {
 			return errorMsg{error: err}
 		}
 
+		s.logger.Info(">>>>>>>>>>", "res", s.state.Resources[".Build.my-resource"])
+
 		return "done"
 	}
 }
@@ -230,9 +232,10 @@ func render(space int, s *state.State, scope *ast.Scope) string {
 		}
 
 		r := rs.GetResource()
-		status := rs.GetStatus()
+		status := rs.GetEvalState()
+		action := rs.GetComponentAction()
 
-		out += ">>" + status + " " + strings.Repeat(" ", space) + r.Name + "\n"
+		out += ">>" + status.State + " " + string(action) + " " + strings.Repeat(" ", space) + r.Name + "\n"
 	}
 	for _, id := range scope.Builds() {
 		bs, ok := s.BuildState(id)
@@ -241,9 +244,9 @@ func render(space int, s *state.State, scope *ast.Scope) string {
 		}
 
 		b := bs.GetBuild()
-		status := bs.GetStatus()
+		status := bs.GetEvalState()
 
-		out += ">>" + status + " " + strings.Repeat(" ", space) + b.Name + "\n"
+		out += ">>" + status.State + " " + strings.Repeat(" ", space) + b.Name + "\n"
 		sub := scope.Sub(id)
 		out += render(space+2, s, sub)
 	}

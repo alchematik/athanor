@@ -18,40 +18,28 @@ type BlueprintInterpreter interface {
 	InterpretBlueprint(source external.BlueprintSource, input map[string]any) (external.Blueprint, error)
 }
 
-func ConvertBoolExpr[T any | bool](name string, expr external.Expr) (ast.Expr[T], error) {
+func ConvertBoolExpr(name string, expr external.Expr) (ast.Expr[bool], error) {
 	switch value := expr.Value.(type) {
 	case external.BoolLiteral:
-		var val T
-		switch v := any(&value).(type) {
-		case *bool:
-			*v = value.Value
-		case *any:
-			*v = value.Value
-		}
-		return ast.Literal[T]{Value: val}, nil
+		return ast.Literal[bool]{Value: value.Value}, nil
 	default:
 		return nil, fmt.Errorf("invalid bool expr: %T", expr)
 	}
 }
 
-func ConvertMapExpr[T any | map[string]any](name string, expr external.Expr) (ast.Expr[T], error) {
+func ConvertMapExpr(name string, expr external.Expr) (ast.Expr[map[string]any], error) {
 	switch value := expr.Value.(type) {
 	case external.MapCollection:
-		m := ast.Map[T]{
+		m := ast.Map[any]{
 			Value: map[ast.Expr[string]]ast.Expr[any]{},
 		}
 		for k, v := range value.Value {
-			key, err := ConvertStringExpr[string](name, external.Expr{Value: external.StringLiteral{Value: k}})
-			if err != nil {
-				return nil, err
-			}
-
 			val, err := ConvertAnyExpr(name, v)
 			if err != nil {
 				return nil, err
 			}
 
-			m.Value[key] = val
+			m.Value[ast.Literal[string]{Value: k}] = val
 		}
 		return m, nil
 	default:
@@ -72,7 +60,7 @@ func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resour
 			return nil, err
 		}
 
-		exists, err := ConvertBoolExpr[bool](name, value.Exists)
+		exists, err := ConvertBoolExpr(name, value.Exists)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +123,7 @@ func (c *Converter) ConvertBuildStmt(s *state.State, g *ast.Global, build extern
 		return ast.StmtBuild{}, err
 	}
 
-	runtimeInput, err := ConvertMapExpr[map[string]any](build.Name, build.Runtimeinput)
+	runtimeInput, err := ConvertMapExpr(build.Name, build.Runtimeinput)
 	if err != nil {
 		return ast.StmtBuild{}, fmt.Errorf("converting runtime input: %s", err)
 	}
@@ -173,40 +161,42 @@ func (c *Converter) ConvertBuildStmt(s *state.State, g *ast.Global, build extern
 func ConvertAnyExpr(name string, expr external.Expr) (ast.Expr[any], error) {
 	switch expr.Value.(type) {
 	case external.StringLiteral:
-		return ConvertStringExpr[any](name, expr)
-	case external.BoolLiteral:
-		return ConvertBoolExpr[any](name, expr)
-	// case external.MapCollection:
-	// 	return ConvertMapExpr(scope, name, expr)
-	// case external.Resource:
-	// 	return ConvertResourceExpr(scope, name, expr)
-	// case external.LocalFile:
-	// return ConvertFileExpr(expr)
-	case external.MapCollection:
-		return ConvertMapExpr[any](name, expr)
-	case external.Resource:
-		return ast.ResourceExpr[any]{
-			// Exists:
+		expr, err := ConvertStringExpr(name, expr)
+		if err != nil {
+			return nil, err
+		}
 
-		}, nil
+		return ast.Any[string]{Value: expr}, nil
+	case external.BoolLiteral:
+		expr, err := ConvertBoolExpr(name, expr)
+		if err != nil {
+			return nil, err
+		}
+
+		return ast.Any[bool]{Value: expr}, nil
+	case external.MapCollection:
+		expr, err := ConvertMapExpr(name, expr)
+		if err != nil {
+			return nil, err
+		}
+
+		return ast.Any[map[string]any]{Value: expr}, nil
+	case external.Resource:
+		expr, err := ConvertResourceExpr(name, expr)
+		if err != nil {
+			return nil, err
+		}
+
+		return ast.Any[state.Resource]{Value: expr}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", expr.Value)
 	}
 }
 
-func ConvertStringExpr[T any | string](name string, expr external.Expr) (ast.Expr[T], error) {
+func ConvertStringExpr(name string, expr external.Expr) (ast.Expr[string], error) {
 	switch value := expr.Value.(type) {
 	case external.StringLiteral:
-		var val T
-		switch v := any(&val).(type) {
-		case *string:
-			*v = value.Value
-		case *any:
-			*v = value.Value
-		default:
-			return nil, fmt.Errorf("unsupported string type: %T", val)
-		}
-		return ast.Literal[T]{Value: val}, nil
+		return ast.Literal[string]{Value: value.Value}, nil
 	default:
 		return nil, fmt.Errorf("invalid bool expr: %T", expr)
 	}

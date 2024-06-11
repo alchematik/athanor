@@ -4,6 +4,19 @@ import (
 	"github.com/alchematik/athanor/internal/state"
 )
 
+type Any[T any] struct {
+	Value Expr[T]
+}
+
+func (a Any[T]) Eval(s *state.State) (any, error) {
+	out, err := a.Value.Eval(s)
+	if err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 type Literal[T any] struct {
 	Value T
 }
@@ -13,34 +26,26 @@ func (l Literal[T]) Eval(_ *state.State) (T, error) {
 }
 
 type Map[T any] struct {
-	Value map[Expr[string]]Expr[any]
+	Value map[Expr[string]]Expr[T]
 }
 
-func (m Map[T]) Eval(s *state.State) (T, error) {
-	out := map[string]any{}
-	var val T
+func (m Map[T]) Eval(s *state.State) (map[string]T, error) {
+	out := map[string]T{}
 	for k, v := range m.Value {
 		outKey, err := k.Eval(s)
 		if err != nil {
-			return val, err
+			return nil, err
 		}
 
 		outVal, err := v.Eval(s)
 		if err != nil {
-			return val, err
+			return nil, err
 		}
 
 		out[outKey] = outVal
 	}
 
-	switch v := any(&val).(type) {
-	case *any:
-		*v = out
-	case *map[string]any:
-		*v = out
-	}
-
-	return val, nil
+	return out, nil
 }
 
 type ResourceExpr[T any | state.Resource] struct {
