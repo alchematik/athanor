@@ -11,10 +11,10 @@ import (
 	"strings"
 
 	external_ast "github.com/alchematik/athanor/ast"
-	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/convert"
 	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/eval"
+	"github.com/alchematik/athanor/internal/scope"
 	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/bytecodealliance/wasmtime-go/v20"
@@ -118,7 +118,7 @@ type Init struct {
 	logger     *slog.Logger
 	inputPath  string
 	configPath string
-	global     *ast.Global
+	scope      *scope.Scope
 	state      *state.State
 	context    context.Context
 }
@@ -187,7 +187,7 @@ func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, i
 }
 
 func (s *Init) Init() tea.Cmd {
-	s.global = ast.NewGlobal()
+	s.scope = scope.NewScope()
 	s.state = &state.State{
 		Resources: map[string]*state.ResourceState{},
 		Builds:    map[string]*state.BuildState{},
@@ -211,7 +211,7 @@ func (s *Init) Init() tea.Cmd {
 				},
 			},
 		}
-		if _, err := c.ConvertBuildStmt(s.state, s.global, b); err != nil {
+		if _, err := c.ConvertBuildStmt(s.state, s.scope, b); err != nil {
 			return errorMsg{error: err}
 		}
 
@@ -220,12 +220,12 @@ func (s *Init) Init() tea.Cmd {
 }
 
 func (s *Init) View() string {
-	return render(0, s.state, s.global.Scope)
+	return render(0, s.state, s.scope.Build())
 }
 
-func render(space int, s *state.State, scope *ast.Scope) string {
+func render(space int, s *state.State, build *scope.Build) string {
 	var out string
-	for _, id := range scope.Resources() {
+	for _, id := range build.Resources() {
 		rs, ok := s.ResourceState(id)
 		if !ok {
 			panic("resource not in state: " + id)
@@ -237,7 +237,7 @@ func render(space int, s *state.State, scope *ast.Scope) string {
 
 		out += ">>" + status.State + " " + string(action) + " " + strings.Repeat(" ", space) + r.Name + "\n"
 	}
-	for _, id := range scope.Builds() {
+	for _, id := range build.Builds() {
 		bs, ok := s.BuildState(id)
 		if !ok {
 			panic("build not in state: " + id)
@@ -247,7 +247,7 @@ func render(space int, s *state.State, scope *ast.Scope) string {
 		status := bs.GetEvalState()
 
 		out += ">>" + status.State + " " + strings.Repeat(" ", space) + b.Name + "\n"
-		sub := scope.Sub(id)
+		sub := build.Build(id)
 		out += render(space+2, s, sub)
 	}
 
@@ -267,13 +267,13 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		next := &ErrorModel{logger: s.logger, error: msg.error}
 		return next, next.Init()
 	case string:
-		iter := dag.InitIterator(s.global.DAG())
+		iter := s.scope.NewIterator()
 		next := &EvalModel{
 			logger:    s.logger,
 			state:     state.NewGlobal(s.state, nil),
 			iter:      iter,
 			evaluator: eval.NewTargetEvaluator(iter),
-			scope:     s.global,
+			scope:     s.scope,
 			context:   s.context,
 		}
 		next.evaluator.Logger = s.logger
@@ -288,7 +288,7 @@ type EvalModel struct {
 	evaluator *eval.TargetEvaluator
 	state     *state.Global
 	logger    *slog.Logger
-	scope     *ast.Global
+	scope     *scope.Scope
 	iter      *dag.Iterator
 	context   context.Context
 }
@@ -349,7 +349,7 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *EvalModel) View() string {
-	return render(0, m.state.Target(), m.scope.Scope)
+	return render(0, m.state.Target(), m.scope.Build())
 }
 
 type evalMsg struct {

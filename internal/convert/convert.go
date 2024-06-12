@@ -6,6 +6,7 @@ import (
 
 	external "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/ast"
+	"github.com/alchematik/athanor/internal/scope"
 	"github.com/alchematik/athanor/internal/state"
 )
 
@@ -83,32 +84,31 @@ func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resour
 	}
 }
 
-func (c *Converter) ConvertStmt(s *state.State, g *ast.Global, stmt external.Stmt) (any, error) {
+func (c *Converter) ConvertStmt(s *state.State, sc *scope.Scope, stmt external.Stmt) (any, error) {
 	switch stmt := stmt.Value.(type) {
 	case external.DeclareBuild:
-		return c.ConvertBuildStmt(s, g, stmt)
+		return c.ConvertBuildStmt(s, sc, stmt)
 	case external.DeclareResource:
-		return c.ConvertResourceStmt(s, g, stmt)
+		return c.ConvertResourceStmt(s, sc, stmt)
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
 }
 
-func (c *Converter) ConvertResourceStmt(s *state.State, g *ast.Global, stmt external.DeclareResource) (ast.StmtResource, error) {
+func (c *Converter) ConvertResourceStmt(s *state.State, sc *scope.Scope, stmt external.DeclareResource) (ast.StmtResource, error) {
 	resource, err := ConvertResourceExpr(stmt.Name, stmt.Resource)
 	if err != nil {
 		return ast.StmtResource{}, err
 	}
 
-	resourceID := g.ComponentID(stmt.Name)
+	resourceID := sc.ComponentID(stmt.Name)
 	r := ast.StmtResource{
 		ID:       resourceID,
 		Name:     stmt.Name,
 		Resource: resource,
 	}
 
-	// g.SetEvaluable(resourceID, r)
-	g.SetResource(resourceID, r)
+	sc.SetResource(resourceID, r)
 	s.Resources[resourceID] = &state.ResourceState{
 		Resource: state.Resource{
 			Name: stmt.Name,
@@ -117,7 +117,7 @@ func (c *Converter) ConvertResourceStmt(s *state.State, g *ast.Global, stmt exte
 	return r, nil
 }
 
-func (c *Converter) ConvertBuildStmt(s *state.State, g *ast.Global, build external.DeclareBuild) (ast.StmtBuild, error) {
+func (c *Converter) ConvertBuildStmt(s *state.State, sc *scope.Scope, build external.DeclareBuild) (ast.StmtBuild, error) {
 	blueprint, err := c.BlueprintInterpreter.InterpretBlueprint(build.BlueprintSource, build.Input)
 	if err != nil {
 		return ast.StmtBuild{}, err
@@ -128,10 +128,10 @@ func (c *Converter) ConvertBuildStmt(s *state.State, g *ast.Global, build extern
 		return ast.StmtBuild{}, fmt.Errorf("converting runtime input: %s", err)
 	}
 
-	buildID := g.ComponentID(build.Name)
+	buildID := sc.ComponentID(build.Name)
 
 	var stmts []any
-	subG := g.Sub(build.Name)
+	subG := sc.Sub(build.Name)
 	for _, stmt := range blueprint.Stmts {
 		s, err := c.ConvertStmt(s, subG, stmt)
 		if err != nil {
@@ -148,7 +148,7 @@ func (c *Converter) ConvertBuildStmt(s *state.State, g *ast.Global, build extern
 		Stmts:        stmts,
 	}
 
-	g.SetEvaluable(buildID, b)
+	sc.SetBuild(buildID, b)
 	s.Builds[buildID] = &state.BuildState{
 		Build: state.Build{
 			Name: build.Name,
