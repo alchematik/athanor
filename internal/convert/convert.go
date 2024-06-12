@@ -65,7 +65,7 @@ func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resour
 			return nil, err
 		}
 
-		return ast.ResourceExpr[state.Resource]{
+		return ast.ResourceExpr{
 			Name:       name,
 			Identifier: identifier,
 			Config:     config,

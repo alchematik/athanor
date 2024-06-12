@@ -1,6 +1,8 @@
 package ast
 
 import (
+	"context"
+
 	"github.com/alchematik/athanor/internal/state"
 )
 
@@ -24,5 +26,9 @@ type StmtWatcher struct {
 }
 
 type Expr[T any] interface {
-	Eval(*state.State) (T, error)
+	Eval(context.Context, API, *state.State) (T, error)
+}
+
+type API interface {
+	EvalResource(context.Context, *state.Resource) error
 }

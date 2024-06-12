@@ -47,6 +47,7 @@ func TargetAction(ctx context.Context, cmd *cli.Command) error {
 	initState := &Init{
 		inputPath:  inputPath,
 		configPath: configFilePath,
+		context:    ctx,
 	}
 	if logFilePath != "" {
 		f, err := tea.LogToFile(logFilePath, "")
@@ -119,6 +120,7 @@ type Init struct {
 	configPath string
 	global     *ast.Global
 	state      *state.State
+	context    context.Context
 }
 
 type interpreter struct {
@@ -213,8 +215,6 @@ func (s *Init) Init() tea.Cmd {
 			return errorMsg{error: err}
 		}
 
-		s.logger.Info(">>>>>>>>>>", "res", s.state.Resources[".Build.my-resource"])
-
 		return "done"
 	}
 }
@@ -274,6 +274,7 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			iter:      iter,
 			evaluator: eval.NewTargetEvaluator(iter),
 			scope:     s.global,
+			context:   s.context,
 		}
 		next.evaluator.Logger = s.logger
 
@@ -289,6 +290,7 @@ type EvalModel struct {
 	logger    *slog.Logger
 	scope     *ast.Global
 	iter      *dag.Iterator
+	context   context.Context
 }
 
 func (m *EvalModel) Init() tea.Cmd {
@@ -319,7 +321,7 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return errorMsg{error: fmt.Errorf("component not found: %s", msg.id)}
 			}
 
-			err := m.evaluator.Eval(m.state, comp)
+			err := m.evaluator.Eval(m.context, m.state, comp)
 			if err != nil {
 				return errorMsg{error: err}
 			}

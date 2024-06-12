@@ -1,8 +1,8 @@
 package eval
 
 import (
+	"context"
 	"fmt"
-
 	"log/slog"
 
 	"github.com/alchematik/athanor/internal/ast"
@@ -17,13 +17,14 @@ func NewTargetEvaluator(iter *dag.Iterator) *TargetEvaluator {
 type TargetEvaluator struct {
 	iter   *dag.Iterator
 	Logger *slog.Logger
+	api    *TargetAPI
 }
 
 func (e *TargetEvaluator) Next() []string {
 	return e.iter.Next()
 }
 
-func (e *TargetEvaluator) Eval(g *state.Global, stmt any) error {
+func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) error {
 	switch stmt := stmt.(type) {
 	case ast.StmtResource:
 		s := g.Target()
@@ -42,7 +43,7 @@ func (e *TargetEvaluator) Eval(g *state.Global, stmt any) error {
 			return err
 		}
 
-		r, err := stmt.Resource.Eval(s)
+		r, err := stmt.Resource.Eval(ctx, e.api, s)
 		if err != nil {
 			current.ToError(err)
 			// TODO: is there a way to short-curcuit?
@@ -78,4 +79,11 @@ func (e *TargetEvaluator) Eval(g *state.Global, stmt any) error {
 	default:
 		return fmt.Errorf("unsupported component type: %T", stmt)
 	}
+}
+
+type TargetAPI struct {
+}
+
+func (a *TargetAPI) EvalResource(ctx context.Context, res *state.Resource) error {
+	return nil
 }
