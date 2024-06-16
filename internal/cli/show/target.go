@@ -2,22 +2,19 @@ package show
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
-	"os"
-	"path/filepath"
 	"strings"
 
 	external_ast "github.com/alchematik/athanor/ast"
+	"github.com/alchematik/athanor/internal/cli/model"
 	"github.com/alchematik/athanor/internal/convert"
 	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/eval"
+	"github.com/alchematik/athanor/internal/interpreter"
 	"github.com/alchematik/athanor/internal/scope"
 	"github.com/alchematik/athanor/internal/state"
 
-	"github.com/bytecodealliance/wasmtime-go/v20"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/urfave/cli/v3"
 )
@@ -79,41 +76,6 @@ func (m *TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-type Quit struct {
-	logger *slog.Logger
-}
-
-func (s *Quit) Init() tea.Cmd {
-	return func() tea.Msg {
-		return "quit"
-	}
-}
-
-func (s *Quit) View() string {
-	return "quitting..."
-}
-
-func (s *Quit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return s, tea.Quit
-}
-
-type ErrorModel struct {
-	logger *slog.Logger
-	error  error
-}
-
-func (e *ErrorModel) Init() tea.Cmd {
-	return tea.Printf("error: %s", e.error)
-}
-
-func (e *ErrorModel) View() string {
-	return e.error.Error()
-}
-
-func (e *ErrorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	return e, tea.Quit
-}
-
 type Init struct {
 	logger     *slog.Logger
 	inputPath  string
@@ -121,69 +83,6 @@ type Init struct {
 	scope      *scope.Scope
 	state      *state.State
 	context    context.Context
-}
-
-type interpreter struct {
-	logger *slog.Logger
-}
-
-func (it *interpreter) InterpretBlueprint(source external_ast.BlueprintSource, input map[string]any) (external_ast.Blueprint, error) {
-	engine := wasmtime.NewEngine()
-	module, err := wasmtime.NewModuleFromFile(engine, source.LocalFile.Path)
-	if err != nil {
-		return external_ast.Blueprint{}, err
-	}
-
-	linker := wasmtime.NewLinker(engine)
-	if err := linker.DefineWasi(); err != nil {
-		return external_ast.Blueprint{}, err
-	}
-
-	wasiConfig := wasmtime.NewWasiConfig()
-
-	dir, err := os.MkdirTemp("", "")
-	if err != nil {
-		return external_ast.Blueprint{}, err
-	}
-	defer os.RemoveAll(dir)
-
-	if err := wasiConfig.PreopenDir(dir, "/"); err != nil {
-		return external_ast.Blueprint{}, err
-	}
-
-	store := wasmtime.NewStore(engine)
-	store.SetWasi(wasiConfig)
-
-	instance, err := linker.Instantiate(store, module)
-	if err != nil {
-		return external_ast.Blueprint{}, err
-	}
-
-	nom := instance.GetFunc(store, "_start")
-	_, err = nom.Call(store)
-	if err != nil {
-		var wasmtimeError *wasmtime.Error
-		if errors.As(err, &wasmtimeError) {
-			st, ok := wasmtimeError.ExitStatus()
-			if ok && st != 0 {
-				return external_ast.Blueprint{}, fmt.Errorf("non-0 exit status: %d", st)
-			}
-		} else {
-			return external_ast.Blueprint{}, err
-		}
-	}
-
-	data, err := os.ReadFile(filepath.Join(dir, "blueprint.json"))
-	if err != nil {
-		return external_ast.Blueprint{}, err
-	}
-
-	var bp external_ast.Blueprint
-	if err := json.Unmarshal(data, &bp); err != nil {
-		return external_ast.Blueprint{}, err
-	}
-
-	return bp, nil
 }
 
 func (s *Init) Init() tea.Cmd {
@@ -196,7 +95,7 @@ func (s *Init) Init() tea.Cmd {
 	return func() tea.Msg {
 		c := convert.Converter{
 			Logger:               s.logger,
-			BlueprintInterpreter: &interpreter{logger: s.logger},
+			BlueprintInterpreter: &interpreter.Interpreter{Logger: s.logger},
 		}
 		b := external_ast.DeclareBuild{
 			Name: "Build",
@@ -218,7 +117,7 @@ func (s *Init) Init() tea.Cmd {
 			},
 		}
 		if _, err := c.ConvertBuildStmt(s.state, s.scope, b); err != nil {
-			return errorMsg{error: err}
+			return model.ErrorMsg{Error: err}
 		}
 
 		return "done"
@@ -269,13 +168,13 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
-			next := &Quit{logger: s.logger}
+			next := &model.Quit{Logger: s.logger}
 			return next, next.Init()
 		}
 
 		return s, nil
-	case errorMsg:
-		next := &ErrorModel{logger: s.logger, error: msg.error}
+	case model.ErrorMsg:
+		next := &model.ErrorModel{Logger: s.logger, Error: msg.Error}
 		return next, next.Init()
 	case string:
 		iter := s.scope.NewIterator()
@@ -317,24 +216,24 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
-			next := &Quit{logger: m.logger}
+			next := &model.Quit{Logger: m.logger}
 			return next, next.Init()
 		}
 
 		return m, nil
-	case errorMsg:
-		next := &ErrorModel{logger: m.logger, error: msg.error}
+	case model.ErrorMsg:
+		next := &model.ErrorModel{Logger: m.logger, Error: msg.Error}
 		return next, next.Init()
 	case evalMsg:
 		return m, func() tea.Msg {
 			comp, ok := m.scope.Component(msg.id)
 			if !ok {
-				return errorMsg{error: fmt.Errorf("component not found: %s", msg.id)}
+				return model.ErrorMsg{Error: fmt.Errorf("component not found: %s", msg.id)}
 			}
 
 			err := m.evaluator.Eval(m.context, m.state, comp)
 			if err != nil {
-				return errorMsg{error: err}
+				return model.ErrorMsg{Error: err}
 			}
 
 			next := m.evaluator.Next()
@@ -369,8 +268,4 @@ type evalMsg struct {
 
 type nextMsg struct {
 	next []string
-}
-
-type errorMsg struct {
-	error error
 }
