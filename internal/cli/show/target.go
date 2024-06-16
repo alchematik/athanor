@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 
 	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/cli/model"
@@ -17,6 +16,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/urfave/cli/v3"
+	"github.com/xlab/treeprint"
 )
 
 func NewShowTargetCommand() *cli.Command {
@@ -125,43 +125,41 @@ func (s *Init) Init() tea.Cmd {
 }
 
 func (s *Init) View() string {
-	return render(0, s.state, s.scope.Build())
+	return "initializing..."
 }
 
-func render(space int, s *state.State, build *scope.Build) string {
-	var out string
+func addNodes(t treeprint.Tree, s *state.State, build *scope.Build) {
 	for _, id := range build.Resources() {
 		rs, ok := s.ResourceState(id)
 		if !ok {
 			panic("resource not in state: " + id)
 		}
 
-		status := rs.GetEvalState()
+		// status := rs.GetEvalState()
 		exists := rs.GetExists()
 		if !exists.Unknown && !exists.Value {
 			continue
 		}
 
-		out += ">>" + status.State + " " + strings.Repeat(" ", space) + rs.Name + "\n"
+		t.AddNode(rs.Name)
 	}
+
 	for _, id := range build.Builds() {
 		bs, ok := s.BuildState(id)
 		if !ok {
 			panic("build not in state: " + id)
 		}
 
-		status := bs.GetEvalState()
+		// status := bs.GetEvalState()
 		exists := bs.GetExists()
 		if !exists.Unknown && !exists.Value {
 			continue
 		}
 
-		out += ">>" + status.State + " " + strings.Repeat(" ", space) + bs.Name + "\n"
-		sub := build.Build(id)
-		out += render(space+2, s, sub)
-	}
+		branch := t.AddBranch(bs.Name)
 
-	return out
+		addNodes(branch, s, build.Build(id))
+	}
 }
 
 func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -259,7 +257,12 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *EvalModel) View() string {
-	return render(0, m.state.Target(), m.scope.Build())
+	tree := treeprint.New()
+	build := m.scope.Build().Build(".Build")
+	tree.SetValue("Build")
+	addNodes(tree, m.state.Target(), build)
+
+	return tree.String()
 }
 
 type evalMsg struct {

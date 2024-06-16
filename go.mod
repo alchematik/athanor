@@ -7,6 +7,7 @@ require (
 	github.com/charmbracelet/bubbletea v0.26.1
 	github.com/stretchr/testify v1.9.0
 	github.com/urfave/cli/v3 v3.0.0-alpha9
+	github.com/xlab/treeprint v1.2.0
 )
 
 require (
