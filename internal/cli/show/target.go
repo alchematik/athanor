@@ -200,6 +200,12 @@ func (s *Init) Init() tea.Cmd {
 		}
 		b := external_ast.DeclareBuild{
 			Name: "Build",
+			Exists: external_ast.Expr{
+				Type: "bool",
+				Value: external_ast.BoolLiteral{
+					Value: true,
+				},
+			},
 			Runtimeinput: external_ast.Expr{
 				Value: external_ast.MapCollection{
 					Value: map[string]external_ast.Expr{},
@@ -233,9 +239,11 @@ func render(space int, s *state.State, build *scope.Build) string {
 
 		r := rs.GetResource()
 		status := rs.GetEvalState()
-		action := rs.GetComponentAction()
+		if !rs.GetExists() {
+			continue
+		}
 
-		out += ">>" + status.State + " " + string(action) + " " + strings.Repeat(" ", space) + r.Name + "\n"
+		out += ">>" + status.State + " " + strings.Repeat(" ", space) + r.Name + "\n"
 	}
 	for _, id := range build.Builds() {
 		bs, ok := s.BuildState(id)
@@ -245,6 +253,9 @@ func render(space int, s *state.State, build *scope.Build) string {
 
 		b := bs.GetBuild()
 		status := bs.GetEvalState()
+		if !bs.GetExists() {
+			continue
+		}
 
 		out += ">>" + status.State + " " + strings.Repeat(" ", space) + b.Name + "\n"
 		sub := build.Build(id)

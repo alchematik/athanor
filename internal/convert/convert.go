@@ -1,6 +1,7 @@
 package convert
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -61,16 +62,10 @@ func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resour
 			return nil, err
 		}
 
-		exists, err := ConvertBoolExpr(name, value.Exists)
-		if err != nil {
-			return nil, err
-		}
-
 		return ast.ResourceExpr{
 			Name:       name,
 			Identifier: identifier,
 			Config:     config,
-			Exists:     exists,
 		}, nil
 	case external.GetResource:
 		from, err := ConvertAnyExpr(name, value.From)
@@ -96,7 +91,21 @@ func (c *Converter) ConvertStmt(s *state.State, sc *scope.Scope, stmt external.S
 }
 
 func (c *Converter) ConvertResourceStmt(s *state.State, sc *scope.Scope, stmt external.DeclareResource) (ast.StmtResource, error) {
+	if stmt.Resource.IsEmpty() {
+		// TODO: Add validation error type.
+		return ast.StmtResource{}, errors.New("must provide resource")
+	}
+
+	if stmt.Exists.IsEmpty() {
+		return ast.StmtResource{}, errors.New("must provide exists")
+	}
+
 	resource, err := ConvertResourceExpr(stmt.Name, stmt.Resource)
+	if err != nil {
+		return ast.StmtResource{}, err
+	}
+
+	exists, err := ConvertBoolExpr(stmt.Name, stmt.Exists)
 	if err != nil {
 		return ast.StmtResource{}, err
 	}
@@ -105,6 +114,8 @@ func (c *Converter) ConvertResourceStmt(s *state.State, sc *scope.Scope, stmt ex
 	r := ast.StmtResource{
 		ID:       resourceID,
 		Name:     stmt.Name,
+		Exists:   exists,
+		BuildID:  sc.ID(),
 		Resource: resource,
 	}
 
@@ -118,6 +129,11 @@ func (c *Converter) ConvertResourceStmt(s *state.State, sc *scope.Scope, stmt ex
 }
 
 func (c *Converter) ConvertBuildStmt(s *state.State, sc *scope.Scope, build external.DeclareBuild) (ast.StmtBuild, error) {
+	// TODO: better validation function.
+	if build.Exists.IsEmpty() {
+		return ast.StmtBuild{}, errors.New("must provide exists")
+	}
+
 	blueprint, err := c.BlueprintInterpreter.InterpretBlueprint(build.BlueprintSource, build.Input)
 	if err != nil {
 		return ast.StmtBuild{}, err
@@ -126,6 +142,11 @@ func (c *Converter) ConvertBuildStmt(s *state.State, sc *scope.Scope, build exte
 	runtimeInput, err := ConvertMapExpr(build.Name, build.Runtimeinput)
 	if err != nil {
 		return ast.StmtBuild{}, fmt.Errorf("converting runtime input: %s", err)
+	}
+
+	exists, err := ConvertBoolExpr(build.Name, build.Exists)
+	if err != nil {
+		return ast.StmtBuild{}, err
 	}
 
 	buildID := sc.ComponentID(build.Name)
@@ -144,6 +165,8 @@ func (c *Converter) ConvertBuildStmt(s *state.State, sc *scope.Scope, build exte
 	b := ast.StmtBuild{
 		ID:           buildID,
 		Name:         build.Name,
+		Exists:       exists,
+		BuildID:      sc.ID(),
 		RuntimeInput: runtimeInput,
 		Stmts:        stmts,
 	}
@@ -198,6 +221,6 @@ func ConvertStringExpr(name string, expr external.Expr) (ast.Expr[string], error
 	case external.StringLiteral:
 		return ast.Literal[string]{Value: value.Value}, nil
 	default:
-		return nil, fmt.Errorf("invalid bool expr: %T", expr)
+		return nil, fmt.Errorf("invalid string expr: %T", expr)
 	}
 }

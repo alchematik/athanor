@@ -9,6 +9,8 @@ import (
 type StmtBuild struct {
 	ID           string
 	Name         string
+	BuildID      string
+	Exists       Expr[bool]
 	RuntimeInput Expr[map[string]any]
 	Stmts        []any
 }
@@ -16,6 +18,8 @@ type StmtBuild struct {
 type StmtResource struct {
 	ID       string
 	Name     string
+	BuildID  string
+	Exists   Expr[bool]
 	Resource Expr[state.Resource]
 }
 

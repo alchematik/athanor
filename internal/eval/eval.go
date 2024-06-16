@@ -50,14 +50,18 @@ func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) e
 			return nil
 		}
 
-		current.ToDone(r)
-		var action state.ComponentAction
-		if r.Exists {
-			action = state.ComponentActionCreate
-		} else {
-			action = state.ComponentActionDelete
+		exists, err := stmt.Exists.Eval(ctx, e.api, s)
+		if err != nil {
+			current.ToError(err)
+			return nil
 		}
-		current.SetComponentAction(action)
+
+		parent, ok := s.BuildState(stmt.BuildID)
+		if ok && !parent.GetExists() {
+			exists = false
+		}
+
+		current.ToDone(r, exists)
 
 		return nil
 	case ast.StmtBuild:
@@ -73,6 +77,19 @@ func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) e
 			current.ToDone()
 			return e.iter.Done(stmt.ID)
 		}
+
+		exists, err := stmt.Exists.Eval(ctx, e.api, s)
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+
+		parent, ok := s.BuildState(stmt.BuildID)
+		if ok && !parent.GetExists() {
+			exists = false
+		}
+
+		current.SetExists(exists)
 
 		current.ToEvaluating()
 		return e.iter.Start(stmt.ID)

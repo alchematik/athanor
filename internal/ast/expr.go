@@ -52,17 +52,11 @@ func (m Map[T]) Eval(ctx context.Context, api API, s *state.State) (map[string]T
 
 type ResourceExpr struct {
 	Name       string
-	Exists     Expr[bool]
 	Identifier Expr[any]
 	Config     Expr[any]
 }
 
 func (r ResourceExpr) Eval(ctx context.Context, api API, s *state.State) (state.Resource, error) {
-	e, err := r.Exists.Eval(ctx, api, s)
-	if err != nil {
-		return state.Resource{}, err
-	}
-
 	id, err := r.Identifier.Eval(ctx, api, s)
 	if err != nil {
 		return state.Resource{}, err
@@ -75,7 +69,6 @@ func (r ResourceExpr) Eval(ctx context.Context, api API, s *state.State) (state.
 
 	res := state.Resource{
 		Name:       r.Name,
-		Exists:     e,
 		Identifier: id,
 		Config:     c,
 	}

@@ -67,10 +67,6 @@ func TestStmt_Unmarshal(t *testing.T) {
 					Resource: ast.Expr{
 						Type: "resource",
 						Value: ast.Resource{
-							Exists: ast.Expr{
-								Type:  "bool",
-								Value: ast.BoolLiteral{Value: true},
-							},
 							Identifier: ast.Expr{
 								Type: "map",
 								Value: ast.MapCollection{

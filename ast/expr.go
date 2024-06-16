@@ -11,6 +11,10 @@ type Expr struct {
 	Value any
 }
 
+func (e Expr) IsEmpty() bool {
+	return e.Type == "" && e.Value == nil
+}
+
 func (e *Expr) UnmarshalJSON(data []byte) error {
 	var inner struct {
 		Type  string          `json:"type"`
@@ -105,7 +109,6 @@ type MapCollection struct {
 
 type Resource struct {
 	// Provider   Expr `json:"provider"`
-	Exists     Expr `json:"exists"`
 	Identifier Expr `json:"identifier"`
 	Config     Expr `json:"config"`
 }

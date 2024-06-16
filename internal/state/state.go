@@ -66,10 +66,17 @@ func (s *State) BuildState(id string) (*BuildState, bool) {
 type ResourceState struct {
 	sync.Mutex
 
-	ComponentAction ComponentAction
-	EvalState       EvalState
-	Resource        Resource
-	Error           error
+	Exists    bool
+	EvalState EvalState
+	Resource  Resource
+	Error     error
+}
+
+func (r *ResourceState) GetExists() bool {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.Exists
 }
 
 func (r *ResourceState) GetResource() Resource {
@@ -86,20 +93,6 @@ func (r *ResourceState) GetEvalState() EvalState {
 	return r.EvalState
 }
 
-func (r *ResourceState) GetComponentAction() ComponentAction {
-	r.Lock()
-	defer r.Unlock()
-
-	return r.ComponentAction
-}
-
-func (r *ResourceState) SetComponentAction(a ComponentAction) {
-	r.Lock()
-	defer r.Unlock()
-
-	r.ComponentAction = a
-}
-
 func (r *ResourceState) ToError(err error) {
 	r.Lock()
 	defer r.Unlock()
@@ -108,12 +101,13 @@ func (r *ResourceState) ToError(err error) {
 	r.EvalState.Error = err
 }
 
-func (r *ResourceState) ToDone(resource Resource) {
+func (r *ResourceState) ToDone(resource Resource, exists bool) {
 	r.Lock()
 	defer r.Unlock()
 
 	r.EvalState.State = "done"
 	r.Resource = resource
+	r.Exists = exists
 }
 
 func (r *ResourceState) ToEvaluating() {
@@ -126,7 +120,6 @@ func (r *ResourceState) ToEvaluating() {
 type Resource struct {
 	Name       string
 	Provider   Provider
-	Exists     bool
 	Identifier any
 	Config     any
 }
@@ -139,10 +132,10 @@ type Provider struct {
 type BuildState struct {
 	sync.Mutex
 
-	ComponentAction ComponentAction
-	EvalState       EvalState
-	Build           Build
-	Error           error
+	Exists    bool
+	EvalState EvalState
+	Build     Build
+	Error     error
 }
 
 func (b *BuildState) GetBuild() Build {
@@ -159,18 +152,18 @@ func (b *BuildState) GetEvalState() EvalState {
 	return b.EvalState
 }
 
-func (b *BuildState) GetComponentAction() ComponentAction {
+func (b *BuildState) GetExists() bool {
 	b.Lock()
 	defer b.Unlock()
 
-	return b.ComponentAction
+	return b.Exists
 }
 
-func (b *BuildState) SetComponentAction(a ComponentAction) {
+func (b *BuildState) SetExists(exists bool) {
 	b.Lock()
 	defer b.Unlock()
 
-	b.ComponentAction = a
+	b.Exists = exists
 }
 
 func (b *BuildState) ToError(err error) {

@@ -20,15 +20,15 @@ func main() {
 				Type: "resource",
 				Value: ast.DeclareResource{
 					Name: "my-resource",
+					Exists: ast.Expr{
+						Type: "bool",
+						Value: ast.BoolLiteral{
+							Value: true,
+						},
+					},
 					Resource: ast.Expr{
 						Type: "resource",
 						Value: ast.Resource{
-							Exists: ast.Expr{
-								Type: "bool",
-								Value: ast.BoolLiteral{
-									Value: true,
-								},
-							},
 							Identifier: ast.Expr{
 								Type: "map",
 								Value: ast.MapCollection{

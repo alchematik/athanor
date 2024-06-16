@@ -53,11 +53,13 @@ func (s *Stmt) UnmarshalJSON(data []byte) error {
 
 type DeclareResource struct {
 	Name     string `json:"name"`
+	Exists   Expr   `json:"exists"`
 	Resource Expr   `json:"resource"`
 }
 
 type DeclareBuild struct {
 	Name            string          `json:"name"`
+	Exists          Expr            `json:"exists"`
 	Input           map[string]any  `json:"input"`
 	Runtimeinput    Expr            `json:"runtime_input"`
 	BlueprintSource BlueprintSource `json:"source"`

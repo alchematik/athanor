@@ -29,6 +29,10 @@ type Scope struct {
 	build      *Build
 }
 
+func (g *Scope) ID() string {
+	return g.id
+}
+
 func (g *Scope) ComponentID(name string) string {
 	return fmt.Sprintf("%s.%s", g.id, name)
 }
