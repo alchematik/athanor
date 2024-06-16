@@ -17,32 +17,9 @@ func main() {
 	bp := ast.Blueprint{
 		Stmts: []ast.Stmt{
 			{
-				Type: "build",
-				Value: ast.DeclareBuild{
-					Name: "sub-build",
-					Exists: ast.Expr{
-						Type: "bool",
-						Value: ast.BoolLiteral{
-							Value: true,
-						},
-					},
-					Runtimeinput: ast.Expr{
-						Type: "map",
-						Value: ast.MapCollection{
-							Value: map[string]ast.Expr{},
-						},
-					},
-					BlueprintSource: ast.BlueprintSource{
-						LocalFile: ast.BlueprintSourceLocalFile{
-							Path: "./example/gcp/sub/main.wasm",
-						},
-					},
-				},
-			},
-			{
 				Type: "resource",
 				Value: ast.DeclareResource{
-					Name: "my-resource",
+					Name: "my-sub-resource",
 					Exists: ast.Expr{
 						Type: "bool",
 						Value: ast.BoolLiteral{
