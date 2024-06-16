@@ -11,7 +11,7 @@ type StmtBuild struct {
 	Name         string
 	BuildID      string
 	Exists       Expr[bool]
-	RuntimeInput Expr[map[string]any]
+	RuntimeInput Expr[map[state.Maybe[string]]state.Maybe[any]]
 	Stmts        []any
 }
 
@@ -30,7 +30,7 @@ type StmtWatcher struct {
 }
 
 type Expr[T any] interface {
-	Eval(context.Context, API, *state.State) (T, error)
+	Eval(context.Context, API, *state.State) (state.Maybe[T], error)
 }
 
 type API interface {

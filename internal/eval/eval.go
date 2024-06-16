@@ -57,8 +57,12 @@ func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) e
 		}
 
 		parent, ok := s.BuildState(stmt.BuildID)
-		if ok && !parent.GetExists() {
-			exists = false
+		if ok {
+			// Parent exists value is known, and it's set to false. Child resource exists should be false also.
+			parentExists := parent.GetExists()
+			if !exists.Unknown && !parentExists.Unknown && !parentExists.Value {
+				exists.Value = false
+			}
 		}
 
 		current.ToDone(r, exists)
@@ -85,8 +89,12 @@ func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) e
 		}
 
 		parent, ok := s.BuildState(stmt.BuildID)
-		if ok && !parent.GetExists() {
-			exists = false
+		if ok {
+			// Parent exists value is known, and it's set to false. Child resource exists should be false also.
+			parentExists := parent.GetExists()
+			if !exists.Unknown && !parentExists.Unknown && !parentExists.Value {
+				exists.Value = false
+			}
 		}
 
 		current.SetExists(exists)
@@ -102,5 +110,6 @@ type TargetAPI struct {
 }
 
 func (a *TargetAPI) EvalResource(ctx context.Context, res *state.Resource) error {
+	res.Attributes = state.Maybe[any]{Unknown: true}
 	return nil
 }

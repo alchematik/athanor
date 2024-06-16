@@ -66,20 +66,21 @@ func (s *State) BuildState(id string) (*BuildState, bool) {
 type ResourceState struct {
 	sync.Mutex
 
-	Exists    bool
+	Name      string
+	Exists    Maybe[bool]
+	Resource  Maybe[Resource]
 	EvalState EvalState
-	Resource  Resource
 	Error     error
 }
 
-func (r *ResourceState) GetExists() bool {
+func (r *ResourceState) GetExists() Maybe[bool] {
 	r.Lock()
 	defer r.Unlock()
 
 	return r.Exists
 }
 
-func (r *ResourceState) GetResource() Resource {
+func (r *ResourceState) GetResource() Maybe[Resource] {
 	r.Lock()
 	defer r.Unlock()
 
@@ -101,7 +102,7 @@ func (r *ResourceState) ToError(err error) {
 	r.EvalState.Error = err
 }
 
-func (r *ResourceState) ToDone(resource Resource, exists bool) {
+func (r *ResourceState) ToDone(resource Maybe[Resource], exists Maybe[bool]) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -118,10 +119,10 @@ func (r *ResourceState) ToEvaluating() {
 }
 
 type Resource struct {
-	Name       string
-	Provider   Provider
-	Identifier any
-	Config     any
+	Provider   Maybe[Provider]
+	Identifier Maybe[any]
+	Config     Maybe[any]
+	Attributes Maybe[any]
 }
 
 type Provider struct {
@@ -132,7 +133,8 @@ type Provider struct {
 type BuildState struct {
 	sync.Mutex
 
-	Exists    bool
+	Name      string
+	Exists    Maybe[bool]
 	EvalState EvalState
 	Build     Build
 	Error     error
@@ -152,14 +154,14 @@ func (b *BuildState) GetEvalState() EvalState {
 	return b.EvalState
 }
 
-func (b *BuildState) GetExists() bool {
+func (b *BuildState) GetExists() Maybe[bool] {
 	b.Lock()
 	defer b.Unlock()
 
 	return b.Exists
 }
 
-func (b *BuildState) SetExists(exists bool) {
+func (b *BuildState) SetExists(exists Maybe[bool]) {
 	b.Lock()
 	defer b.Unlock()
 
@@ -189,5 +191,9 @@ func (b *BuildState) ToEvaluating() {
 }
 
 type Build struct {
-	Name string
+}
+
+type Maybe[T any] struct {
+	Value   T
+	Unknown bool
 }

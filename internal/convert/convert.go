@@ -29,7 +29,7 @@ func ConvertBoolExpr(name string, expr external.Expr) (ast.Expr[bool], error) {
 	}
 }
 
-func ConvertMapExpr(name string, expr external.Expr) (ast.Expr[map[string]any], error) {
+func ConvertMapExpr(name string, expr external.Expr) (ast.Expr[map[state.Maybe[string]]state.Maybe[any]], error) {
 	switch value := expr.Value.(type) {
 	case external.MapCollection:
 		m := ast.Map[any]{
@@ -121,9 +121,7 @@ func (c *Converter) ConvertResourceStmt(s *state.State, sc *scope.Scope, stmt ex
 
 	sc.SetResource(resourceID, r)
 	s.Resources[resourceID] = &state.ResourceState{
-		Resource: state.Resource{
-			Name: stmt.Name,
-		},
+		Name: stmt.Name,
 	}
 	return r, nil
 }
@@ -173,9 +171,7 @@ func (c *Converter) ConvertBuildStmt(s *state.State, sc *scope.Scope, build exte
 
 	sc.SetBuild(buildID, b)
 	s.Builds[buildID] = &state.BuildState{
-		Build: state.Build{
-			Name: build.Name,
-		},
+		Name: build.Name,
 	}
 
 	return b, nil
@@ -203,7 +199,7 @@ func ConvertAnyExpr(name string, expr external.Expr) (ast.Expr[any], error) {
 			return nil, err
 		}
 
-		return ast.Any[map[string]any]{Value: expr}, nil
+		return ast.Any[map[state.Maybe[string]]state.Maybe[any]]{Value: expr}, nil
 	case external.Resource:
 		expr, err := ConvertResourceExpr(name, expr)
 		if err != nil {

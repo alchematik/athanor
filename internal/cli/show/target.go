@@ -237,13 +237,13 @@ func render(space int, s *state.State, build *scope.Build) string {
 			panic("resource not in state: " + id)
 		}
 
-		r := rs.GetResource()
 		status := rs.GetEvalState()
-		if !rs.GetExists() {
+		exists := rs.GetExists()
+		if !exists.Unknown && !exists.Value {
 			continue
 		}
 
-		out += ">>" + status.State + " " + strings.Repeat(" ", space) + r.Name + "\n"
+		out += ">>" + status.State + " " + strings.Repeat(" ", space) + rs.Name + "\n"
 	}
 	for _, id := range build.Builds() {
 		bs, ok := s.BuildState(id)
@@ -251,13 +251,13 @@ func render(space int, s *state.State, build *scope.Build) string {
 			panic("build not in state: " + id)
 		}
 
-		b := bs.GetBuild()
 		status := bs.GetEvalState()
-		if !bs.GetExists() {
+		exists := bs.GetExists()
+		if !exists.Unknown && !exists.Value {
 			continue
 		}
 
-		out += ">>" + status.State + " " + strings.Repeat(" ", space) + b.Name + "\n"
+		out += ">>" + status.State + " " + strings.Repeat(" ", space) + bs.Name + "\n"
 		sub := build.Build(id)
 		out += render(space+2, s, sub)
 	}
