@@ -16,6 +16,7 @@ import (
 	"github.com/alchematik/athanor/internal/scope"
 	"github.com/alchematik/athanor/internal/state"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/urfave/cli/v3"
 	"github.com/xlab/treeprint"
@@ -43,25 +44,31 @@ func TargetAction(ctx context.Context, cmd *cli.Command) error {
 	logFilePath := cmd.String("log-file")
 	configFilePath := cmd.String("config")
 
-	initState := &Init{
-		inputPath:  inputPath,
-		configPath: configFilePath,
-		context:    ctx,
-	}
+	var logger *slog.Logger
 	if logFilePath != "" {
 		f, err := tea.LogToFile(logFilePath, "")
 		if err != nil {
 			return err
 		}
 
-		initState.logger = slog.New(slog.NewTextHandler(f, nil))
+		logger = slog.New(slog.NewTextHandler(f, nil))
 	}
-	_, err := tea.NewProgram(&TargetModel{current: initState}).Run()
+
+	initState := &Init{
+		inputPath:  inputPath,
+		configPath: configFilePath,
+		context:    ctx,
+		spinner:    spinner.New(),
+		logger:     logger,
+	}
+	m := &TargetModel{current: initState, logger: logger}
+	_, err := tea.NewProgram(m).Run()
 	return err
 }
 
 type TargetModel struct {
 	current tea.Model
+	logger  *slog.Logger
 }
 
 func (m *TargetModel) Init() tea.Cmd {
@@ -85,6 +92,7 @@ type Init struct {
 	scope      *scope.Scope
 	state      *state.State
 	context    context.Context
+	spinner    spinner.Model
 }
 
 func (s *Init) Init() tea.Cmd {
@@ -94,7 +102,7 @@ func (s *Init) Init() tea.Cmd {
 		Builds:    map[string]*state.BuildState{},
 	}
 
-	return func() tea.Msg {
+	return tea.Batch(func() tea.Msg {
 		c := convert.Converter{
 			Logger:               s.logger,
 			BlueprintInterpreter: &interpreter.Interpreter{Logger: s.logger},
@@ -123,44 +131,47 @@ func (s *Init) Init() tea.Cmd {
 		}
 
 		return "done"
-	}
+	}, s.spinner.Tick)
 }
 
 func (s *Init) View() string {
-	return "initializing..."
+	return s.spinner.View() + " initializing..."
 }
 
-func addNodes(t treeprint.Tree, s *state.State, build *scope.Build) {
-	for _, id := range build.Resources() {
+func (m *EvalModel) addNodes(t treeprint.Tree, s *state.State, build *scope.Build) {
+	resources := build.Resources()
+	sort.Strings(resources)
+	for _, id := range resources {
 		rs, ok := s.ResourceState(id)
 		if !ok {
 			panic("resource not in state: " + id)
 		}
 
-		// status := rs.GetEvalState()
 		exists := rs.GetExists()
 		if !exists.Unknown && !exists.Value {
+			t.AddNode(m.renderEvalState(rs.GetEvalState()) + rs.Name)
 			continue
 		}
 
-		t.AddNode(renderResource(rs.Name, rs.GetResource()))
+		t.AddNode(m.renderResource(rs.GetEvalState(), rs.Name, rs.GetResource()))
 	}
 
-	for _, id := range build.Builds() {
+	builds := build.Builds()
+	sort.Strings(builds)
+	for _, id := range builds {
 		bs, ok := s.BuildState(id)
 		if !ok {
 			panic("build not in state: " + id)
 		}
 
-		// status := bs.GetEvalState()
 		exists := bs.GetExists()
 		if !exists.Unknown && !exists.Value {
 			continue
 		}
 
-		branch := t.AddBranch(bs.Name)
+		branch := t.AddBranch(m.renderEvalState(bs.GetEvalState()) + bs.Name)
 
-		addNodes(branch, s, build.Build(id))
+		m.addNodes(branch, s, build.Build(id))
 	}
 }
 
@@ -185,10 +196,15 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			evaluator: eval.NewTargetEvaluator(iter),
 			scope:     s.scope,
 			context:   s.context,
+			spinner:   s.spinner,
 		}
 		next.evaluator.Logger = s.logger
 
 		return next, next.Init()
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		s.spinner, cmd = s.spinner.Update(msg)
+		return s, cmd
 	default:
 		return s, nil
 	}
@@ -201,6 +217,7 @@ type EvalModel struct {
 	scope     *scope.Scope
 	iter      *dag.Iterator
 	context   context.Context
+	spinner   spinner.Model
 }
 
 func (m *EvalModel) Init() tea.Cmd {
@@ -209,6 +226,7 @@ func (m *EvalModel) Init() tea.Cmd {
 	for i, id := range ids {
 		cmds[i] = func() tea.Msg { return evalMsg{id: id} }
 	}
+	cmds = append(cmds, m.spinner.Tick)
 	return tea.Batch(cmds...)
 }
 
@@ -253,6 +271,10 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case string:
 		m.logger.Info("done")
 		return m, nil
+	case spinner.TickMsg:
+		var cmd tea.Cmd
+		m.spinner, cmd = m.spinner.Update(msg)
+		return m, cmd
 	default:
 		return m, nil
 	}
@@ -261,8 +283,10 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *EvalModel) View() string {
 	tree := treeprint.New()
 	build := m.scope.Build().Build(".Build")
-	tree.SetValue("Build")
-	addNodes(tree, m.state.Target(), build)
+	target := m.state.Target()
+	s, _ := target.BuildState(".Build")
+	tree.SetValue(m.renderEvalState(s.GetEvalState()) + "Build")
+	m.addNodes(tree, m.state.Target(), build)
 
 	return tree.String()
 }
@@ -275,13 +299,13 @@ type nextMsg struct {
 	next []string
 }
 
-func renderResource(name string, r state.Maybe[state.Resource]) string {
+func (m *EvalModel) renderResource(s state.EvalState, name string, r state.Maybe[state.Resource]) string {
 	res, ok := r.Unwrap()
 	if !ok {
 		return fmt.Sprintf("%s (known after reconcile)", name)
 	}
 
-	out := name + "\n"
+	out := m.renderEvalState(s) + name + "\n"
 	out += "    [identifier]\n"
 	out += render(res.Identifier, 8, false)
 	out += "    [config]\n"
@@ -289,6 +313,19 @@ func renderResource(name string, r state.Maybe[state.Resource]) string {
 	out += "    [attrs]\n"
 	out += render(res.Attributes, 8, false)
 	return out
+}
+
+func (m *EvalModel) renderEvalState(es state.EvalState) string {
+	switch es.State {
+	case "", "done":
+		return ""
+	case "evaluating":
+		return m.spinner.View()
+	case "error":
+		return "x"
+	default:
+		return ""
+	}
 }
 
 const (
