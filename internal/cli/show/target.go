@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 
 	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/cli/model"
@@ -141,7 +143,7 @@ func addNodes(t treeprint.Tree, s *state.State, build *scope.Build) {
 			continue
 		}
 
-		t.AddNode(rs.Name)
+		t.AddNode(renderResource(rs.Name, rs.GetResource()))
 	}
 
 	for _, id := range build.Builds() {
@@ -271,4 +273,103 @@ type evalMsg struct {
 
 type nextMsg struct {
 	next []string
+}
+
+func renderResource(name string, r state.Maybe[state.Resource]) string {
+	res, ok := r.Unwrap()
+	if !ok {
+		return fmt.Sprintf("%s (known after reconcile)", name)
+	}
+
+	out := name + "\n"
+	out += "    [identifier]\n"
+	out += render(res.Identifier, 8, false)
+	out += "    [config]\n"
+	out += render(res.Config, 8, false)
+	out += "    [attrs]\n"
+	out += render(res.Attributes, 8, false)
+	return out
+}
+
+const (
+	unknown = "(known after reconcile)"
+)
+
+func renderString(str state.Maybe[string]) string {
+	val, ok := str.Unwrap()
+	if !ok {
+		return unknown
+	}
+
+	return `"` + val + `"`
+}
+
+func render(val any, space int, inline bool) string {
+	padding := strings.Repeat(" ", space)
+	if inline {
+		padding = ""
+	}
+	switch val := val.(type) {
+	case state.Maybe[any]:
+		v, ok := val.Unwrap()
+		if !ok {
+			return padding + "(known after reconcile)"
+		}
+
+		return render(v, space, inline)
+	case state.Maybe[string]:
+		return padding + renderString(val)
+	case state.Maybe[map[state.Maybe[string]]state.Maybe[any]]:
+		m, ok := val.Unwrap()
+		if !ok {
+			return padding + unknown
+		}
+
+		var list [][]string
+		for k, v := range m {
+			keyLabel := renderString(k)
+
+			mapVal, ok := v.Unwrap()
+			if !ok {
+				list = append(list, []string{keyLabel, unknown})
+				continue
+			}
+
+			// TODO: Handle nested maps.
+			list = append(list, []string{keyLabel, render(mapVal, 0, false)})
+		}
+
+		return format(space, list)
+	default:
+		return fmt.Sprintf("%T", val)
+	}
+}
+
+func format(space int, list [][]string) string {
+	padding := strings.Repeat(" ", space)
+
+	var max int
+	sort.Slice(list, func(i, j int) bool {
+		if len(list[i][0]) > max {
+			max = len(list[i][0])
+		}
+		if len(list[j][0]) > max {
+			max = len(list[j][0])
+		}
+		return list[i][0] < list[j][0]
+	})
+
+	var out string
+	for _, entry := range list {
+		k := entry[0]
+		v := entry[1]
+
+		if len(k) < max {
+			k += strings.Repeat(" ", max-len(k))
+		}
+
+		out += padding + k + " = " + v + "\n"
+	}
+
+	return out
 }

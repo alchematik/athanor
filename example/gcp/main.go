@@ -62,6 +62,18 @@ func main() {
 												Value: "my-resource-name",
 											},
 										},
+										"region": {
+											Type: "string",
+											Value: ast.StringLiteral{
+												Value: "us-west-2",
+											},
+										},
+										"project": {
+											Type: "string",
+											Value: ast.StringLiteral{
+												Value: "1234",
+											},
+										},
 									},
 								},
 							},
@@ -70,6 +82,61 @@ func main() {
 								Value: ast.MapCollection{
 									Value: map[string]ast.Expr{
 										"thing": {
+											Type: "string",
+											Value: ast.StringLiteral{
+												Value: "my-config",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			{
+				Type: "resource",
+				Value: ast.DeclareResource{
+					Name: "my-other-resource",
+					Exists: ast.Expr{
+						Type: "bool",
+						Value: ast.BoolLiteral{
+							Value: true,
+						},
+					},
+					Resource: ast.Expr{
+						Type: "resource",
+						Value: ast.Resource{
+							Identifier: ast.Expr{
+								Type: "map",
+								Value: ast.MapCollection{
+									Value: map[string]ast.Expr{
+										"name": {
+											Type: "string",
+											Value: ast.StringLiteral{
+												Value: "my-other-resource-name",
+											},
+										},
+										"region": {
+											Type: "string",
+											Value: ast.StringLiteral{
+												Value: "us-east-1",
+											},
+										},
+										"project": {
+											Type: "string",
+											Value: ast.StringLiteral{
+												Value: "1234",
+											},
+										},
+									},
+								},
+							},
+							Config: ast.Expr{
+								Type: "map",
+								Value: ast.MapCollection{
+									Value: map[string]ast.Expr{
+										"other-thing": {
 											Type: "string",
 											Value: ast.StringLiteral{
 												Value: "my-config",

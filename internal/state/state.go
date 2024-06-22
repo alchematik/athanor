@@ -197,3 +197,12 @@ type Maybe[T any] struct {
 	Value   T
 	Unknown bool
 }
+
+func (m Maybe[T]) Unwrap() (T, bool) {
+	var value T
+	if m.Unknown {
+		return value, false
+	}
+
+	return m.Value, true
+}
