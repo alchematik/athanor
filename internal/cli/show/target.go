@@ -9,12 +9,11 @@ import (
 
 	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/cli/model"
-	"github.com/alchematik/athanor/internal/convert"
 	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/eval"
 	"github.com/alchematik/athanor/internal/interpreter"
+	"github.com/alchematik/athanor/internal/plan"
 	"github.com/alchematik/athanor/internal/scope"
-	"github.com/alchematik/athanor/internal/state"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -90,21 +89,20 @@ type Init struct {
 	inputPath  string
 	configPath string
 	scope      *scope.Scope
-	state      *state.State
+	plan       *plan.Plan
 	context    context.Context
 	spinner    spinner.Model
 }
 
 func (s *Init) Init() tea.Cmd {
 	s.scope = scope.NewScope()
-	s.state = &state.State{
-		Resources: map[string]*state.ResourceState{},
-		Builds:    map[string]*state.BuildState{},
+	s.plan = &plan.Plan{
+		Resources: map[string]*plan.ResourcePlan{},
+		Builds:    map[string]*plan.BuildPlan{},
 	}
 
 	return tea.Batch(func() tea.Msg {
-		c := convert.Converter{
-			Logger:               s.logger,
+		c := plan.Converter{
 			BlueprintInterpreter: &interpreter.Interpreter{Logger: s.logger},
 		}
 		b := external_ast.DeclareBuild{
@@ -126,7 +124,7 @@ func (s *Init) Init() tea.Cmd {
 				},
 			},
 		}
-		if _, err := c.ConvertBuildStmt(s.state, s.scope, b); err != nil {
+		if _, err := c.ConvertBuildStmt(s.plan, s.scope, b); err != nil {
 			return model.ErrorMsg{Error: err}
 		}
 
@@ -138,28 +136,28 @@ func (s *Init) View() string {
 	return s.spinner.View() + " initializing..."
 }
 
-func (m *EvalModel) addNodes(t treeprint.Tree, s *state.State, build *scope.Build) {
+func (m *EvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Build) {
 	resources := build.Resources()
 	sort.Strings(resources)
 	for _, id := range resources {
-		rs, ok := s.ResourceState(id)
+		rs, ok := p.Resource(id)
 		if !ok {
 			panic("resource not in state: " + id)
 		}
 
 		exists := rs.GetExists()
 		if !exists.Unknown && !exists.Value {
-			t.AddNode(m.renderEvalState(rs.GetEvalState()) + rs.Name)
+			t.AddNode(m.renderEvalState(rs.GetEvalState()) + rs.GetName())
 			continue
 		}
 
-		t.AddNode(m.renderResource(rs.GetEvalState(), rs.Name, rs.GetResource()))
+		t.AddNode(m.renderResource(rs.GetEvalState(), rs.GetName(), rs.GetResource()))
 	}
 
 	builds := build.Builds()
 	sort.Strings(builds)
 	for _, id := range builds {
-		bs, ok := s.BuildState(id)
+		bs, ok := p.Build(id)
 		if !ok {
 			panic("build not in state: " + id)
 		}
@@ -169,9 +167,9 @@ func (m *EvalModel) addNodes(t treeprint.Tree, s *state.State, build *scope.Buil
 			continue
 		}
 
-		branch := t.AddBranch(m.renderEvalState(bs.GetEvalState()) + bs.Name)
+		branch := t.AddBranch(m.renderEvalState(bs.GetEvalState()) + bs.GetName())
 
-		m.addNodes(branch, s, build.Build(id))
+		m.addNodes(branch, p, build.Build(id))
 	}
 }
 
@@ -191,9 +189,9 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		iter := s.scope.NewIterator()
 		next := &EvalModel{
 			logger:    s.logger,
-			state:     state.NewGlobal(s.state, nil),
+			plan:      s.plan,
 			iter:      iter,
-			evaluator: eval.NewTargetEvaluator(iter),
+			evaluator: eval.NewTargetEvaluator(iter, s.logger),
 			scope:     s.scope,
 			context:   s.context,
 			spinner:   s.spinner,
@@ -212,7 +210,7 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 type EvalModel struct {
 	evaluator *eval.TargetEvaluator
-	state     *state.Global
+	plan      *plan.Plan
 	logger    *slog.Logger
 	scope     *scope.Scope
 	iter      *dag.Iterator
@@ -249,7 +247,7 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return model.ErrorMsg{Error: fmt.Errorf("component not found: %s", msg.id)}
 			}
 
-			err := m.evaluator.Eval(m.context, m.state, comp)
+			err := m.evaluator.Eval(m.context, m.plan, comp)
 			if err != nil {
 				return model.ErrorMsg{Error: err}
 			}
@@ -283,10 +281,9 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *EvalModel) View() string {
 	tree := treeprint.New()
 	build := m.scope.Build().Build(".Build")
-	target := m.state.Target()
-	s, _ := target.BuildState(".Build")
+	s, _ := m.plan.Build(".Build")
 	tree.SetValue(m.renderEvalState(s.GetEvalState()) + "Build")
-	m.addNodes(tree, m.state.Target(), build)
+	m.addNodes(tree, m.plan, build)
 
 	return tree.String()
 }
@@ -299,23 +296,34 @@ type nextMsg struct {
 	next []string
 }
 
-func (m *EvalModel) renderResource(s state.EvalState, name string, r state.Maybe[state.Resource]) string {
+func (m *EvalModel) renderResource(s plan.EvalState, name string, r plan.Maybe[plan.Resource]) string {
 	res, ok := r.Unwrap()
 	if !ok {
 		return fmt.Sprintf("%s (known after reconcile)", name)
 	}
 
-	out := m.renderEvalState(s) + name + "\n"
+	provider, ok := res.Provider.Unwrap()
+	var providerStr string
+	if ok {
+		providerName, _ := provider.Name.Unwrap()
+		providerStr += providerName
+		if providerVersion, ok := provider.Version.Unwrap(); ok && providerName != "" {
+			providerStr += "@" + providerVersion
+		}
+		providerStr = fmt.Sprintf("(%s)", providerStr)
+	}
+
+	out := m.renderEvalState(s) + name + " " + providerStr + " " + "\n"
 	out += "    [identifier]\n"
 	out += render(res.Identifier, 8, false)
 	out += "    [config]\n"
 	out += render(res.Config, 8, false)
 	out += "    [attrs]\n"
-	out += render(res.Attributes, 8, false)
+	out += render(res.Attrs, 8, false)
 	return out
 }
 
-func (m *EvalModel) renderEvalState(es state.EvalState) string {
+func (m *EvalModel) renderEvalState(es plan.EvalState) string {
 	switch es.State {
 	case "", "done":
 		return ""
@@ -332,7 +340,7 @@ const (
 	unknown = "(known after reconcile)"
 )
 
-func renderString(str state.Maybe[string]) string {
+func renderString(str plan.Maybe[string]) string {
 	val, ok := str.Unwrap()
 	if !ok {
 		return unknown
@@ -347,16 +355,16 @@ func render(val any, space int, inline bool) string {
 		padding = ""
 	}
 	switch val := val.(type) {
-	case state.Maybe[any]:
+	case plan.Maybe[any]:
 		v, ok := val.Unwrap()
 		if !ok {
 			return padding + "(known after reconcile)"
 		}
 
 		return render(v, space, inline)
-	case state.Maybe[string]:
+	case plan.Maybe[string]:
 		return padding + renderString(val)
-	case state.Maybe[map[state.Maybe[string]]state.Maybe[any]]:
+	case plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]]:
 		m, ok := val.Unwrap()
 		if !ok {
 			return padding + unknown

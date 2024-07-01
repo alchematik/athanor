@@ -58,6 +58,12 @@ func (e *Expr) UnmarshalJSON(data []byte) error {
 			return err
 		}
 		e.Value = *value
+	case "provider":
+		value := &Provider{}
+		if err := json.Unmarshal(inner.Value, &value); err != nil {
+			return err
+		}
+		e.Value = *value
 	case "environment":
 		value := &Environment{}
 		if err := json.Unmarshal(inner.Value, &value); err != nil {
@@ -108,12 +114,15 @@ type MapCollection struct {
 }
 
 type Resource struct {
-	// Provider   Expr `json:"provider"`
+	Type       Expr `json:"type"`
+	Provider   Expr `json:"provider"`
 	Identifier Expr `json:"identifier"`
 	Config     Expr `json:"config"`
 }
 
 type Provider struct {
+	Name    Expr `json:"name"`
+	Version Expr `json:"version"`
 }
 
 type Environment struct {

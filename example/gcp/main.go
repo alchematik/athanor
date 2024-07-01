@@ -52,6 +52,29 @@ func main() {
 					Resource: ast.Expr{
 						Type: "resource",
 						Value: ast.Resource{
+							Type: ast.Expr{
+								Type: "string",
+								Value: ast.StringLiteral{
+									Value: "bucket",
+								},
+							},
+							Provider: ast.Expr{
+								Type: "provider",
+								Value: ast.Provider{
+									Name: ast.Expr{
+										Type: "string",
+										Value: ast.StringLiteral{
+											Value: "google-cloud",
+										},
+									},
+									Version: ast.Expr{
+										Type: "string",
+										Value: ast.StringLiteral{
+											Value: "v0.0.1",
+										},
+									},
+								},
+							},
 							Identifier: ast.Expr{
 								Type: "map",
 								Value: ast.MapCollection{
@@ -107,6 +130,29 @@ func main() {
 					Resource: ast.Expr{
 						Type: "resource",
 						Value: ast.Resource{
+							Type: ast.Expr{
+								Type: "string",
+								Value: ast.StringLiteral{
+									Value: "bucket",
+								},
+							},
+							Provider: ast.Expr{
+								Type: "provider",
+								Value: ast.Provider{
+									Name: ast.Expr{
+										Type: "string",
+										Value: ast.StringLiteral{
+											Value: "google-cloud",
+										},
+									},
+									Version: ast.Expr{
+										Type: "string",
+										Value: ast.StringLiteral{
+											Value: "v0.0.1",
+										},
+									},
+								},
+							},
 							Identifier: ast.Expr{
 								Type: "map",
 								Value: ast.MapCollection{

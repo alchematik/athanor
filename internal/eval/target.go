@@ -7,28 +7,27 @@ import (
 
 	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/dag"
-	"github.com/alchematik/athanor/internal/state"
+	"github.com/alchematik/athanor/internal/plan"
 )
 
-func NewTargetEvaluator(iter *dag.Iterator) *TargetEvaluator {
-	return &TargetEvaluator{iter: iter}
+func NewTargetEvaluator(iter *dag.Iterator, logger *slog.Logger) *TargetEvaluator {
+	return &TargetEvaluator{iter: iter, api: &ActualAPI{logger: logger}}
 }
 
 type TargetEvaluator struct {
 	iter   *dag.Iterator
 	Logger *slog.Logger
-	api    *TargetAPI
+	api    ast.API
 }
 
 func (e *TargetEvaluator) Next() []string {
 	return e.iter.Next()
 }
 
-func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) error {
+func (e *TargetEvaluator) Eval(ctx context.Context, p *plan.Plan, stmt any) error {
 	switch stmt := stmt.(type) {
-	case ast.StmtResource:
-		s := g.Target()
-		current, ok := s.ResourceState(stmt.ID)
+	case plan.StmtResource:
+		current, ok := p.Resource(stmt.ID)
 		if !ok {
 			return fmt.Errorf("resource not in state: %s", stmt.ID)
 		}
@@ -43,20 +42,21 @@ func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) e
 			return err
 		}
 
-		r, err := stmt.Resource.Eval(ctx, e.api, s)
+		exists, err := stmt.Exists.Eval(ctx, p)
 		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+
+		r, err := stmt.Resource.Eval(ctx, p)
+		if err != nil {
+			// TODO: handle not found.
 			current.ToError(err)
 			// TODO: is there a way to short-curcuit?
 			return nil
 		}
 
-		exists, err := stmt.Exists.Eval(ctx, e.api, s)
-		if err != nil {
-			current.ToError(err)
-			return nil
-		}
-
-		parent, ok := s.BuildState(stmt.BuildID)
+		parent, ok := p.Build(stmt.BuildID)
 		if ok {
 			// Parent exists value is known, and it's set to false. Child resource exists should be false also.
 			parentExists := parent.GetExists()
@@ -68,9 +68,8 @@ func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) e
 		current.ToDone(r, exists)
 
 		return nil
-	case ast.StmtBuild:
-		s := g.Target()
-		current, ok := s.BuildState(stmt.ID)
+	case plan.StmtBuild:
+		current, ok := p.Build(stmt.ID)
 		if !ok {
 			return fmt.Errorf("build not in state: %s", stmt.ID)
 		}
@@ -82,13 +81,13 @@ func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) e
 			return e.iter.Done(stmt.ID)
 		}
 
-		exists, err := stmt.Exists.Eval(ctx, e.api, s)
+		exists, err := stmt.Exists.Eval(ctx, p)
 		if err != nil {
 			current.ToError(err)
 			return nil
 		}
 
-		parent, ok := s.BuildState(stmt.BuildID)
+		parent, ok := p.Build(stmt.BuildID)
 		if ok {
 			// Parent exists value is known, and it's set to false. Child resource exists should be false also.
 			parentExists := parent.GetExists()
@@ -104,12 +103,4 @@ func (e *TargetEvaluator) Eval(ctx context.Context, g *state.Global, stmt any) e
 	default:
 		return fmt.Errorf("unsupported component type: %T", stmt)
 	}
-}
-
-type TargetAPI struct {
-}
-
-func (a *TargetAPI) EvalResource(ctx context.Context, res *state.Resource) error {
-	res.Attributes = state.Maybe[any]{Unknown: true}
-	return nil
 }

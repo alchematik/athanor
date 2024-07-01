@@ -37,16 +37,6 @@ type EvalState struct {
 	Error error
 }
 
-type ComponentAction string
-
-const (
-	ComponentActionEmpty   = ""
-	ComponentActionCreate  = "create"
-	ComponentActionDelete  = "delete"
-	ComponentActionUpdate  = "update"
-	ComponentActionUnknown = "unknown"
-)
-
 func (s *State) ResourceState(id string) (*ResourceState, bool) {
 	s.Lock()
 	defer s.Unlock()
@@ -119,6 +109,7 @@ func (r *ResourceState) ToEvaluating() {
 }
 
 type Resource struct {
+	Type       Maybe[string]
 	Provider   Maybe[Provider]
 	Identifier Maybe[any]
 	Config     Maybe[any]
@@ -126,8 +117,8 @@ type Resource struct {
 }
 
 type Provider struct {
-	Name    string
-	Version string
+	Name    Maybe[string]
+	Version Maybe[string]
 }
 
 type BuildState struct {

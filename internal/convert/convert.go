@@ -32,7 +32,7 @@ func ConvertBoolExpr(name string, expr external.Expr) (ast.Expr[bool], error) {
 func ConvertMapExpr(name string, expr external.Expr) (ast.Expr[map[state.Maybe[string]]state.Maybe[any]], error) {
 	switch value := expr.Value.(type) {
 	case external.MapCollection:
-		m := ast.Map[any]{
+		m := ast.Map{
 			Value: map[ast.Expr[string]]ast.Expr[any]{},
 		}
 		for k, v := range value.Value {
@@ -62,8 +62,20 @@ func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resour
 			return nil, err
 		}
 
+		t, err := ConvertStringExpr(name, value.Type)
+		if err != nil {
+			return nil, err
+		}
+
+		p, err := ConvertProviderExpr(name, value.Provider)
+		if err != nil {
+			return nil, err
+		}
+
 		return ast.ResourceExpr{
 			Name:       name,
+			Provider:   p,
+			Type:       t,
 			Identifier: identifier,
 			Config:     config,
 		}, nil
@@ -76,6 +88,28 @@ func ConvertResourceExpr(name string, expr external.Expr) (ast.Expr[state.Resour
 		return ast.GetResource{Name: value.Name, From: from}, nil
 	default:
 		return nil, fmt.Errorf("invalid resource expr: %T", expr)
+	}
+}
+
+func ConvertProviderExpr(name string, expr external.Expr) (ast.Expr[state.Provider], error) {
+	switch value := expr.Value.(type) {
+	case external.Provider:
+		n, err := ConvertStringExpr(name, value.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		v, err := ConvertStringExpr(name, value.Version)
+		if err != nil {
+			return nil, err
+		}
+
+		return ast.ProviderExpr{
+			Name:    n,
+			Version: v,
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid provider expr: %T", expr)
 	}
 }
 

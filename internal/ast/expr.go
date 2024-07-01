@@ -28,33 +28,33 @@ func (l Literal[T]) Eval(_ context.Context, _ API, _ *state.State) (state.Maybe[
 	return state.Maybe[T]{Value: l.Value}, nil
 }
 
-type Map[T any] struct {
-	Value map[Expr[string]]Expr[T]
+type Map struct {
+	Value map[Expr[string]]Expr[any]
 }
 
-func (m Map[T]) Eval(ctx context.Context, api API, s *state.State) (state.Maybe[map[state.Maybe[string]]state.Maybe[T]], error) {
-	out := state.Maybe[map[state.Maybe[string]]state.Maybe[T]]{
-		Value: map[state.Maybe[string]]state.Maybe[T]{},
-	}
+func (m Map) Eval(ctx context.Context, api API, s *state.State) (state.Maybe[map[state.Maybe[string]]state.Maybe[any]], error) {
+	out := map[state.Maybe[string]]state.Maybe[any]{}
 	for k, v := range m.Value {
 		outKey, err := k.Eval(ctx, api, s)
 		if err != nil {
-			return out, err
+			return state.Maybe[map[state.Maybe[string]]state.Maybe[any]]{}, err
 		}
 
 		outVal, err := v.Eval(ctx, api, s)
 		if err != nil {
-			return out, err
+			return state.Maybe[map[state.Maybe[string]]state.Maybe[any]]{}, err
 		}
 
-		out.Value[outKey] = outVal
+		out[outKey] = outVal
 	}
 
-	return out, nil
+	return state.Maybe[map[state.Maybe[string]]state.Maybe[any]]{Value: out}, nil
 }
 
 type ResourceExpr struct {
 	Name       string
+	Provider   Expr[state.Provider]
+	Type       Expr[string]
 	Identifier Expr[any]
 	Config     Expr[any]
 }
@@ -70,7 +70,19 @@ func (r ResourceExpr) Eval(ctx context.Context, api API, s *state.State) (state.
 		return state.Maybe[state.Resource]{}, err
 	}
 
+	t, err := r.Type.Eval(ctx, api, s)
+	if err != nil {
+		return state.Maybe[state.Resource]{}, err
+	}
+
+	p, err := r.Provider.Eval(ctx, api, s)
+	if err != nil {
+		return state.Maybe[state.Resource]{}, err
+	}
+
 	res := state.Resource{
+		Type:       t,
+		Provider:   p,
 		Identifier: id,
 		Config:     c,
 	}
@@ -80,6 +92,29 @@ func (r ResourceExpr) Eval(ctx context.Context, api API, s *state.State) (state.
 	}
 
 	return state.Maybe[state.Resource]{Value: res}, nil
+}
+
+type ProviderExpr struct {
+	Name    Expr[string]
+	Version Expr[string]
+}
+
+func (p ProviderExpr) Eval(ctx context.Context, api API, s *state.State) (state.Maybe[state.Provider], error) {
+	name, err := p.Name.Eval(ctx, api, s)
+	if err != nil {
+		return state.Maybe[state.Provider]{}, err
+	}
+
+	version, err := p.Version.Eval(ctx, api, s)
+	if err != nil {
+		return state.Maybe[state.Provider]{}, err
+	}
+
+	out := state.Provider{
+		Name:    name,
+		Version: version,
+	}
+	return state.Maybe[state.Provider]{Value: out}, nil
 }
 
 type GetResource struct {
