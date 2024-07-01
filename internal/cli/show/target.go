@@ -196,7 +196,6 @@ func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			context:   s.context,
 			spinner:   s.spinner,
 		}
-		next.evaluator.Logger = s.logger
 
 		return next, next.Init()
 	case spinner.TickMsg:

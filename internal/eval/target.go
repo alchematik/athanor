@@ -5,19 +5,17 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/alchematik/athanor/internal/ast"
 	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/plan"
 )
 
 func NewTargetEvaluator(iter *dag.Iterator, logger *slog.Logger) *TargetEvaluator {
-	return &TargetEvaluator{iter: iter, api: &ActualAPI{logger: logger}}
+	return &TargetEvaluator{iter: iter, logger: logger}
 }
 
 type TargetEvaluator struct {
 	iter   *dag.Iterator
-	Logger *slog.Logger
-	api    ast.API
+	logger *slog.Logger
 }
 
 func (e *TargetEvaluator) Next() []string {
