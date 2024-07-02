@@ -21,9 +21,9 @@ import (
 	"github.com/xlab/treeprint"
 )
 
-func NewShowTargetCommand() *cli.Command {
+func NewPlanCommand() *cli.Command {
 	return &cli.Command{
-		Name: "target",
+		Name: "plan",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
 				Name:  "log-file",
@@ -34,11 +34,11 @@ func NewShowTargetCommand() *cli.Command {
 				Usage: "path to config file",
 			},
 		},
-		Action: TargetAction,
+		Action: PlanAction,
 	}
 }
 
-func TargetAction(ctx context.Context, cmd *cli.Command) error {
+func PlanAction(ctx context.Context, cmd *cli.Command) error {
 	inputPath := cmd.Args().First()
 	logFilePath := cmd.String("log-file")
 	configFilePath := cmd.String("config")
@@ -60,25 +60,25 @@ func TargetAction(ctx context.Context, cmd *cli.Command) error {
 		spinner:    spinner.New(),
 		logger:     logger,
 	}
-	m := &TargetModel{current: initState, logger: logger}
+	m := &PlanModel{current: initState, logger: logger}
 	_, err := tea.NewProgram(m).Run()
 	return err
 }
 
-type TargetModel struct {
+type PlanModel struct {
 	current tea.Model
 	logger  *slog.Logger
 }
 
-func (m *TargetModel) Init() tea.Cmd {
+func (m *PlanModel) Init() tea.Cmd {
 	return m.current.Init()
 }
 
-func (m *TargetModel) View() string {
+func (m *PlanModel) View() string {
 	return m.current.View()
 }
 
-func (m *TargetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *PlanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.current.Update(msg)
 	m.current = next
 	return m, cmd

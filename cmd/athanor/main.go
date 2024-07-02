@@ -17,7 +17,7 @@ func main() {
 			{
 				Name: "show",
 				Commands: []*cli.Command{
-					show.NewShowTargetCommand(),
+					show.NewPlanCommand(),
 				},
 			},
 		},
