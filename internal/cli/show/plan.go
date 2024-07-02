@@ -53,38 +53,38 @@ func PlanAction(ctx context.Context, cmd *cli.Command) error {
 		logger = slog.New(slog.NewTextHandler(f, nil))
 	}
 
-	initState := &Init{
+	init := &PlanInit{
 		inputPath:  inputPath,
 		configPath: configFilePath,
 		context:    ctx,
 		spinner:    spinner.New(),
 		logger:     logger,
 	}
-	m := &PlanModel{current: initState, logger: logger}
+	m := &Model{current: init, logger: logger}
 	_, err := tea.NewProgram(m).Run()
 	return err
 }
 
-type PlanModel struct {
+type Model struct {
 	current tea.Model
 	logger  *slog.Logger
 }
 
-func (m *PlanModel) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return m.current.Init()
 }
 
-func (m *PlanModel) View() string {
+func (m *Model) View() string {
 	return m.current.View()
 }
 
-func (m *PlanModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	next, cmd := m.current.Update(msg)
 	m.current = next
 	return m, cmd
 }
 
-type Init struct {
+type PlanInit struct {
 	logger     *slog.Logger
 	inputPath  string
 	configPath string
@@ -94,7 +94,7 @@ type Init struct {
 	spinner    spinner.Model
 }
 
-func (s *Init) Init() tea.Cmd {
+func (s *PlanInit) Init() tea.Cmd {
 	s.scope = scope.NewScope()
 	s.plan = &plan.Plan{
 		Resources: map[string]*plan.ResourcePlan{},
@@ -132,7 +132,7 @@ func (s *Init) Init() tea.Cmd {
 	}, s.spinner.Tick)
 }
 
-func (s *Init) View() string {
+func (s *PlanInit) View() string {
 	return s.spinner.View() + " initializing..."
 }
 
@@ -173,7 +173,7 @@ func (m *EvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Build)
 	}
 }
 
-func (s *Init) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (s *PlanInit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {

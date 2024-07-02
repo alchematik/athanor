@@ -18,6 +18,7 @@ func main() {
 				Name: "show",
 				Commands: []*cli.Command{
 					show.NewPlanCommand(),
+					show.NewStateCommand(),
 				},
 			},
 		},
@@ -26,5 +27,4 @@ func main() {
 	if err := app.Run(context.Background(), os.Args); err != nil {
 		log.Fatal(err)
 	}
-
 }
