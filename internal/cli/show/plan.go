@@ -53,7 +53,7 @@ func PlanAction(ctx context.Context, cmd *cli.Command) error {
 		logger = slog.New(slog.NewTextHandler(f, nil))
 	}
 
-	init := &PlanInit{
+	init := &PlanInitModel{
 		inputPath:  inputPath,
 		configPath: configFilePath,
 		context:    ctx,
@@ -84,7 +84,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-type PlanInit struct {
+type PlanInitModel struct {
 	logger     *slog.Logger
 	inputPath  string
 	configPath string
@@ -94,7 +94,7 @@ type PlanInit struct {
 	spinner    spinner.Model
 }
 
-func (s *PlanInit) Init() tea.Cmd {
+func (s *PlanInitModel) Init() tea.Cmd {
 	s.scope = scope.NewScope()
 	s.plan = &plan.Plan{
 		Resources: map[string]*plan.ResourcePlan{},
@@ -132,11 +132,11 @@ func (s *PlanInit) Init() tea.Cmd {
 	}, s.spinner.Tick)
 }
 
-func (s *PlanInit) View() string {
+func (s *PlanInitModel) View() string {
 	return s.spinner.View() + " initializing..."
 }
 
-func (m *EvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Build) {
+func (m *PlanEvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Build) {
 	resources := build.Resources()
 	sort.Strings(resources)
 	for _, id := range resources {
@@ -173,7 +173,7 @@ func (m *EvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Build)
 	}
 }
 
-func (s *PlanInit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (s *PlanInitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
@@ -187,11 +187,11 @@ func (s *PlanInit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return next, next.Init()
 	case string:
 		iter := s.scope.NewIterator()
-		next := &EvalModel{
+		next := &PlanEvalModel{
 			logger:    s.logger,
 			plan:      s.plan,
 			iter:      iter,
-			evaluator: eval.NewTargetEvaluator(iter, s.logger),
+			evaluator: eval.NewPlanEvaluator(iter, s.logger),
 			scope:     s.scope,
 			context:   s.context,
 			spinner:   s.spinner,
@@ -207,8 +207,8 @@ func (s *PlanInit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-type EvalModel struct {
-	evaluator *eval.TargetEvaluator
+type PlanEvalModel struct {
+	evaluator *eval.PlanEvaluator
 	plan      *plan.Plan
 	logger    *slog.Logger
 	scope     *scope.Scope
@@ -217,7 +217,7 @@ type EvalModel struct {
 	spinner   spinner.Model
 }
 
-func (m *EvalModel) Init() tea.Cmd {
+func (m *PlanEvalModel) Init() tea.Cmd {
 	ids := m.evaluator.Next()
 	cmds := make([]tea.Cmd, len(ids))
 	for i, id := range ids {
@@ -227,7 +227,7 @@ func (m *EvalModel) Init() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *PlanEvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
@@ -277,7 +277,7 @@ func (m *EvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m *EvalModel) View() string {
+func (m *PlanEvalModel) View() string {
 	tree := treeprint.New()
 	build := m.scope.Build().Build(".Build")
 	s, _ := m.plan.Build(".Build")
@@ -295,7 +295,7 @@ type nextMsg struct {
 	next []string
 }
 
-func (m *EvalModel) renderResource(s plan.EvalState, name string, r plan.Maybe[plan.Resource]) string {
+func (m *PlanEvalModel) renderResource(s plan.EvalState, name string, r plan.Maybe[plan.Resource]) string {
 	res, ok := r.Unwrap()
 	if !ok {
 		return fmt.Sprintf("%s (known after reconcile)", name)
@@ -314,15 +314,15 @@ func (m *EvalModel) renderResource(s plan.EvalState, name string, r plan.Maybe[p
 
 	out := m.renderEvalState(s) + name + " " + providerStr + " " + "\n"
 	out += "    [identifier]\n"
-	out += render(res.Identifier, 8, false)
+	out += renderMaybe(res.Identifier, 8, false)
 	out += "    [config]\n"
-	out += render(res.Config, 8, false)
+	out += renderMaybe(res.Config, 8, false)
 	out += "    [attrs]\n"
-	out += render(res.Attrs, 8, false)
+	out += renderMaybe(res.Attrs, 8, false)
 	return out
 }
 
-func (m *EvalModel) renderEvalState(es plan.EvalState) string {
+func (m *PlanEvalModel) renderEvalState(es plan.EvalState) string {
 	switch es.State {
 	case "", "done":
 		return ""
@@ -339,7 +339,7 @@ const (
 	unknown = "(known after reconcile)"
 )
 
-func renderString(str plan.Maybe[string]) string {
+func renderMaybeString(str plan.Maybe[string]) string {
 	val, ok := str.Unwrap()
 	if !ok {
 		return unknown
@@ -348,7 +348,7 @@ func renderString(str plan.Maybe[string]) string {
 	return `"` + val + `"`
 }
 
-func render(val any, space int, inline bool) string {
+func renderMaybe(val any, space int, inline bool) string {
 	padding := strings.Repeat(" ", space)
 	if inline {
 		padding = ""
@@ -360,9 +360,9 @@ func render(val any, space int, inline bool) string {
 			return padding + "(known after reconcile)"
 		}
 
-		return render(v, space, inline)
+		return renderMaybe(v, space, inline)
 	case plan.Maybe[string]:
-		return padding + renderString(val)
+		return padding + renderMaybeString(val)
 	case plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]]:
 		m, ok := val.Unwrap()
 		if !ok {
@@ -371,7 +371,7 @@ func render(val any, space int, inline bool) string {
 
 		var list [][]string
 		for k, v := range m {
-			keyLabel := renderString(k)
+			keyLabel := renderMaybeString(k)
 
 			mapVal, ok := v.Unwrap()
 			if !ok {
@@ -380,7 +380,7 @@ func render(val any, space int, inline bool) string {
 			}
 
 			// TODO: Handle nested maps.
-			list = append(list, []string{keyLabel, render(mapVal, 0, false)})
+			list = append(list, []string{keyLabel, renderMaybe(mapVal, 0, false)})
 		}
 
 		return format(space, list)

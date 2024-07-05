@@ -9,20 +9,20 @@ import (
 	"github.com/alchematik/athanor/internal/plan"
 )
 
-func NewTargetEvaluator(iter *dag.Iterator, logger *slog.Logger) *TargetEvaluator {
-	return &TargetEvaluator{iter: iter, logger: logger}
+func NewPlanEvaluator(iter *dag.Iterator, logger *slog.Logger) *PlanEvaluator {
+	return &PlanEvaluator{iter: iter, logger: logger}
 }
 
-type TargetEvaluator struct {
+type PlanEvaluator struct {
 	iter   *dag.Iterator
 	logger *slog.Logger
 }
 
-func (e *TargetEvaluator) Next() []string {
+func (e *PlanEvaluator) Next() []string {
 	return e.iter.Next()
 }
 
-func (e *TargetEvaluator) Eval(ctx context.Context, p *plan.Plan, stmt any) error {
+func (e *PlanEvaluator) Eval(ctx context.Context, p *plan.Plan, stmt any) error {
 	switch stmt := stmt.(type) {
 	case plan.StmtResource:
 		current, ok := p.Resource(stmt.ID)
