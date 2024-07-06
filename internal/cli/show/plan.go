@@ -43,45 +43,21 @@ func PlanAction(ctx context.Context, cmd *cli.Command) error {
 	logFilePath := cmd.String("log-file")
 	configFilePath := cmd.String("config")
 
-	var logger *slog.Logger
-	if logFilePath != "" {
-		f, err := tea.LogToFile(logFilePath, "")
-		if err != nil {
-			return err
-		}
-
-		logger = slog.New(slog.NewTextHandler(f, nil))
+	m, err := model.NewBaseModel(logFilePath)
+	if err != nil {
+		return err
 	}
 
 	init := &PlanInitModel{
 		inputPath:  inputPath,
 		configPath: configFilePath,
 		context:    ctx,
-		spinner:    spinner.New(),
-		logger:     logger,
+		spinner:    m.Spinner,
+		logger:     m.Logger,
 	}
-	m := &Model{current: init, logger: logger}
-	_, err := tea.NewProgram(m).Run()
+	m.Current = init
+	_, err = tea.NewProgram(m).Run()
 	return err
-}
-
-type Model struct {
-	current tea.Model
-	logger  *slog.Logger
-}
-
-func (m *Model) Init() tea.Cmd {
-	return m.current.Init()
-}
-
-func (m *Model) View() string {
-	return m.current.View()
-}
-
-func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	next, cmd := m.current.Update(msg)
-	m.current = next
-	return m, cmd
 }
 
 type PlanInitModel struct {
@@ -91,7 +67,7 @@ type PlanInitModel struct {
 	scope      *scope.Scope
 	plan       *plan.Plan
 	context    context.Context
-	spinner    spinner.Model
+	spinner    *spinner.Model
 }
 
 func (s *PlanInitModel) Init() tea.Cmd {
@@ -101,7 +77,7 @@ func (s *PlanInitModel) Init() tea.Cmd {
 		Builds:    map[string]*plan.BuildPlan{},
 	}
 
-	return tea.Batch(func() tea.Msg {
+	return func() tea.Msg {
 		c := plan.Converter{
 			BlueprintInterpreter: &interpreter.Interpreter{Logger: s.logger},
 		}
@@ -129,7 +105,7 @@ func (s *PlanInitModel) Init() tea.Cmd {
 		}
 
 		return "done"
-	}, s.spinner.Tick)
+	}
 }
 
 func (s *PlanInitModel) View() string {
@@ -174,17 +150,7 @@ func (m *PlanEvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Bu
 }
 
 func (s *PlanInitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
-			next := &model.Quit{Logger: s.logger}
-			return next, next.Init()
-		}
-
-		return s, nil
-	case model.ErrorMsg:
-		next := &model.ErrorModel{Logger: s.logger, Error: msg.Error}
-		return next, next.Init()
+	switch msg.(type) {
 	case string:
 		iter := s.scope.NewIterator()
 		next := &PlanEvalModel{
@@ -198,10 +164,6 @@ func (s *PlanInitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		return next, next.Init()
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		s.spinner, cmd = s.spinner.Update(msg)
-		return s, cmd
 	default:
 		return s, nil
 	}
@@ -214,7 +176,7 @@ type PlanEvalModel struct {
 	scope     *scope.Scope
 	iter      *dag.Iterator
 	context   context.Context
-	spinner   spinner.Model
+	spinner   *spinner.Model
 }
 
 func (m *PlanEvalModel) Init() tea.Cmd {
@@ -223,22 +185,11 @@ func (m *PlanEvalModel) Init() tea.Cmd {
 	for i, id := range ids {
 		cmds[i] = func() tea.Msg { return evalMsg{id: id} }
 	}
-	cmds = append(cmds, m.spinner.Tick)
 	return tea.Batch(cmds...)
 }
 
 func (m *PlanEvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		if k := msg.String(); k == "ctrl+c" || k == "q" || k == "esc" {
-			next := &model.Quit{Logger: m.logger}
-			return next, next.Init()
-		}
-
-		return m, nil
-	case model.ErrorMsg:
-		next := &model.ErrorModel{Logger: m.logger, Error: msg.Error}
-		return next, next.Init()
 	case evalMsg:
 		return m, func() tea.Msg {
 			comp, ok := m.scope.Component(msg.id)
@@ -268,10 +219,6 @@ func (m *PlanEvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case string:
 		m.logger.Info("done")
 		return m, nil
-	case spinner.TickMsg:
-		var cmd tea.Cmd
-		m.spinner, cmd = m.spinner.Update(msg)
-		return m, cmd
 	default:
 		return m, nil
 	}
