@@ -5,14 +5,9 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log/slog"
-	"os/exec"
 
 	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/state"
-	"github.com/alchematik/athanor/provider"
-
-	"github.com/hashicorp/go-hclog"
-	plugin "github.com/hashicorp/go-plugin"
 )
 
 func init() {
@@ -59,65 +54,6 @@ func (e *StateEvaluator) Eval(ctx context.Context, s *state.State, stmt any) err
 		if err != nil {
 			current.ToError(err)
 			return nil
-		}
-
-		// TODO: extract this into provider plugin manager.
-		client := plugin.NewClient(&plugin.ClientConfig{
-			HandshakeConfig: plugin.HandshakeConfig{
-				ProtocolVersion:  1,
-				MagicCookieKey:   "BASIC_PLUGIN",
-				MagicCookieValue: "hello",
-			},
-			Plugins: map[string]plugin.Plugin{
-				"provider": &provider.Plugin{},
-			},
-			Cmd:    exec.Command(".provider/google-cloud-v0.0.1"),
-			Logger: hclog.NewNullLogger(),
-		})
-		defer client.Kill()
-
-		c, err := client.Client()
-		if err != nil {
-			return err
-		}
-
-		p, err := c.Dispense("provider")
-		if err != nil {
-			return err
-		}
-
-		providerClient, ok := p.(*provider.Client)
-		if !ok {
-			return fmt.Errorf("invalid provider client: %T", p)
-		}
-
-		res, err := providerClient.Get(ctx, provider.GetResourceRequest{
-			Type:       r.Type,
-			Identifier: r.Identifier,
-		})
-		if err != nil {
-			// TODO: handle not found error.
-			current.ToError(err)
-			return nil
-		}
-
-		// plug, err := e.providerManager.ProviderPlugin(r.Provider)
-		// if err != nil {
-		// 	return err
-		// }
-
-		// res, err := plug.Get(ctx, r.Identifier)
-		// if err != nil {
-		// 	// TODO: handle not found error.
-		// 	current.ToError(err)
-		// 	return nil
-		// }
-		r = state.Resource{
-			Provider:   r.Provider,
-			Type:       r.Type,
-			Identifier: r.Identifier,
-			Config:     res.Resource.Config,
-			Attrs:      res.Resource.Attrs,
 		}
 
 		current.ToDone(r, true)

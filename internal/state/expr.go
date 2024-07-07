@@ -2,6 +2,13 @@ package state
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
+
+	"github.com/alchematik/athanor/provider"
+
+	"github.com/hashicorp/go-hclog"
+	plugin "github.com/hashicorp/go-plugin"
 )
 
 type StmtBuild struct {
@@ -94,26 +101,57 @@ func (e ExprResource) Eval(ctx context.Context, s *State) (Resource, error) {
 		return Resource{}, err
 	}
 
-	config, err := e.Config.Eval(ctx, s)
-	if err != nil {
-		return Resource{}, err
-	}
-
 	t, err := e.Type.Eval(ctx, s)
 	if err != nil {
 		return Resource{}, err
 	}
 
-	provider, err := e.Provider.Eval(ctx, s)
+	p, err := e.Provider.Eval(ctx, s)
 	if err != nil {
 		return Resource{}, err
 	}
 
-	return Resource{
+	// TODO: Extract and use provider to determine plugin.
+	client := plugin.NewClient(&plugin.ClientConfig{
+		HandshakeConfig: plugin.HandshakeConfig{
+			ProtocolVersion:  1,
+			MagicCookieKey:   "BASIC_PLUGIN",
+			MagicCookieValue: "hello",
+		},
+		Plugins: map[string]plugin.Plugin{
+			"provider": &provider.Plugin{},
+		},
+		Cmd:    exec.Command(".provider/google-cloud-v0.0.1"),
+		Logger: hclog.NewNullLogger(),
+	})
+	defer client.Kill()
+
+	c, err := client.Client()
+	if err != nil {
+		return Resource{}, err
+	}
+
+	pr, err := c.Dispense("provider")
+	if err != nil {
+		return Resource{}, err
+	}
+
+	providerClient, ok := pr.(*provider.Client)
+	if !ok {
+		return Resource{}, fmt.Errorf("invalid provider client: %T", p)
+	}
+
+	res, err := providerClient.Get(ctx, provider.GetResourceRequest{
 		Type:       t,
 		Identifier: id,
-		Config:     config,
-		Provider:   provider,
+	})
+
+	return Resource{
+		Type:       t,
+		Provider:   p,
+		Identifier: id,
+		Config:     res.Resource.Config,
+		Attrs:      res.Resource.Attrs,
 	}, nil
 }
 

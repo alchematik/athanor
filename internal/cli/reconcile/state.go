@@ -28,7 +28,7 @@ func NewStateCommand() *cli.Command {
 
 func StateAction(ctx context.Context, cmd *cli.Command) error {
 	// inputPath := cmd.Args().First()
-	// logFilePath := cmd.String("log-file")
+	logFilePath := cmd.String("log-file")
 	// configFilePath := cmd.String("config")
 	//
 	// var logger *slog.Logger
@@ -40,8 +40,12 @@ func StateAction(ctx context.Context, cmd *cli.Command) error {
 	//
 	// 	logger = slog.New(slog.NewTextHandler(f, nil))
 	// }
-	m := &model.BaseModel{}
-	_, err := tea.NewProgram(m).Run()
+	m, err := model.NewBaseModel(logFilePath)
+	if err != nil {
+		return err
+	}
+
+	_, err = tea.NewProgram(m).Run()
 	return err
 }
 

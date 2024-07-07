@@ -53,6 +53,11 @@ func StateAction(ctx context.Context, cmd *cli.Command) error {
 		context:    ctx,
 		spinner:    m.Spinner,
 		logger:     m.Logger,
+		scope:      scope.NewScope(),
+		state: &state.State{
+			Resources: map[string]*state.ResourceState{},
+			Builds:    map[string]*state.BuildState{},
+		},
 	}
 	m.Current = init
 	_, err = tea.NewProgram(m).Run()
@@ -70,11 +75,6 @@ type StateInit struct {
 }
 
 func (m *StateInit) Init() tea.Cmd {
-	m.scope = scope.NewScope()
-	m.state = &state.State{
-		Resources: map[string]*state.ResourceState{},
-		Builds:    map[string]*state.BuildState{},
-	}
 	cmd := func() tea.Msg {
 		c := state.Converter{
 			BlueprintInterpreter: &interpreter.Interpreter{Logger: m.logger},
