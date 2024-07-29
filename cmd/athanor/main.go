@@ -19,6 +19,7 @@ func main() {
 				Commands: []*cli.Command{
 					show.NewPlanCommand(),
 					show.NewStateCommand(),
+					show.NewDiffCommand(),
 				},
 			},
 		},

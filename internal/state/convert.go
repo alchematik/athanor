@@ -65,9 +65,7 @@ func (c *Converter) ConvertBuildStmt(s *State, sc *scope.Scope, build external.D
 	}
 
 	sc.SetBuild(buildID, b)
-	s.Builds[buildID] = &BuildState{
-		name: build.Name,
-	}
+	s.Builds[buildID] = NewBuildState(build.Name)
 
 	return b, nil
 }
@@ -93,9 +91,7 @@ func (c *Converter) ConvertResourceStmt(s *State, sc *scope.Scope, stmt external
 	}
 
 	sc.SetResource(resourceID, r)
-	s.Resources[resourceID] = &ResourceState{
-		name: stmt.Name,
-	}
+	s.Resources[resourceID] = NewResourceState(stmt.Name)
 	return r, nil
 }
 

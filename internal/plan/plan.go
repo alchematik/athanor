@@ -27,6 +27,10 @@ func (p *Plan) Build(id string) (*BuildPlan, bool) {
 	return b, ok
 }
 
+func NewResourcePlan(name string) *ResourcePlan {
+	return &ResourcePlan{name: name}
+}
+
 type ResourcePlan struct {
 	sync.Mutex
 
@@ -94,6 +98,10 @@ func (r *ResourcePlan) ToEvaluating() {
 	r.evalState.State = "evaluating"
 }
 
+func NewBuildPlan(name string) *BuildPlan {
+	return &BuildPlan{name: name}
+}
+
 type BuildPlan struct {
 	sync.Mutex
 
@@ -158,7 +166,8 @@ type Resource struct {
 	Provider   Maybe[Provider]
 	Identifier Maybe[any]
 	Config     Maybe[any]
-	Attrs      Maybe[any]
+	// TODO: remove?
+	Attrs Maybe[any]
 }
 
 type Provider struct {

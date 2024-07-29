@@ -34,6 +34,19 @@ func (m Maybe[T]) Unwrap() (T, bool) {
 	return m.Value, !m.Unknown
 }
 
+func MaybeIsOfType[V any](m Maybe[any]) bool {
+	v, _ := m.Unwrap()
+	_, ok := v.(V)
+	return ok
+}
+
+func ToMaybeType[V any](m Maybe[any]) Maybe[V] {
+	unwrapped, _ := m.Unwrap()
+	v := unwrapped.(V)
+
+	return Maybe[V]{Value: v, Unknown: m.Unknown}
+}
+
 type ExprAny[T any] struct {
 	Value Expr[T]
 }

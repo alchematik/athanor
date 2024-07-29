@@ -41,7 +41,6 @@ func NewPlanCommand() *cli.Command {
 func PlanAction(ctx context.Context, cmd *cli.Command) error {
 	inputPath := cmd.Args().First()
 	logFilePath := cmd.String("log-file")
-	configFilePath := cmd.String("config")
 
 	m, err := model.NewBaseModel(logFilePath)
 	if err != nil {
@@ -49,11 +48,10 @@ func PlanAction(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	init := &PlanInitModel{
-		inputPath:  inputPath,
-		configPath: configFilePath,
-		context:    ctx,
-		spinner:    m.Spinner,
-		logger:     m.Logger,
+		inputPath: inputPath,
+		context:   ctx,
+		spinner:   m.Spinner,
+		logger:    m.Logger,
 	}
 	m.Current = init
 	_, err = tea.NewProgram(m).Run()
@@ -61,13 +59,12 @@ func PlanAction(ctx context.Context, cmd *cli.Command) error {
 }
 
 type PlanInitModel struct {
-	logger     *slog.Logger
-	inputPath  string
-	configPath string
-	scope      *scope.Scope
-	plan       *plan.Plan
-	context    context.Context
-	spinner    *spinner.Model
+	logger    *slog.Logger
+	inputPath string
+	scope     *scope.Scope
+	plan      *plan.Plan
+	context   context.Context
+	spinner   *spinner.Model
 }
 
 func (s *PlanInitModel) Init() tea.Cmd {

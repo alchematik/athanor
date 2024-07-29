@@ -41,19 +41,17 @@ func NewStateCommand() *cli.Command {
 func StateAction(ctx context.Context, cmd *cli.Command) error {
 	inputPath := cmd.Args().First()
 	logFilePath := cmd.String("log-file")
-	configFilePath := cmd.String("config")
 
 	m, err := model.NewBaseModel(logFilePath)
 	if err != nil {
 		return err
 	}
 	init := &StateInit{
-		inputPath:  inputPath,
-		configPath: configFilePath,
-		context:    ctx,
-		spinner:    m.Spinner,
-		logger:     m.Logger,
-		scope:      scope.NewScope(),
+		inputPath: inputPath,
+		context:   ctx,
+		spinner:   m.Spinner,
+		logger:    m.Logger,
+		scope:     scope.NewScope(),
 		state: &state.State{
 			Resources: map[string]*state.ResourceState{},
 			Builds:    map[string]*state.BuildState{},

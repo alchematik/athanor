@@ -71,9 +71,7 @@ func (c *Converter) ConvertBuildStmt(p *Plan, sc *scope.Scope, build external.De
 	}
 
 	sc.SetBuild(buildID, b)
-	p.Builds[buildID] = &BuildPlan{
-		name: build.Name,
-	}
+	p.Builds[buildID] = NewBuildPlan(build.Name)
 
 	return b, nil
 }
@@ -108,9 +106,7 @@ func (c *Converter) ConvertResourceStmt(p *Plan, sc *scope.Scope, stmt external.
 	}
 
 	sc.SetResource(resourceID, r)
-	p.Resources[resourceID] = &ResourcePlan{
-		name: stmt.Name,
-	}
+	p.Resources[resourceID] = NewResourcePlan(stmt.Name)
 	return r, nil
 }
 

@@ -32,12 +32,15 @@ type EvalState struct {
 	Error error
 }
 
+func NewResourceState(name string) *ResourceState {
+	return &ResourceState{name: name}
+}
+
 type ResourceState struct {
 	sync.Mutex
 
 	name      string
 	evalState EvalState
-	error     error
 	exists    bool
 	resource  Resource
 }
@@ -92,6 +95,10 @@ func (r *ResourceState) ToEvaluating() {
 	defer r.Unlock()
 
 	r.evalState.State = "evaluating"
+}
+
+func NewBuildState(name string) *BuildState {
+	return &BuildState{name: name}
 }
 
 type BuildState struct {
