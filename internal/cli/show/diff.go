@@ -2,11 +2,16 @@ package show
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"sort"
+	"strings"
 
 	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/cli/model"
+	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/eval"
 	"github.com/alchematik/athanor/internal/interpreter"
 	"github.com/alchematik/athanor/internal/plan"
 	"github.com/alchematik/athanor/internal/scope"
@@ -15,6 +20,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/urfave/cli/v3"
+	"github.com/xlab/treeprint"
 )
 
 func NewDiffCommand() *cli.Command {
@@ -71,6 +77,7 @@ type DiffInit struct {
 	inputPath string
 	scope     *scope.Scope
 	diff      *diff.Diff
+	context   context.Context
 }
 
 func (m *DiffInit) Init() tea.Cmd {
@@ -117,8 +124,158 @@ func (m *DiffInit) View() string {
 func (m *DiffInit) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg.(type) {
 	case string:
-		return m, nil
+		iter := m.scope.NewIterator()
+		next := &DiffEval{
+			logger:  m.logger,
+			iter:    iter,
+			context: m.context,
+			spinner: m.spinner,
+			scope:   m.scope,
+			diff:    m.diff,
+			evaluator: &eval.DiffEvaluator{
+				Iter:   iter,
+				Logger: m.logger,
+			},
+		}
+		return next, next.Init()
 	default:
 		return m, nil
+	}
+}
+
+type DiffEval struct {
+	logger    *slog.Logger
+	iter      *dag.Iterator
+	context   context.Context
+	spinner   *spinner.Model
+	diff      *diff.Diff
+	scope     *scope.Scope
+	evaluator *eval.DiffEvaluator
+}
+
+func (e *DiffEval) Init() tea.Cmd {
+	ids := e.evaluator.Next()
+	cmds := make([]tea.Cmd, len(ids))
+	for i, id := range ids {
+		cmds[i] = func() tea.Msg { return evalMsg{id: id} }
+	}
+	return tea.Batch(cmds...)
+}
+
+func (s *DiffEval) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case evalMsg:
+		return s, func() tea.Msg {
+			comp, ok := s.scope.Component(msg.id)
+			if !ok {
+				return model.ErrorMsg{Error: fmt.Errorf("component not found: %s", msg.id)}
+			}
+
+			err := s.evaluator.Eval(s.context, s.diff, comp)
+			if err != nil {
+				return model.ErrorMsg{Error: err}
+			}
+
+			next := s.evaluator.Next()
+
+			return nextMsg{next: next}
+		}
+	case nextMsg:
+		if len(msg.next) == 0 {
+			return s, func() tea.Msg { return "done" }
+		}
+		cmds := make([]tea.Cmd, len(msg.next))
+		for i, id := range msg.next {
+			cmds[i] = func() tea.Msg { return evalMsg{id: id} }
+		}
+
+		return s, tea.Batch(cmds...)
+	case string:
+		s.logger.Info("done")
+		return s, nil
+	default:
+		return s, nil
+	}
+}
+
+func (s *DiffEval) View() string {
+	tree := treeprint.New()
+	build := s.scope.Build().Build(".Build")
+	b, _ := s.diff.Build(".Build")
+	tree.SetValue(s.renderEvalState(b.GetEvalState()) + "Build")
+	s.addNodes(tree, s.diff, build)
+
+	return tree.String()
+}
+
+func (s *DiffEval) renderEvalState(es diff.EvalState) string {
+	switch es.State {
+	case "", "done":
+		return ""
+	case "evaluating":
+		return s.spinner.View()
+	case "error":
+		return "x"
+	default:
+		return ""
+	}
+}
+
+func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.Diff, build *scope.Build) {
+	resources := build.Resources()
+	sort.Strings(resources)
+	for _, id := range resources {
+		rs, ok := p.Resource(id)
+		if !ok {
+			panic("resource not in state: " + id)
+		}
+
+		t.AddNode(s.renderResource(rs.GetEvalState(), rs.GetName(), rs.GetResource()))
+	}
+
+	builds := build.Builds()
+	sort.Strings(builds)
+	for _, id := range builds {
+		bs, ok := p.Build(id)
+		if !ok {
+			panic("build not in state: " + id)
+		}
+
+		branch := t.AddBranch(s.renderEvalState(bs.GetEvalState()) + bs.GetName())
+
+		s.addNodes(branch, p, build.Build(id))
+	}
+}
+
+func (s *DiffEval) renderResource(st diff.EvalState, name string, r diff.DiffType[diff.Resource]) string {
+	providerStr := fmt.Sprintf("(%s@%s)", r.Diff.Provider.Name, r.Diff.Provider.Version)
+	out := s.renderEvalState(st) + name + " " + providerStr + " " + "\n"
+	// out += "    [identifier]\n"
+	// out += render(r.Identifier, 8, false)
+	out += "    [config]\n"
+	out += s.renderDiff(r.Diff.Config, 8)
+	// out += "    [attrs]\n"
+	// out += render(r.Attrs, 8, false)
+	return out
+}
+
+func (s *DiffEval) renderDiff(d diff.DiffType[any], space int) string {
+	padding := strings.Repeat(" ", space)
+	switch d := d.Diff.(type) {
+	case diff.DiffMap:
+		var list [][]string
+		// for k, v := range d {
+
+		// TODO: handle nested maps.
+		// list = append(list, []string{k, s.renderDiff(v, 0)})
+		// }
+
+		return format(space, list)
+	case diff.DiffLiteral[string]:
+		return padding + fmt.Sprintf("'%s' -> '%s'", d.State, d.Plan)
+	case diff.DiffLiteral[bool]:
+		return padding + fmt.Sprintf("%v -> %v", d.State, d.Plan)
+	default:
+		return fmt.Sprintf("unknown type: %T", d)
 	}
 }

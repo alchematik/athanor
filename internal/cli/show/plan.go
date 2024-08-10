@@ -292,23 +292,27 @@ func renderMaybeString(str plan.Maybe[string]) string {
 	return `"` + val + `"`
 }
 
-func renderMaybe(val any, space int, inline bool) string {
+func renderMaybe(val plan.Maybe[any], space int, inline bool) string {
 	padding := strings.Repeat(" ", space)
 	if inline {
 		padding = ""
 	}
-	switch val := val.(type) {
-	case plan.Maybe[any]:
-		v, ok := val.Unwrap()
-		if !ok {
-			return padding + "(known after reconcile)"
-		}
-
-		return renderMaybe(v, space, inline)
-	case plan.Maybe[string]:
-		return padding + renderMaybeString(val)
-	case plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]]:
-		m, ok := val.Unwrap()
+	_, ok := val.Unwrap()
+	if !ok {
+		return padding + "(known after reconcile)"
+	}
+	switch {
+	// case plan.Maybe[any]:
+	// 	v, ok := val.Unwrap()
+	// 	if !ok {
+	// 		return padding + "(known after reconcile)"
+	// 	}
+	//
+	// 	return renderMaybe(v, space, inline)
+	case plan.MaybeIsOfType[string](val):
+		return padding + renderMaybeString(plan.ToMaybeType[string](val))
+	case plan.MaybeIsOfType[map[plan.Maybe[string]]plan.Maybe[any]](val):
+		m, ok := plan.ToMaybeType[map[plan.Maybe[string]]plan.Maybe[any]](val).Unwrap()
 		if !ok {
 			return padding + unknown
 		}
@@ -317,14 +321,8 @@ func renderMaybe(val any, space int, inline bool) string {
 		for k, v := range m {
 			keyLabel := renderMaybeString(k)
 
-			mapVal, ok := v.Unwrap()
-			if !ok {
-				list = append(list, []string{keyLabel, unknown})
-				continue
-			}
-
 			// TODO: Handle nested maps.
-			list = append(list, []string{keyLabel, renderMaybe(mapVal, 0, false)})
+			list = append(list, []string{keyLabel, renderMaybe(v, 0, false)})
 		}
 
 		return format(space, list)

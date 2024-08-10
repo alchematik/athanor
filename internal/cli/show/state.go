@@ -270,13 +270,6 @@ func render(val any, space int, inline bool) string {
 		padding = ""
 	}
 	switch val := val.(type) {
-	// case any:
-	// 	v, ok := val.Unwrap()
-	// 	if !ok {
-	// 		return padding + "(known after reconcile)"
-	// 	}
-	//
-	// 	return renderMaybe(v, space, inline)
 	case string:
 		return padding + renderString(val)
 	case map[string]any:

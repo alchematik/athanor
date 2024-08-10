@@ -91,7 +91,7 @@ type ExprMap struct {
 	State state.ExprMap
 }
 
-type DiffMap map[string]DiffType[any]
+type DiffMap map[DiffType[DiffLiteral[string]]]DiffType[any]
 
 func (e ExprMap) Eval(ctx context.Context, d *Diff) (DiffType[DiffMap], error) {
 	s, err := e.State.Eval(ctx, d.State)
@@ -141,6 +141,10 @@ func (e ExprResource) Eval(ctx context.Context, d *Diff) (DiffType[Resource], er
 	}
 
 	t.Diff.Config = cfg
+	t.Diff.Provider = Provider{
+		Name:    s.Provider.Name,
+		Version: s.Provider.Version,
+	}
 
 	// TODO: Handle case where creating or deleting resource.
 	t.Type = t.Diff.Config.Type
@@ -160,29 +164,65 @@ func diffMap(p plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]], s map[string]
 	}
 
 	var isUnknown, isUpdate bool
-	for k, v := range unwrapped {
+	for k, pv := range unwrapped {
 		pk, ok := k.Unwrap()
 		if !ok {
 			isUnknown = true
 			continue
 		}
 
-		sv := s[pk]
+		sv, ok := s[pk]
+		if !ok {
+			d, err := diffLiteral[string](k, "")
+			if err != nil {
+				return t, err
+			}
+			if d.Type == TypeUnknown {
+				isUnknown = true
+			}
+			if d.Type != TypeNoop {
+				isUpdate = true
+			}
 
-		var err error
-		t.Diff[pk], err = diffAny(v, sv)
+			dv, err := diffAny(pv, nil)
+			if err != nil {
+				return t, err
+			}
+
+			t.Diff[d] = dv
+
+			continue
+		}
+
+		d, err := diffLiteral[string](k, pk)
 		if err != nil {
-			return t, nil
+			return t, err
 		}
 
-		if t.Diff[pk].Type == TypeUnknown {
-			isUnknown = true
+		dv, err := diffAny(pv, sv)
+		if err != nil {
+			return t, err
 		}
 
-		if t.Diff[pk].Type != TypeNoop {
-			isUpdate = true
-		}
+		t.Diff[d] = dv
 	}
+
+	// for sk := range s {
+	// 	_, ok := t.Diff[sk]
+	// 	if ok {
+	// 		continue
+	// 	}
+	//
+	// 	// var err error
+	// 	// t.Diff[sk], err = diffAny(plan.Maybe[any]{}, sv)
+	// 	// if err != nil {
+	// 	// 	return t, err
+	// 	// }
+	//
+	// 	t.Diff[sk] = DiffType[any]{
+	// 		Type: TypeDelete,
+	// 	}
+	// }
 
 	switch {
 	case isUnknown:
@@ -199,11 +239,6 @@ func diffMap(p plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]], s map[string]
 func diffAny(p plan.Maybe[any], s any) (DiffType[any], error) {
 	switch {
 	case plan.MaybeIsOfType[string](p):
-		s, ok := s.(string)
-		if !ok {
-			return DiffType[any]{}, fmt.Errorf("cannot compare string and %T", s)
-		}
-
 		d, err := diffLiteral[string](plan.ToMaybeType[string](p), s)
 		if err != nil {
 			return DiffType[any]{}, err
@@ -214,11 +249,6 @@ func diffAny(p plan.Maybe[any], s any) (DiffType[any], error) {
 			Type: d.Type,
 		}, nil
 	case plan.MaybeIsOfType[bool](p):
-		s, ok := s.(bool)
-		if !ok {
-			return DiffType[any]{}, fmt.Errorf("cannot compare string and %T", s)
-		}
-
 		d, err := diffLiteral[bool](plan.ToMaybeType[bool](p), s)
 		if err != nil {
 			return DiffType[any]{}, err
@@ -228,25 +258,70 @@ func diffAny(p plan.Maybe[any], s any) (DiffType[any], error) {
 			Diff: d.Diff,
 			Type: d.Type,
 		}, nil
+	case plan.MaybeIsOfType[map[plan.Maybe[string]]plan.Maybe[any]](p):
+		s, ok := s.(map[string]any)
+		if !ok {
+			return DiffType[any]{}, fmt.Errorf("cannot compare map and %T", s)
+		}
+
+		d, err := diffMap(plan.ToMaybeType[map[plan.Maybe[string]]plan.Maybe[any]](p), s)
+		if err != nil {
+			return DiffType[any]{}, err
+		}
+
+		return DiffType[any]{
+			Diff: d.Diff,
+			Type: d.Type,
+		}, nil
 	default:
-		return DiffType[any]{}, nil
+		// if p.Value == nil {
+		// 	if s == nil {
+		// 		return DiffType[any]{
+		// 			Type: TypeNoop,
+		// 		}, nil
+		// 	}
+		//
+		// 	switch s := s.(type) {
+		// 	case string:
+		//
+		// 		return DiffType[any]{
+		// 			Type: TypeDelete,
+		// 		}, nil
+		// 	}
+		//
+		// }
+
+		return DiffType[any]{}, fmt.Errorf("unknown type: %T", p)
 	}
 }
 
-func diffLiteral[T comparable](p plan.Maybe[T], s T) (DiffType[DiffLiteral[T]], error) {
+func diffLiteral[T comparable](p plan.Maybe[T], s any) (DiffType[DiffLiteral[T]], error) {
 	unwrapped, ok := p.Unwrap()
+
+	var val T
+	var isNil bool
+	switch s := s.(type) {
+	case T:
+		val = s
+	case nil:
+		isNil = true
+	default:
+		return DiffType[DiffLiteral[T]]{}, fmt.Errorf("incompatible type %T for type %T", s, val)
+	}
 
 	t := DiffType[DiffLiteral[T]]{
 		Diff: DiffLiteral[T]{
 			Plan:  unwrapped,
-			State: s,
+			State: val,
 		},
 	}
 
 	switch {
 	case !ok:
 		t.Type = TypeUnknown
-	case unwrapped == s:
+	case isNil:
+		t.Type = TypeDelete
+	case unwrapped == val:
 		t.Type = TypeNoop
 	default:
 		t.Type = TypeUpdate

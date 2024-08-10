@@ -57,7 +57,8 @@ func (e ExprAny[T]) Eval(ctx context.Context, p *Plan) (Maybe[any], error) {
 		return Maybe[any]{}, err
 	}
 
-	return Maybe[any]{Value: out}, nil
+	val, ok := out.Unwrap()
+	return Maybe[any]{Value: val, Unknown: !ok}, nil
 }
 
 type ExprLiteral[T any] struct {

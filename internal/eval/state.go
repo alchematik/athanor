@@ -56,6 +56,7 @@ func (e *StateEvaluator) Eval(ctx context.Context, s *state.State, stmt any) err
 			return nil
 		}
 
+		// TODO: Handle cases where not exist
 		current.ToDone(r, true)
 		return nil
 	case state.StmtBuild:
