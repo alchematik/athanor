@@ -12,7 +12,7 @@ type StmtBuild struct {
 	ID                string
 	Name              string
 	BuildID           string
-	Exists            Expr[DiffLiteral[bool]]
+	Exists            Expr[Literal[bool]]
 	Stmts             []any
 	StateRuntimeInput state.Expr[map[string]any]
 	PlanRuntimeInput  plan.Expr[map[plan.Maybe[string]]plan.Maybe[any]]
@@ -22,49 +22,49 @@ type StmtResource struct {
 	ID       string
 	Name     string
 	BuildID  string
-	Exists   Expr[DiffLiteral[bool]]
+	Exists   Expr[Literal[bool]]
 	Resource Expr[Resource]
 }
 
-type Type string
+type Action string
 
 const (
-	TypeCreate  Type = "create"
-	TypeUpdate       = "update"
-	TypeDelete       = "delete"
-	TypeNoop         = "noop"
-	TypeUnknown      = "unknown"
-	TypeEmpty        = ""
+	ActionCreate  Action = "create"
+	ActionUpdate         = "update"
+	ActionDelete         = "delete"
+	ActionNoop           = "noop"
+	ActionUnknown        = "unknown"
+	ActionEmpty          = ""
 )
 
 type Expr[T any] interface {
-	Eval(context.Context, *Diff) (DiffType[T], error)
+	Eval(context.Context, *DiffResult) (Diff[T], error)
 }
 
-type DiffType[T any] struct {
-	Diff T
-	Type Type
+type Diff[T any] struct {
+	Diff   T
+	Action Action
 }
 
 type ExprAny[T any] struct {
 	Value Expr[T]
 }
 
-func (e ExprAny[T]) Eval(ctx context.Context, d *Diff) (DiffType[any], error) {
+func (e ExprAny[T]) Eval(ctx context.Context, d *DiffResult) (Diff[any], error) {
 	res, err := e.Value.Eval(ctx, d)
 	if err != nil {
-		return DiffType[any]{}, err
+		return Diff[any]{}, err
 	}
 
-	return DiffType[any]{
-		Diff: res.Diff,
-		Type: res.Type,
+	return Diff[any]{
+		Diff:   res.Diff,
+		Action: res.Action,
 	}, nil
 }
 
-type DiffLiteral[T any] struct {
-	Plan  T
-	State T
+type Literal[T any] struct {
+	Plan  Emptyable[T]
+	State Emptyable[T]
 }
 
 type ExprLiteral[T comparable] struct {
@@ -72,18 +72,26 @@ type ExprLiteral[T comparable] struct {
 	State state.Expr[T]
 }
 
-func (e ExprLiteral[T]) Eval(ctx context.Context, d *Diff) (DiffType[DiffLiteral[T]], error) {
+type Emptyable[T any] struct {
+	Value   T
+	IsEmpty bool
+}
+
+func (e ExprLiteral[T]) Eval(ctx context.Context, d *DiffResult) (Diff[Literal[T]], error) {
 	p, err := e.Plan.Eval(ctx, d.Plan)
 	if err != nil {
-		return DiffType[DiffLiteral[T]]{}, err
+		return Diff[Literal[T]]{}, err
 	}
 
 	s, err := e.State.Eval(ctx, d.State)
 	if err != nil {
-		return DiffType[DiffLiteral[T]]{}, err
+		return Diff[Literal[T]]{}, err
 	}
 
-	return diffLiteral[T](p, s)
+	return diffLiteral[T](
+		Emptyable[plan.Maybe[T]]{Value: p},
+		Emptyable[T]{Value: s},
+	)
 }
 
 type ExprMap struct {
@@ -91,20 +99,23 @@ type ExprMap struct {
 	State state.ExprMap
 }
 
-type DiffMap map[DiffType[DiffLiteral[string]]]DiffType[any]
+type Map map[Diff[Literal[string]]]Diff[any]
 
-func (e ExprMap) Eval(ctx context.Context, d *Diff) (DiffType[DiffMap], error) {
+func (e ExprMap) Eval(ctx context.Context, d *DiffResult) (Diff[Map], error) {
 	s, err := e.State.Eval(ctx, d.State)
 	if err != nil {
-		return DiffType[DiffMap]{}, err
+		return Diff[Map]{}, err
 	}
 
 	p, err := e.Plan.Eval(ctx, d.Plan)
 	if err != nil {
-		return DiffType[DiffMap]{}, err
+		return Diff[Map]{}, err
 	}
 
-	return diffMap(p, s)
+	return diffMap(
+		Emptyable[plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]]]{Value: p},
+		Emptyable[map[string]any]{Value: s},
+	)
 }
 
 type ExprResource struct {
@@ -113,29 +124,33 @@ type ExprResource struct {
 	State state.Expr[state.Resource]
 }
 
-func (e ExprResource) Eval(ctx context.Context, d *Diff) (DiffType[Resource], error) {
+func (e ExprResource) Eval(ctx context.Context, d *DiffResult) (Diff[Resource], error) {
 	// TODO: Handle not found.
 	s, err := e.State.Eval(ctx, d.State)
 	if err != nil {
-		return DiffType[Resource]{}, err
+		return Diff[Resource]{}, err
 	}
 
 	p, err := e.Plan.Eval(ctx, d.Plan)
 	if err != nil {
-		return DiffType[Resource]{}, err
+		return Diff[Resource]{}, err
 	}
 
-	t := DiffType[Resource]{
+	t := Diff[Resource]{
 		Diff: Resource{},
 	}
 
 	unwrapped, ok := p.Unwrap()
 	if !ok {
-		t.Type = TypeUnknown
+		t.Action = ActionUnknown
 		return t, nil
 	}
 
-	cfg, err := diffAny(unwrapped.Config, s.Config)
+	// TODO: Handle not found.
+	cfg, err := diffAny(
+		Emptyable[plan.Maybe[any]]{Value: unwrapped.Config, IsEmpty: unwrapped.Config.Value == nil},
+		Emptyable[any]{Value: s.Config, IsEmpty: s.Config == nil},
+	)
 	if err != nil {
 		return t, err
 	}
@@ -147,184 +162,325 @@ func (e ExprResource) Eval(ctx context.Context, d *Diff) (DiffType[Resource], er
 	}
 
 	// TODO: Handle case where creating or deleting resource.
-	t.Type = t.Diff.Config.Type
+	t.Action = t.Diff.Config.Action
 
 	return t, nil
 }
 
-func diffMap(p plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]], s map[string]any) (DiffType[DiffMap], error) {
-	t := DiffType[DiffMap]{
-		Diff: DiffMap{},
-	}
-
-	unwrapped, ok := p.Unwrap()
-	if !ok {
-		t.Type = TypeUnknown
-		return t, nil
-	}
-
-	var isUnknown, isUpdate bool
-	for k, pv := range unwrapped {
-		pk, ok := k.Unwrap()
-		if !ok {
-			isUnknown = true
-			continue
-		}
-
-		sv, ok := s[pk]
-		if !ok {
-			d, err := diffLiteral[string](k, "")
-			if err != nil {
-				return t, err
-			}
-			if d.Type == TypeUnknown {
-				isUnknown = true
-			}
-			if d.Type != TypeNoop {
-				isUpdate = true
-			}
-
-			dv, err := diffAny(pv, nil)
-			if err != nil {
-				return t, err
-			}
-
-			t.Diff[d] = dv
-
-			continue
-		}
-
-		d, err := diffLiteral[string](k, pk)
-		if err != nil {
-			return t, err
-		}
-
-		dv, err := diffAny(pv, sv)
-		if err != nil {
-			return t, err
-		}
-
-		t.Diff[d] = dv
-	}
-
-	// for sk := range s {
-	// 	_, ok := t.Diff[sk]
-	// 	if ok {
-	// 		continue
-	// 	}
-	//
-	// 	// var err error
-	// 	// t.Diff[sk], err = diffAny(plan.Maybe[any]{}, sv)
-	// 	// if err != nil {
-	// 	// 	return t, err
-	// 	// }
-	//
-	// 	t.Diff[sk] = DiffType[any]{
-	// 		Type: TypeDelete,
-	// 	}
-	// }
-
+func diffMap(p Emptyable[plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]]], s Emptyable[map[string]any]) (Diff[Map], error) {
 	switch {
-	case isUnknown:
-		t.Type = TypeUnknown
-	case isUpdate:
-		t.Type = TypeUpdate
-	default:
-		t.Type = TypeNoop
-	}
+	case p.IsEmpty && s.IsEmpty:
+		return Diff[Map]{
+			Action: ActionNoop,
+			Diff:   Map{},
+		}, nil
+	case p.IsEmpty && !s.IsEmpty:
+		m := Map{}
+		for sk, sv := range s.Value {
+			kd, err := diffLiteral[string](
+				Emptyable[plan.Maybe[string]]{IsEmpty: true},
+				Emptyable[string]{Value: sk},
+			)
+			if err != nil {
+				return Diff[Map]{}, err
+			}
 
-	return t, nil
+			vd, err := diffAny(
+				Emptyable[plan.Maybe[any]]{IsEmpty: true},
+				Emptyable[any]{Value: sv},
+			)
+			if err != nil {
+				return Diff[Map]{}, err
+			}
+
+			m[kd] = vd
+		}
+
+		return Diff[Map]{
+			Action: ActionDelete,
+			Diff:   m,
+		}, nil
+	case !p.IsEmpty && s.IsEmpty:
+		m := Map{}
+		unwrapped, ok := p.Value.Unwrap()
+		if !ok {
+			return Diff[Map]{
+				Action: ActionUnknown,
+				Diff:   m,
+			}, nil
+		}
+
+		for k, v := range unwrapped {
+			kd, err := diffLiteral[string](
+				Emptyable[plan.Maybe[string]]{Value: k},
+				Emptyable[string]{IsEmpty: true},
+			)
+			if err != nil {
+				return Diff[Map]{}, err
+			}
+
+			vd, err := diffAny(
+				Emptyable[plan.Maybe[any]]{Value: v},
+				Emptyable[any]{IsEmpty: true},
+			)
+			if err != nil {
+				return Diff[Map]{}, err
+			}
+
+			m[kd] = vd
+		}
+
+		return Diff[Map]{
+			Action: ActionCreate,
+			Diff:   m,
+		}, nil
+	default:
+		m := Map{}
+		unwrapped, ok := p.Value.Unwrap()
+		if !ok {
+			return Diff[Map]{
+				Action: ActionUnknown,
+				Diff:   m,
+			}, nil
+		}
+
+		var isUpdate bool
+		for k, v := range unwrapped {
+			kp, ok := k.Unwrap()
+			if !ok {
+				kd := Diff[Literal[string]]{
+					Action: ActionUnknown,
+				}
+				m[kd] = Diff[any]{
+					Action: ActionUnknown,
+				}
+				continue
+			}
+			sv, present := s.Value[kp]
+			if present {
+				kd := Diff[Literal[string]]{
+					Action: ActionNoop,
+					Diff: Literal[string]{
+						Plan:  Emptyable[string]{Value: kp},
+						State: Emptyable[string]{Value: kp},
+					},
+				}
+
+				vd, err := diffAny(
+					Emptyable[plan.Maybe[any]]{Value: v},
+					Emptyable[any]{Value: sv},
+				)
+				if err != nil {
+					return Diff[Map]{}, err
+				}
+
+				isUpdate = isUpdate || vd.Action != ActionNoop
+
+				m[kd] = vd
+				continue
+			}
+
+			kd, err := diffLiteral[string](
+				Emptyable[plan.Maybe[string]]{Value: k},
+				Emptyable[string]{IsEmpty: true},
+			)
+			if err != nil {
+				return Diff[Map]{}, err
+			}
+
+			vd, err := diffAny(
+				Emptyable[plan.Maybe[any]]{Value: v},
+				Emptyable[any]{IsEmpty: true},
+			)
+			if err != nil {
+				return Diff[Map]{}, err
+			}
+
+			m[kd] = vd
+		}
+
+		for k, v := range s.Value {
+			kd := Diff[Literal[string]]{
+				Action: ActionNoop,
+				Diff: Literal[string]{
+					Plan:  Emptyable[string]{Value: k},
+					State: Emptyable[string]{Value: k},
+				},
+			}
+
+			_, ok := m[kd]
+			if ok {
+				// Diff already accounted for.
+				continue
+			}
+
+			kd = Diff[Literal[string]]{
+				Action: ActionDelete,
+				Diff: Literal[string]{
+					Plan:  Emptyable[string]{IsEmpty: true},
+					State: Emptyable[string]{Value: k},
+				},
+			}
+
+			vd, err := diffAny(
+				Emptyable[plan.Maybe[any]]{IsEmpty: true},
+				Emptyable[any]{Value: v},
+			)
+			if err != nil {
+				return Diff[Map]{}, err
+			}
+
+			isUpdate = true
+			m[kd] = vd
+		}
+
+		var action Action = ActionNoop
+		if isUpdate {
+			action = ActionUpdate
+		}
+
+		return Diff[Map]{
+			Action: action,
+			Diff:   m,
+		}, nil
+	}
 }
 
-func diffAny(p plan.Maybe[any], s any) (DiffType[any], error) {
-	switch {
-	case plan.MaybeIsOfType[string](p):
-		d, err := diffLiteral[string](plan.ToMaybeType[string](p), s)
+func diffAny(p Emptyable[plan.Maybe[any]], s Emptyable[any]) (Diff[any], error) {
+	if p.IsEmpty && s.IsEmpty {
+		return Diff[any]{Action: ActionNoop}, nil
+	}
+
+	if p.IsEmpty {
+		switch val := s.Value.(type) {
+		case string:
+			return Diff[any]{
+				Action: ActionDelete,
+				Diff: Literal[string]{
+					Plan:  Emptyable[string]{IsEmpty: true},
+					State: Emptyable[string]{Value: val},
+				},
+			}, nil
+		case bool:
+			return Diff[any]{
+				Action: ActionDelete,
+				Diff: Literal[bool]{
+					Plan:  Emptyable[bool]{IsEmpty: true},
+					State: Emptyable[bool]{Value: val},
+				},
+			}, nil
+		case map[string]any:
+			d, err := diffMap(
+				Emptyable[plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]]]{IsEmpty: true},
+				Emptyable[map[string]any]{Value: val},
+			)
+			if err != nil {
+				return Diff[any]{}, err
+			}
+
+			return Diff[any]{
+				Action: ActionDelete,
+				Diff:   d,
+			}, nil
+		default:
+			return Diff[any]{}, fmt.Errorf("unknown state diff type: %T", s.Value)
+		}
+	}
+
+	switch planVal := p.Value.Value.(type) {
+	case string:
+		stringPlanVal, _ := p.Value.Value.(string)
+		stringPlan := Emptyable[plan.Maybe[string]]{
+			IsEmpty: p.IsEmpty,
+			Value: plan.Maybe[string]{
+				Unknown: p.Value.Unknown,
+				Value:   stringPlanVal,
+			},
+		}
+		stringStateVal, _ := s.Value.(string)
+		stringState := Emptyable[string]{
+			IsEmpty: s.IsEmpty,
+			Value:   stringStateVal,
+		}
+		d, err := diffLiteral[string](stringPlan, stringState)
 		if err != nil {
-			return DiffType[any]{}, err
+			return Diff[any]{}, err
 		}
 
-		return DiffType[any]{
-			Diff: d.Diff,
-			Type: d.Type,
+		return Diff[any]{
+			Diff:   d.Diff,
+			Action: d.Action,
 		}, nil
-	case plan.MaybeIsOfType[bool](p):
-		d, err := diffLiteral[bool](plan.ToMaybeType[bool](p), s)
+	case bool:
+		d, err := diffLiteral[bool](
+			Emptyable[plan.Maybe[bool]]{
+				IsEmpty: p.IsEmpty,
+				Value: plan.Maybe[bool]{
+					Unknown: p.Value.Unknown,
+					Value:   p.Value.Value.(bool),
+				},
+			},
+			Emptyable[bool]{
+				IsEmpty: s.IsEmpty,
+				Value:   s.Value.(bool),
+			},
+		)
 		if err != nil {
-			return DiffType[any]{}, err
+			return Diff[any]{}, err
 		}
 
-		return DiffType[any]{
-			Diff: d.Diff,
-			Type: d.Type,
+		return Diff[any]{
+			Diff:   d.Diff,
+			Action: d.Action,
 		}, nil
-	case plan.MaybeIsOfType[map[plan.Maybe[string]]plan.Maybe[any]](p):
-		s, ok := s.(map[string]any)
-		if !ok {
-			return DiffType[any]{}, fmt.Errorf("cannot compare map and %T", s)
-		}
-
-		d, err := diffMap(plan.ToMaybeType[map[plan.Maybe[string]]plan.Maybe[any]](p), s)
+	case map[plan.Maybe[string]]plan.Maybe[any]:
+		stateVal, _ := s.Value.(map[string]any)
+		d, err := diffMap(
+			Emptyable[plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]]]{
+				IsEmpty: p.IsEmpty,
+				Value: plan.Maybe[map[plan.Maybe[string]]plan.Maybe[any]]{
+					Unknown: p.Value.Unknown,
+					Value:   planVal,
+				},
+			},
+			Emptyable[map[string]any]{
+				IsEmpty: s.IsEmpty,
+				Value:   stateVal,
+			},
+		)
 		if err != nil {
-			return DiffType[any]{}, err
+			return Diff[any]{}, err
 		}
 
-		return DiffType[any]{
-			Diff: d.Diff,
-			Type: d.Type,
+		return Diff[any]{
+			Diff:   d.Diff,
+			Action: d.Action,
 		}, nil
 	default:
-		// if p.Value == nil {
-		// 	if s == nil {
-		// 		return DiffType[any]{
-		// 			Type: TypeNoop,
-		// 		}, nil
-		// 	}
-		//
-		// 	switch s := s.(type) {
-		// 	case string:
-		//
-		// 		return DiffType[any]{
-		// 			Type: TypeDelete,
-		// 		}, nil
-		// 	}
-		//
-		// }
-
-		return DiffType[any]{}, fmt.Errorf("unknown type: %T", p)
+		return Diff[any]{}, fmt.Errorf("unknown diff type: %T", p.Value.Value)
 	}
 }
 
-func diffLiteral[T comparable](p plan.Maybe[T], s any) (DiffType[DiffLiteral[T]], error) {
-	unwrapped, ok := p.Unwrap()
-
-	var val T
-	var isNil bool
-	switch s := s.(type) {
-	case T:
-		val = s
-	case nil:
-		isNil = true
-	default:
-		return DiffType[DiffLiteral[T]]{}, fmt.Errorf("incompatible type %T for type %T", s, val)
-	}
-
-	t := DiffType[DiffLiteral[T]]{
-		Diff: DiffLiteral[T]{
-			Plan:  unwrapped,
-			State: val,
+func diffLiteral[T comparable](p Emptyable[plan.Maybe[T]], s Emptyable[T]) (Diff[Literal[T]], error) {
+	unwrapped, ok := p.Value.Unwrap()
+	t := Diff[Literal[T]]{
+		Diff: Literal[T]{
+			Plan:  Emptyable[T]{Value: unwrapped},
+			State: s,
 		},
 	}
 
 	switch {
 	case !ok:
-		t.Type = TypeUnknown
-	case isNil:
-		t.Type = TypeDelete
-	case unwrapped == val:
-		t.Type = TypeNoop
+		t.Action = ActionUnknown
+	case p.IsEmpty && s.IsEmpty || unwrapped == s.Value:
+		t.Action = ActionNoop
+	case s.IsEmpty:
+		t.Action = ActionCreate
+	case p.IsEmpty:
+		t.Action = ActionDelete
 	default:
-		t.Type = TypeUpdate
+		t.Action = ActionUpdate
 	}
 
 	return t, nil

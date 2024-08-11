@@ -19,7 +19,7 @@ type BlueprintInterpreter interface {
 	InterpretBlueprint(source external.BlueprintSource, input map[string]any) (external.Blueprint, error)
 }
 
-func (c *Converter) ConvertStmt(d *Diff, sc *scope.Scope, stmt external.Stmt) (any, error) {
+func (c *Converter) ConvertStmt(d *DiffResult, sc *scope.Scope, stmt external.Stmt) (any, error) {
 	switch stmt := stmt.Value.(type) {
 	case external.DeclareResource:
 		return c.ConvertResourceStmt(d, sc, stmt)
@@ -30,7 +30,7 @@ func (c *Converter) ConvertStmt(d *Diff, sc *scope.Scope, stmt external.Stmt) (a
 	}
 }
 
-func (c *Converter) ConvertBuildStmt(d *Diff, sc *scope.Scope, stmt external.DeclareBuild) (StmtBuild, error) {
+func (c *Converter) ConvertBuildStmt(d *DiffResult, sc *scope.Scope, stmt external.DeclareBuild) (StmtBuild, error) {
 	blueprint, err := c.BlueprintInterpreter.InterpretBlueprint(stmt.BlueprintSource, stmt.Input)
 	if err != nil {
 		return StmtBuild{}, err
@@ -73,7 +73,7 @@ func (c *Converter) ConvertBuildStmt(d *Diff, sc *scope.Scope, stmt external.Dec
 	return b, nil
 }
 
-func (c *Converter) ConvertResourceStmt(d *Diff, sc *scope.Scope, stmt external.DeclareResource) (StmtResource, error) {
+func (c *Converter) ConvertResourceStmt(d *DiffResult, sc *scope.Scope, stmt external.DeclareResource) (StmtResource, error) {
 	resourceID := sc.ComponentID(stmt.Name)
 
 	d.Plan.Resources[resourceID] = plan.NewResourcePlan(stmt.Name)
@@ -133,7 +133,7 @@ func (c *Converter) ConvertAnyExpr(name string, expr external.Expr) (Expr[any], 
 			return nil, err
 		}
 
-		return ExprAny[DiffLiteral[bool]]{
+		return ExprAny[Literal[bool]]{
 			Value: expr,
 		}, nil
 	default:
@@ -142,7 +142,7 @@ func (c *Converter) ConvertAnyExpr(name string, expr external.Expr) (Expr[any], 
 
 }
 
-func (c *Converter) ConvertBoolExpr(name string, expr external.Expr) (Expr[DiffLiteral[bool]], error) {
+func (c *Converter) ConvertBoolExpr(name string, expr external.Expr) (Expr[Literal[bool]], error) {
 	switch expr.Value.(type) {
 	case external.BoolLiteral:
 		p, err := c.PlanConverter.ConvertBoolExpr(name, expr)

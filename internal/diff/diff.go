@@ -7,7 +7,7 @@ import (
 	"github.com/alchematik/athanor/internal/state"
 )
 
-type Diff struct {
+type DiffResult struct {
 	sync.Mutex
 
 	Plan      *plan.Plan
@@ -16,7 +16,7 @@ type Diff struct {
 	Builds    map[string]*BuildDiff
 }
 
-func (d *Diff) Resource(id string) (*ResourceDiff, bool) {
+func (d *DiffResult) Resource(id string) (*ResourceDiff, bool) {
 	d.Lock()
 	defer d.Unlock()
 
@@ -24,7 +24,7 @@ func (d *Diff) Resource(id string) (*ResourceDiff, bool) {
 	return r, ok
 }
 
-func (d *Diff) Build(id string) (*BuildDiff, bool) {
+func (d *DiffResult) Build(id string) (*BuildDiff, bool) {
 	d.Lock()
 	defer d.Unlock()
 
@@ -77,8 +77,8 @@ type ResourceDiff struct {
 
 	name      string
 	evalState EvalState
-	exists    DiffType[DiffLiteral[bool]]
-	resource  DiffType[Resource]
+	exists    Diff[Literal[bool]]
+	resource  Diff[Resource]
 }
 
 func (r *ResourceDiff) ToEvaluating() {
@@ -88,7 +88,7 @@ func (r *ResourceDiff) ToEvaluating() {
 	r.evalState.State = "evaluating"
 }
 
-func (r *ResourceDiff) ToDone(rd DiffType[Resource], exists DiffType[DiffLiteral[bool]]) {
+func (r *ResourceDiff) ToDone(rd Diff[Resource], exists Diff[Literal[bool]]) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -120,7 +120,7 @@ func (r *ResourceDiff) GetName() string {
 	return r.name
 }
 
-func (r *ResourceDiff) GetResource() DiffType[Resource] {
+func (r *ResourceDiff) GetResource() Diff[Resource] {
 	r.Lock()
 	defer r.Unlock()
 
@@ -131,7 +131,7 @@ type Resource struct {
 	Type       string
 	Provider   Provider
 	Identifier any
-	Config     DiffType[any]
+	Config     Diff[any]
 }
 
 type Provider struct {

@@ -53,7 +53,7 @@ func DiffAction(ctx context.Context, cmd *cli.Command) error {
 		spinner:   m.Spinner,
 		logger:    m.Logger,
 		inputPath: inputPath,
-		diff: &diff.Diff{
+		diff: &diff.DiffResult{
 			Resources: map[string]*diff.ResourceDiff{},
 			Builds:    map[string]*diff.BuildDiff{},
 			Plan: &plan.Plan{
@@ -76,7 +76,7 @@ type DiffInit struct {
 	spinner   *spinner.Model
 	inputPath string
 	scope     *scope.Scope
-	diff      *diff.Diff
+	diff      *diff.DiffResult
 	context   context.Context
 }
 
@@ -148,7 +148,7 @@ type DiffEval struct {
 	iter      *dag.Iterator
 	context   context.Context
 	spinner   *spinner.Model
-	diff      *diff.Diff
+	diff      *diff.DiffResult
 	scope     *scope.Scope
 	evaluator *eval.DiffEvaluator
 }
@@ -221,7 +221,7 @@ func (s *DiffEval) renderEvalState(es diff.EvalState) string {
 	}
 }
 
-func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.Diff, build *scope.Build) {
+func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.DiffResult, build *scope.Build) {
 	resources := build.Resources()
 	sort.Strings(resources)
 	for _, id := range resources {
@@ -247,7 +247,7 @@ func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.Diff, build *scope.Build) 
 	}
 }
 
-func (s *DiffEval) renderResource(st diff.EvalState, name string, r diff.DiffType[diff.Resource]) string {
+func (s *DiffEval) renderResource(st diff.EvalState, name string, r diff.Diff[diff.Resource]) string {
 	providerStr := fmt.Sprintf("(%s@%s)", r.Diff.Provider.Name, r.Diff.Provider.Version)
 	out := s.renderEvalState(st) + name + " " + providerStr + " " + "\n"
 	// out += "    [identifier]\n"
@@ -259,23 +259,58 @@ func (s *DiffEval) renderResource(st diff.EvalState, name string, r diff.DiffTyp
 	return out
 }
 
-func (s *DiffEval) renderDiff(d diff.DiffType[any], space int) string {
+func (s *DiffEval) renderDiff(d diff.Diff[any], space int) string {
 	padding := strings.Repeat(" ", space)
-	switch d := d.Diff.(type) {
-	case diff.DiffMap:
+	switch v := d.Diff.(type) {
+	case diff.Map:
 		var list [][]string
 		// for k, v := range d {
 
 		// TODO: handle nested maps.
 		// list = append(list, []string{k, s.renderDiff(v, 0)})
 		// }
+		for kd, vd := range v {
+			list = append(list, []string{renderStringDiff(kd, 0), s.renderDiff(vd, 0)})
+		}
 
 		return format(space, list)
-	case diff.DiffLiteral[string]:
-		return padding + fmt.Sprintf("'%s' -> '%s'", d.State, d.Plan)
-	case diff.DiffLiteral[bool]:
-		return padding + fmt.Sprintf("%v -> %v", d.State, d.Plan)
+	case diff.Literal[string]:
+		switch d.Action {
+		case diff.ActionCreate:
+			return padding + v.Plan.Value
+		case diff.ActionDelete:
+			return padding + v.State.Value
+		case diff.ActionUpdate:
+			return padding + fmt.Sprintf("'%s' -> '%s'", v.State.Value, v.Plan.Value)
+		default:
+			panic("unknown action: " + d.Action)
+		}
+	case diff.Literal[bool]:
+		switch d.Action {
+		case diff.ActionCreate:
+			return padding + fmt.Sprintf("%v", v.Plan.Value)
+		case diff.ActionDelete:
+			return padding + fmt.Sprintf("%v", v.Plan.Value)
+		case diff.ActionUpdate:
+			return padding + fmt.Sprintf("'%v' -> '%v'", v.State.Value, v.Plan.Value)
+		default:
+			panic("unknown action: " + d.Action)
+		}
 	default:
 		return fmt.Sprintf("unknown type: %T", d)
+	}
+}
+
+func renderStringDiff(d diff.Diff[diff.Literal[string]], space int) string {
+	padding := strings.Repeat(" ", space)
+	switch d.Action {
+	case diff.ActionCreate:
+		return padding + d.Diff.Plan.Value
+	case diff.ActionDelete:
+		return padding + d.Diff.State.Value
+	case diff.ActionUpdate:
+		return padding + fmt.Sprintf("'%s' -> '%s'", d.Diff.State.Value, d.Diff.Plan.Value)
+	default:
+		panic("unknown action: " + d.Action)
 	}
 }

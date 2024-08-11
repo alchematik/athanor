@@ -18,7 +18,7 @@ func (e *DiffEvaluator) Next() []string {
 	return e.Iter.Next()
 }
 
-func (e *DiffEvaluator) Eval(ctx context.Context, d *diff.Diff, stmt any) error {
+func (e *DiffEvaluator) Eval(ctx context.Context, d *diff.DiffResult, stmt any) error {
 	switch stmt := stmt.(type) {
 	case diff.StmtResource:
 		current, ok := d.Resource(stmt.ID)

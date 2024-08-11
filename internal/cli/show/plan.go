@@ -297,11 +297,11 @@ func renderMaybe(val plan.Maybe[any], space int, inline bool) string {
 	if inline {
 		padding = ""
 	}
-	_, ok := val.Unwrap()
+	v, ok := val.Unwrap()
 	if !ok {
 		return padding + "(known after reconcile)"
 	}
-	switch {
+	switch v.(type) {
 	// case plan.Maybe[any]:
 	// 	v, ok := val.Unwrap()
 	// 	if !ok {
@@ -309,9 +309,9 @@ func renderMaybe(val plan.Maybe[any], space int, inline bool) string {
 	// 	}
 	//
 	// 	return renderMaybe(v, space, inline)
-	case plan.MaybeIsOfType[string](val):
+	case string:
 		return padding + renderMaybeString(plan.ToMaybeType[string](val))
-	case plan.MaybeIsOfType[map[plan.Maybe[string]]plan.Maybe[any]](val):
+	case map[plan.Maybe[string]]plan.Maybe[any]:
 		m, ok := plan.ToMaybeType[map[plan.Maybe[string]]plan.Maybe[any]](val).Unwrap()
 		if !ok {
 			return padding + unknown
