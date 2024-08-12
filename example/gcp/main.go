@@ -110,6 +110,12 @@ func main() {
 												Value: "my-config",
 											},
 										},
+										"test": {
+											Type: "string",
+											Value: ast.StringLiteral{
+												Value: "hey",
+											},
+										},
 									},
 								},
 							},

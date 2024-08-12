@@ -249,10 +249,10 @@ func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.DiffResult, build *scope.B
 
 func (s *DiffEval) renderResource(st diff.EvalState, name string, r diff.Diff[diff.Resource]) string {
 	providerStr := fmt.Sprintf("(%s@%s)", r.Diff.Provider.Name, r.Diff.Provider.Version)
-	out := s.renderEvalState(st) + name + " " + providerStr + " " + "\n"
+	out := renderDiffAction(r.Action) + s.renderEvalState(st) + name + " " + providerStr + " " + "\n"
 	// out += "    [identifier]\n"
 	// out += render(r.Identifier, 8, false)
-	out += "    [config]\n"
+	out += renderDiffAction(r.Diff.Config.Action) + "    [config]\n"
 	out += s.renderDiff(r.Diff.Config, 8)
 	// out += "    [attrs]\n"
 	// out += render(r.Attrs, 8, false)
@@ -277,22 +277,26 @@ func (s *DiffEval) renderDiff(d diff.Diff[any], space int) string {
 	case diff.Literal[string]:
 		switch d.Action {
 		case diff.ActionCreate:
-			return padding + v.Plan.Value
+			return "+ " + padding + v.Plan.Value
 		case diff.ActionDelete:
-			return padding + v.State.Value
+			return "- " + padding + v.State.Value
 		case diff.ActionUpdate:
-			return padding + fmt.Sprintf("'%s' -> '%s'", v.State.Value, v.Plan.Value)
+			return "~ " + padding + fmt.Sprintf("'%s' -> '%s'", v.State.Value, v.Plan.Value)
+		case diff.ActionNoop:
+			return "  " + padding + v.Plan.Value
 		default:
 			panic("unknown action: " + d.Action)
 		}
 	case diff.Literal[bool]:
 		switch d.Action {
 		case diff.ActionCreate:
-			return padding + fmt.Sprintf("%v", v.Plan.Value)
+			return "+ " + padding + fmt.Sprintf("%v", v.Plan.Value)
 		case diff.ActionDelete:
-			return padding + fmt.Sprintf("%v", v.Plan.Value)
+			return "- " + padding + fmt.Sprintf("%v", v.Plan.Value)
 		case diff.ActionUpdate:
-			return padding + fmt.Sprintf("'%v' -> '%v'", v.State.Value, v.Plan.Value)
+			return "~ " + padding + fmt.Sprintf("'%v' -> '%v'", v.State.Value, v.Plan.Value)
+		case diff.ActionNoop:
+			return "  " + padding + fmt.Sprintf("%v", v.Plan.Value)
 		default:
 			panic("unknown action: " + d.Action)
 		}
@@ -305,12 +309,31 @@ func renderStringDiff(d diff.Diff[diff.Literal[string]], space int) string {
 	padding := strings.Repeat(" ", space)
 	switch d.Action {
 	case diff.ActionCreate:
-		return padding + d.Diff.Plan.Value
+		return "+ " + padding + d.Diff.Plan.Value
 	case diff.ActionDelete:
-		return padding + d.Diff.State.Value
+		return "- " + padding + d.Diff.State.Value
 	case diff.ActionUpdate:
-		return padding + fmt.Sprintf("'%s' -> '%s'", d.Diff.State.Value, d.Diff.Plan.Value)
+		return "~ " + padding + fmt.Sprintf("'%s' -> '%s'", d.Diff.State.Value, d.Diff.Plan.Value)
+	case diff.ActionNoop:
+		return "  " + padding + d.Diff.Plan.Value
 	default:
 		panic("unknown action: " + d.Action)
+	}
+}
+
+func renderDiffAction(a diff.Action) string {
+	switch a {
+	case diff.ActionNoop:
+		return "  "
+	case diff.ActionDelete:
+		return "- "
+	case diff.ActionCreate:
+		return "+ "
+	case diff.ActionUpdate:
+		return "~ "
+	case diff.ActionUnknown:
+		return "? "
+	default:
+		return "  "
 	}
 }

@@ -40,6 +40,7 @@ type EvalState struct {
 type BuildDiff struct {
 	sync.Mutex
 
+	action    Action
 	name      string
 	evalState EvalState
 }
@@ -63,6 +64,13 @@ func (b *BuildDiff) GetEvalState() EvalState {
 	defer b.Unlock()
 
 	return b.evalState
+}
+
+func (b *BuildDiff) GetAction() Action {
+	b.Lock()
+	defer b.Unlock()
+
+	return b.action
 }
 
 func (b *BuildDiff) GetName() string {

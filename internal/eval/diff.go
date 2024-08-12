@@ -7,6 +7,8 @@ import (
 
 	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/plan"
+	"github.com/alchematik/athanor/internal/state"
 )
 
 type DiffEvaluator struct {
@@ -42,13 +44,13 @@ func (e *DiffEvaluator) Eval(ctx context.Context, d *diff.DiffResult, stmt any) 
 			return nil
 		}
 
+		// TODO: This doesn't make sense because the state exists will always be false.
+		// Need to get rid of the resource expr and move the identifier, config, etc into the statement.
 		exists, err := stmt.Exists.Eval(ctx, d)
 		if err != nil {
 			current.ToError(err)
 			return nil
 		}
-
-		e.Logger.Info("resource >>>>>>>>>>>>>>", "resource", r)
 
 		current.ToDone(r, exists)
 		return nil
@@ -59,6 +61,19 @@ func (e *DiffEvaluator) Eval(ctx context.Context, d *diff.DiffResult, stmt any) 
 		}
 
 		if e.Iter.Visited(stmt.ID) {
+			s, _ := d.State.Build(stmt.ID)
+			p, _ := d.Plan.Build(stmt.ID)
+			stateExists := s.GetExists()
+			planExists := p.GetExists()
+			expr := diff.ExprLiteral[bool]{
+				Plan:  plan.ExprLiteral[bool]{Value: planExists.Value},
+				State: state.ExprLiteral[bool]{Value: stateExists},
+			}
+
+			// TODO: Use these values
+			exists, err := expr.Eval(ctx, d)
+			e.Logger.Info("got build exists diff", "exists", exists, "err", err)
+
 			current.ToDone()
 			return e.Iter.Done(stmt.ID)
 		}
