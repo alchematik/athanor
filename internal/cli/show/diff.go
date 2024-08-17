@@ -230,7 +230,7 @@ func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.DiffResult, build *scope.B
 			panic("resource not in state: " + id)
 		}
 
-		t.AddNode(s.renderResource(rs.GetEvalState(), rs.GetName(), rs.GetResource()))
+		t.AddNode(s.renderResource(rs))
 	}
 
 	builds := build.Builds()
@@ -247,13 +247,15 @@ func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.DiffResult, build *scope.B
 	}
 }
 
-func (s *DiffEval) renderResource(st diff.EvalState, name string, r diff.Diff[diff.Resource]) string {
-	providerStr := fmt.Sprintf("(%s@%s)", r.Diff.Provider.Name, r.Diff.Provider.Version)
-	out := renderDiffAction(r.Action) + s.renderEvalState(st) + name + " " + providerStr + " " + "\n"
-	// out += "    [identifier]\n"
-	// out += render(r.Identifier, 8, false)
-	out += renderDiffAction(r.Diff.Config.Action) + "    [config]\n"
-	out += s.renderDiff(r.Diff.Config, 8)
+func (s *DiffEval) renderResource(r *diff.ResourceDiff) string {
+	p := r.GetProvider()
+	providerStr := fmt.Sprintf("(%s@%s)", p.Name, p.Version)
+	out := s.renderEvalState(r.GetEvalState()) + r.GetName() + " " + providerStr + " " + "\n"
+	out += "    [identifier]\n"
+	out += render(r.Identifier(), 8, false)
+	configDiff := r.GetConfig()
+	out += renderDiffAction(configDiff.Action) + "    [config]\n"
+	out += s.renderDiff(configDiff, 8)
 	// out += "    [attrs]\n"
 	// out += render(r.Attrs, 8, false)
 	return out

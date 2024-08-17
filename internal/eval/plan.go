@@ -45,14 +45,35 @@ func (e *PlanEvaluator) Eval(ctx context.Context, p *plan.Plan, stmt any) error 
 			current.ToError(err)
 			return nil
 		}
+		current.SetExists(exists)
 
-		r, err := stmt.Resource.Eval(ctx, p)
+		t, err := stmt.Type.Eval(ctx, p)
 		if err != nil {
-			// TODO: handle not found.
 			current.ToError(err)
-			// TODO: is there a way to short-curcuit?
 			return nil
 		}
+		current.SetType(t)
+
+		provider, err := stmt.Provider.Eval(ctx, p)
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+		current.SetProvider(provider)
+
+		id, err := stmt.Identifier.Eval(ctx, p)
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+		current.SetIdentifier(id)
+
+		config, err := stmt.Config.Eval(ctx, p)
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+		current.SetConfig(config)
 
 		parent, ok := p.Build(stmt.BuildID)
 		if ok {
@@ -63,7 +84,7 @@ func (e *PlanEvaluator) Eval(ctx context.Context, p *plan.Plan, stmt any) error 
 			}
 		}
 
-		current.ToDone(r, exists)
+		current.ToDone()
 
 		return nil
 	case plan.StmtBuild:

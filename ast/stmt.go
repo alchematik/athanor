@@ -52,9 +52,12 @@ func (s *Stmt) UnmarshalJSON(data []byte) error {
 }
 
 type DeclareResource struct {
-	Name     string `json:"name"`
-	Exists   Expr   `json:"exists"`
-	Resource Expr   `json:"resource"`
+	Name       string `json:"name"`
+	Exists     Expr   `json:"exists"`
+	Type       Expr   `json:"type"`
+	Provider   Expr   `json:"provider"`
+	Identifier Expr   `json:"identifier"`
+	Config     Expr   `json:"config"`
 }
 
 type DeclareBuild struct {

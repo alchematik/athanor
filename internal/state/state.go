@@ -39,10 +39,14 @@ func NewResourceState(name string) *ResourceState {
 type ResourceState struct {
 	sync.Mutex
 
-	name      string
-	evalState EvalState
-	exists    bool
-	resource  Resource
+	name         string
+	evalState    EvalState
+	exists       bool
+	resourceType string
+	provider     Provider
+	identifier   any
+	config       any
+	attributes   any
 }
 
 func (r *ResourceState) GetName() string {
@@ -59,11 +63,81 @@ func (r *ResourceState) GetExists() bool {
 	return r.exists
 }
 
-func (r *ResourceState) GetResource() Resource {
+func (r *ResourceState) SetExists(exists bool) {
 	r.Lock()
 	defer r.Unlock()
 
-	return r.resource
+	r.exists = exists
+}
+
+func (r *ResourceState) Type() string {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.resourceType
+}
+
+func (r *ResourceState) SetType(t string) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.resourceType = t
+}
+
+func (r *ResourceState) Provider() Provider {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.provider
+}
+
+func (r *ResourceState) SetProvider(p Provider) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.provider = p
+}
+
+func (r *ResourceState) Identifier() any {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.identifier
+}
+
+func (r *ResourceState) SetIdentifier(id any) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.identifier = id
+}
+
+func (r *ResourceState) Config() any {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.config
+}
+
+func (r *ResourceState) SetConfig(config any) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.config = config
+}
+
+func (r *ResourceState) Attributes() any {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.attributes
+}
+
+func (r *ResourceState) SetAttributes(attrs any) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.attributes = attrs
 }
 
 func (r *ResourceState) GetEvalState() EvalState {
@@ -81,13 +155,11 @@ func (r *ResourceState) ToError(err error) {
 	r.evalState.Error = err
 }
 
-func (r *ResourceState) ToDone(resource Resource, exists bool) {
+func (r *ResourceState) ToDone() {
 	r.Lock()
 	defer r.Unlock()
 
 	r.evalState.State = "done"
-	r.resource = resource
-	r.exists = exists
 }
 
 func (r *ResourceState) ToEvaluating() {

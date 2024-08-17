@@ -21,38 +21,27 @@ func TestStmt_Unmarshal(t *testing.T) {
 			  "type": "resource",
 			  "value": {
 			    "name": "my-resource",
-			    "resource": {
-			      "type": "resource",
+			    "identifier": {
+			      "type": "map",
 			      "value": {
-			    		"exists": {
-			      		"type": "bool",
-			      		"value": {
-			        		"bool_literal": true
-			      		}
-			    		},
-			        "identifier": {
-			          "type": "map",
-			          "value": {
-			            "map_collection": {
-			              "foo": {
-			                "type": "string",
-			                "value": {
-			                  "string_literal": "bar"
-			                }
-			              }
+			        "map_collection": {
+			          "foo": {
+			            "type": "string",
+			            "value": {
+			              "string_literal": "bar"
 			            }
 			          }
-			        },
-			        "config": {
-			          "type": "map",
-			          "value": {
-			            "map_collection": {
-			              "enabled": {
-			                "type": "bool",
-			                "value": {
-			                  "bool_literal": true
-			                }
-			              }
+			        }
+			      }
+			    },
+			    "config": {
+			      "type": "map",
+			      "value": {
+			        "map_collection": {
+			          "enabled": {
+			            "type": "bool",
+			            "value": {
+			              "bool_literal": true
 			            }
 			          }
 			        }
@@ -64,29 +53,24 @@ func TestStmt_Unmarshal(t *testing.T) {
 				Type: "resource",
 				Value: ast.DeclareResource{
 					Name: "my-resource",
-					Resource: ast.Expr{
-						Type: "resource",
-						Value: ast.Resource{
-							Identifier: ast.Expr{
-								Type: "map",
-								Value: ast.MapCollection{
-									Value: map[string]ast.Expr{
-										"foo": {
-											Type:  "string",
-											Value: ast.StringLiteral{Value: "bar"},
-										},
-									},
+					Identifier: ast.Expr{
+						Type: "map",
+						Value: ast.MapCollection{
+							Value: map[string]ast.Expr{
+								"foo": {
+									Type:  "string",
+									Value: ast.StringLiteral{Value: "bar"},
 								},
 							},
-							Config: ast.Expr{
-								Type: "map",
-								Value: ast.MapCollection{
-									Value: map[string]ast.Expr{
-										"enabled": {
-											Type:  "bool",
-											Value: ast.BoolLiteral{Value: true},
-										},
-									},
+						},
+					},
+					Config: ast.Expr{
+						Type: "map",
+						Value: ast.MapCollection{
+							Value: map[string]ast.Expr{
+								"enabled": {
+									Type:  "bool",
+									Value: ast.BoolLiteral{Value: true},
 								},
 							},
 						},

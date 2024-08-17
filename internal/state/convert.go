@@ -71,23 +71,32 @@ func (c *Converter) ConvertBuildStmt(s *State, sc *scope.Scope, build external.D
 }
 
 func (c *Converter) ConvertResourceStmt(s *State, sc *scope.Scope, stmt external.DeclareResource) (StmtResource, error) {
-	resource, err := c.ConvertResourceExpr(stmt.Name, stmt.Resource)
+	// TODO: Validate
+
+	t, err := c.ConvertStringExpr(stmt.Name, stmt.Type)
 	if err != nil {
 		return StmtResource{}, err
 	}
 
-	exists, err := c.ConvertBoolExpr(stmt.Name, stmt.Exists)
+	provider, err := c.ConvertProviderExpr(stmt.Name, stmt.Provider)
+	if err != nil {
+		return StmtResource{}, err
+	}
+
+	id, err := c.ConvertAnyExpr(stmt.Name, stmt.Identifier)
 	if err != nil {
 		return StmtResource{}, err
 	}
 
 	resourceID := sc.ComponentID(stmt.Name)
 	r := StmtResource{
-		ID:       resourceID,
-		Name:     stmt.Name,
-		Exists:   exists,
-		BuildID:  sc.ID(),
-		Resource: resource,
+		ID:      resourceID,
+		Name:    stmt.Name,
+		BuildID: sc.ID(),
+
+		Type:       t,
+		Provider:   provider,
+		Identifier: id,
 	}
 
 	sc.SetResource(resourceID, r)
@@ -117,41 +126,6 @@ func (c *Converter) ConvertProviderExpr(name string, expr external.Expr) (Expr[P
 	}
 }
 
-func (c *Converter) ConvertResourceExpr(name string, expr external.Expr) (Expr[Resource], error) {
-	switch value := expr.Value.(type) {
-	case external.Resource:
-		identifier, err := c.ConvertAnyExpr(name, value.Identifier)
-		if err != nil {
-			return nil, err
-		}
-
-		config, err := c.ConvertAnyExpr(name, value.Config)
-		if err != nil {
-			return nil, err
-		}
-
-		t, err := c.ConvertStringExpr(name, value.Type)
-		if err != nil {
-			return nil, err
-		}
-
-		p, err := c.ConvertProviderExpr(name, value.Provider)
-		if err != nil {
-			return nil, err
-		}
-
-		return ExprResource{
-			Name:       name,
-			Provider:   p,
-			Type:       t,
-			Identifier: identifier,
-			Config:     config,
-		}, nil
-	default:
-		return nil, fmt.Errorf("invalid resource expr: %T", expr)
-	}
-}
-
 func (c *Converter) ConvertAnyExpr(name string, expr external.Expr) (Expr[any], error) {
 	switch expr.Value.(type) {
 	case external.StringLiteral:
@@ -175,13 +149,6 @@ func (c *Converter) ConvertAnyExpr(name string, expr external.Expr) (Expr[any], 
 		}
 
 		return ExprAny[map[string]any]{Value: expr}, nil
-	case external.Resource:
-		expr, err := c.ConvertResourceExpr(name, expr)
-		if err != nil {
-			return nil, err
-		}
-
-		return ExprAny[Resource]{Value: expr}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", expr.Value)
 	}

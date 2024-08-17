@@ -3,6 +3,7 @@ package plan
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	external "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/scope"
@@ -10,6 +11,7 @@ import (
 
 type Converter struct {
 	BlueprintInterpreter BlueprintInterpreter
+	Logger               *slog.Logger
 }
 
 type BlueprintInterpreter interface {
@@ -77,32 +79,44 @@ func (c *Converter) ConvertBuildStmt(p *Plan, sc *scope.Scope, build external.De
 }
 
 func (c *Converter) ConvertResourceStmt(p *Plan, sc *scope.Scope, stmt external.DeclareResource) (StmtResource, error) {
-	if stmt.Resource.IsEmpty() {
-		// TODO: Add validation error type.
-		return StmtResource{}, errors.New("must provide resource")
-	}
-
-	if stmt.Exists.IsEmpty() {
-		return StmtResource{}, errors.New("must provide exists")
-	}
-
-	resource, err := c.ConvertResourceExpr(stmt.Name, stmt.Resource)
-	if err != nil {
-		return StmtResource{}, err
-	}
+	// TODO: Validate
 
 	exists, err := c.ConvertBoolExpr(stmt.Name, stmt.Exists)
 	if err != nil {
 		return StmtResource{}, err
 	}
 
+	t, err := c.ConvertStringExpr(stmt.Name, stmt.Type)
+	if err != nil {
+		return StmtResource{}, err
+	}
+
+	provider, err := c.ConvertProviderExpr(stmt.Name, stmt.Provider)
+	if err != nil {
+		return StmtResource{}, err
+	}
+
+	id, err := c.ConvertAnyExpr(stmt.Name, stmt.Identifier)
+	if err != nil {
+		return StmtResource{}, err
+	}
+
+	config, err := c.ConvertAnyExpr(stmt.Name, stmt.Config)
+	if err != nil {
+		return StmtResource{}, err
+	}
+
 	resourceID := sc.ComponentID(stmt.Name)
 	r := StmtResource{
-		ID:       resourceID,
-		Name:     stmt.Name,
-		Exists:   exists,
-		BuildID:  sc.ID(),
-		Resource: resource,
+		ID:      resourceID,
+		Name:    stmt.Name,
+		BuildID: sc.ID(),
+
+		Exists:     exists,
+		Type:       t,
+		Provider:   provider,
+		Identifier: id,
+		Config:     config,
 	}
 
 	sc.SetResource(resourceID, r)
@@ -133,50 +147,8 @@ func (c *Converter) ConvertAnyExpr(name string, expr external.Expr) (Expr[any], 
 		}
 
 		return ExprAny[map[Maybe[string]]Maybe[any]]{Value: expr}, nil
-	case external.Resource:
-		expr, err := c.ConvertResourceExpr(name, expr)
-		if err != nil {
-			return nil, err
-		}
-
-		return ExprAny[Resource]{Value: expr}, nil
 	default:
 		return nil, fmt.Errorf("invalid expr: %T", expr.Value)
-	}
-}
-
-func (c *Converter) ConvertResourceExpr(name string, expr external.Expr) (Expr[Resource], error) {
-	switch value := expr.Value.(type) {
-	case external.Resource:
-		identifier, err := c.ConvertAnyExpr(name, value.Identifier)
-		if err != nil {
-			return nil, err
-		}
-
-		config, err := c.ConvertAnyExpr(name, value.Config)
-		if err != nil {
-			return nil, err
-		}
-
-		t, err := c.ConvertStringExpr(name, value.Type)
-		if err != nil {
-			return nil, err
-		}
-
-		p, err := c.ConvertProviderExpr(name, value.Provider)
-		if err != nil {
-			return nil, err
-		}
-
-		return ExprResource{
-			Name:       name,
-			Provider:   p,
-			Type:       t,
-			Identifier: identifier,
-			Config:     config,
-		}, nil
-	default:
-		return nil, fmt.Errorf("invalid resource expr: %T", expr)
 	}
 }
 

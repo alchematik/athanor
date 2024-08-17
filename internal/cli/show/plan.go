@@ -77,6 +77,7 @@ func (s *PlanInitModel) Init() tea.Cmd {
 	return func() tea.Msg {
 		c := plan.Converter{
 			BlueprintInterpreter: &interpreter.Interpreter{Logger: s.logger},
+			Logger:               s.logger,
 		}
 		b := external_ast.DeclareBuild{
 			Name: "Build",
@@ -124,7 +125,7 @@ func (m *PlanEvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Bu
 			continue
 		}
 
-		t.AddNode(m.renderResource(rs.GetEvalState(), rs.GetName(), rs.GetResource()))
+		t.AddNode(m.renderResource(rs.GetEvalState(), rs.GetName(), rs))
 	}
 
 	builds := build.Builds()
@@ -239,13 +240,8 @@ type nextMsg struct {
 	next []string
 }
 
-func (m *PlanEvalModel) renderResource(s plan.EvalState, name string, r plan.Maybe[plan.Resource]) string {
-	res, ok := r.Unwrap()
-	if !ok {
-		return fmt.Sprintf("%s (known after reconcile)", name)
-	}
-
-	provider, ok := res.Provider.Unwrap()
+func (m *PlanEvalModel) renderResource(s plan.EvalState, name string, res *plan.ResourcePlan) string {
+	provider, ok := res.Provider().Unwrap()
 	var providerStr string
 	if ok {
 		providerName, _ := provider.Name.Unwrap()
@@ -258,11 +254,11 @@ func (m *PlanEvalModel) renderResource(s plan.EvalState, name string, r plan.May
 
 	out := m.renderEvalState(s) + name + " " + providerStr + " " + "\n"
 	out += "    [identifier]\n"
-	out += renderMaybe(res.Identifier, 8, false)
+	out += renderMaybe(res.Identifier(), 8, false)
 	out += "    [config]\n"
-	out += renderMaybe(res.Config, 8, false)
-	out += "    [attrs]\n"
-	out += renderMaybe(res.Attrs, 8, false)
+	out += renderMaybe(res.Config(), 8, false)
+	// out += "    [attrs]\n"
+	// out += renderMaybe(res.Attrs, 8, false)
 	return out
 }
 

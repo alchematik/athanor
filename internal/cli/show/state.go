@@ -211,7 +211,7 @@ func (s *StateEvalModel) addNodes(t treeprint.Tree, p *state.State, build *scope
 			continue
 		}
 
-		t.AddNode(s.renderResource(rs.GetEvalState(), rs.GetName(), rs.GetResource()))
+		t.AddNode(s.renderResource(rs.GetEvalState(), rs.GetName(), rs))
 	}
 
 	builds := build.Builds()
@@ -246,17 +246,17 @@ func (s *StateEvalModel) renderEvalState(es state.EvalState) string {
 	}
 }
 
-func (s *StateEvalModel) renderResource(st state.EvalState, name string, r state.Resource) string {
-
-	providerStr := fmt.Sprintf("(%s@%s)", r.Provider.Name, r.Provider.Version)
+func (s *StateEvalModel) renderResource(st state.EvalState, name string, r *state.ResourceState) string {
+	p := r.Provider()
+	providerStr := fmt.Sprintf("(%s@%s)", p.Name, p.Version)
 
 	out := s.renderEvalState(st) + name + " " + providerStr + " " + "\n"
 	out += "    [identifier]\n"
-	out += render(r.Identifier, 8, false)
+	out += render(r.Identifier(), 8, false)
 	out += "    [config]\n"
-	out += render(r.Config, 8, false)
+	out += render(r.Config(), 8, false)
 	out += "    [attrs]\n"
-	out += render(r.Attrs, 8, false)
+	out += render(r.Attributes(), 8, false)
 	return out
 }
 

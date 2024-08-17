@@ -5,9 +5,14 @@ import (
 	"encoding/gob"
 	"fmt"
 	"log/slog"
+	"os/exec"
 
 	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/state"
+	"github.com/alchematik/athanor/provider"
+
+	"github.com/hashicorp/go-hclog"
+	plugin "github.com/hashicorp/go-plugin"
 )
 
 func init() {
@@ -50,14 +55,76 @@ func (e *StateEvaluator) Eval(ctx context.Context, s *state.State, stmt any) err
 			return err
 		}
 
-		r, err := stmt.Resource.Eval(ctx, s)
+		t, err := stmt.Type.Eval(ctx, s)
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+		current.SetType(t)
+
+		// TODO: Use provider to initialize plugin client.
+		prov, err := stmt.Provider.Eval(ctx, s)
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+		current.SetProvider(prov)
+
+		id, err := stmt.Identifier.Eval(ctx, s)
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+		current.SetIdentifier(id)
+
+		// TODO: Extract and use provider to determine plugin.
+		client := plugin.NewClient(&plugin.ClientConfig{
+			HandshakeConfig: plugin.HandshakeConfig{
+				ProtocolVersion:  1,
+				MagicCookieKey:   "BASIC_PLUGIN",
+				MagicCookieValue: "hello",
+			},
+			Plugins: map[string]plugin.Plugin{
+				"provider": &provider.Plugin{},
+			},
+			Cmd:    exec.Command(".provider/google-cloud-v0.0.1"),
+			Logger: hclog.NewNullLogger(),
+		})
+		defer client.Kill()
+
+		c, err := client.Client()
 		if err != nil {
 			current.ToError(err)
 			return nil
 		}
 
-		// TODO: Handle cases where not exist
-		current.ToDone(r, true)
+		pr, err := c.Dispense("provider")
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+
+		providerClient, ok := pr.(*provider.Client)
+		if !ok {
+			current.ToError(fmt.Errorf("invalid provider client: %T", pr))
+			return nil
+		}
+
+		res, err := providerClient.Get(ctx, provider.GetResourceRequest{
+			Type:       t,
+			Identifier: id,
+		})
+		if err != nil {
+			current.ToError(err)
+			return nil
+		}
+
+		// TODO: Handle case where doesn't exist
+		current.SetExists(true)
+		current.SetConfig(res.Resource.Config)
+		current.SetAttributes(res.Resource.Attrs)
+
+		current.ToDone()
 		return nil
 	case state.StmtBuild:
 		current, ok := s.Build(stmt.ID)

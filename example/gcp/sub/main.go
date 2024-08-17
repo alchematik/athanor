@@ -20,61 +20,56 @@ func main() {
 				Type: "resource",
 				Value: ast.DeclareResource{
 					Name: "my-sub-resource",
+					Type: ast.Expr{
+						Type: "string",
+						Value: ast.StringLiteral{
+							Value: "bucket",
+						},
+					},
 					Exists: ast.Expr{
 						Type: "bool",
 						Value: ast.BoolLiteral{
 							Value: true,
 						},
 					},
-					Resource: ast.Expr{
-						Type: "resource",
-						Value: ast.Resource{
-							Type: ast.Expr{
+					Provider: ast.Expr{
+						Type: "provider",
+						Value: ast.Provider{
+							Name: ast.Expr{
 								Type: "string",
 								Value: ast.StringLiteral{
-									Value: "bucket",
+									Value: "google-cloud",
 								},
 							},
-							Provider: ast.Expr{
-								Type: "provider",
-								Value: ast.Provider{
-									Name: ast.Expr{
-										Type: "string",
-										Value: ast.StringLiteral{
-											Value: "google-cloud",
-										},
-									},
-									Version: ast.Expr{
-										Type: "string",
-										Value: ast.StringLiteral{
-											Value: "v0.0.1",
-										},
-									},
+							Version: ast.Expr{
+								Type: "string",
+								Value: ast.StringLiteral{
+									Value: "v0.0.1",
 								},
 							},
-							Identifier: ast.Expr{
-								Type: "map",
-								Value: ast.MapCollection{
-									Value: map[string]ast.Expr{
-										"name": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "my-resource-name",
-											},
-										},
+						},
+					},
+					Identifier: ast.Expr{
+						Type: "map",
+						Value: ast.MapCollection{
+							Value: map[string]ast.Expr{
+								"name": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "my-resource-name",
 									},
 								},
 							},
-							Config: ast.Expr{
-								Type: "map",
-								Value: ast.MapCollection{
-									Value: map[string]ast.Expr{
-										"thing": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "my-config",
-											},
-										},
+						},
+					},
+					Config: ast.Expr{
+						Type: "map",
+						Value: ast.MapCollection{
+							Value: map[string]ast.Expr{
+								"thing": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "my-config",
 									},
 								},
 							},

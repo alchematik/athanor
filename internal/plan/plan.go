@@ -37,8 +37,12 @@ type ResourcePlan struct {
 	name      string
 	evalState EvalState
 	error     error
-	exists    Maybe[bool]
-	resource  Maybe[Resource]
+
+	resourceType Maybe[string]
+	exists       Maybe[bool]
+	provider     Maybe[Provider]
+	identifier   Maybe[any]
+	config       Maybe[any]
 }
 
 type EvalState struct {
@@ -60,11 +64,67 @@ func (r *ResourcePlan) GetExists() Maybe[bool] {
 	return r.exists
 }
 
-func (r *ResourcePlan) GetResource() Maybe[Resource] {
+func (r *ResourcePlan) SetExists(exists Maybe[bool]) {
 	r.Lock()
 	defer r.Unlock()
 
-	return r.resource
+	r.exists = exists
+}
+
+func (r *ResourcePlan) Provider() Maybe[Provider] {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.provider
+}
+
+func (r *ResourcePlan) SetProvider(provider Maybe[Provider]) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.provider = provider
+}
+
+func (r *ResourcePlan) Identifier() Maybe[any] {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.identifier
+}
+
+func (r *ResourcePlan) SetIdentifier(id Maybe[any]) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.identifier = id
+}
+
+func (r *ResourcePlan) Config() Maybe[any] {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.config
+}
+
+func (r *ResourcePlan) SetConfig(config Maybe[any]) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.config = config
+}
+
+func (r *ResourcePlan) Type() Maybe[string] {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.resourceType
+}
+
+func (r *ResourcePlan) SetType(t Maybe[string]) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.resourceType = t
 }
 
 func (r *ResourcePlan) GetEvalState() EvalState {
@@ -82,13 +142,11 @@ func (r *ResourcePlan) ToError(err error) {
 	r.evalState.Error = err
 }
 
-func (r *ResourcePlan) ToDone(resource Maybe[Resource], exists Maybe[bool]) {
+func (r *ResourcePlan) ToDone() {
 	r.Lock()
 	defer r.Unlock()
 
 	r.evalState.State = "done"
-	r.resource = resource
-	r.exists = exists
 }
 
 func (r *ResourcePlan) ToEvaluating() {

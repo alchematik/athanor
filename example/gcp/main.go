@@ -49,73 +49,68 @@ func main() {
 							Value: true,
 						},
 					},
-					Resource: ast.Expr{
-						Type: "resource",
-						Value: ast.Resource{
-							Type: ast.Expr{
+					Type: ast.Expr{
+						Type: "string",
+						Value: ast.StringLiteral{
+							Value: "bucket",
+						},
+					},
+					Provider: ast.Expr{
+						Type: "provider",
+						Value: ast.Provider{
+							Name: ast.Expr{
 								Type: "string",
 								Value: ast.StringLiteral{
-									Value: "bucket",
+									Value: "google-cloud",
 								},
 							},
-							Provider: ast.Expr{
-								Type: "provider",
-								Value: ast.Provider{
-									Name: ast.Expr{
-										Type: "string",
-										Value: ast.StringLiteral{
-											Value: "google-cloud",
-										},
-									},
-									Version: ast.Expr{
-										Type: "string",
-										Value: ast.StringLiteral{
-											Value: "v0.0.1",
-										},
-									},
+							Version: ast.Expr{
+								Type: "string",
+								Value: ast.StringLiteral{
+									Value: "v0.0.1",
 								},
 							},
-							Identifier: ast.Expr{
-								Type: "map",
-								Value: ast.MapCollection{
-									Value: map[string]ast.Expr{
-										"name": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "my-resource-name",
-											},
-										},
-										"region": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "us-west-2",
-											},
-										},
-										"project": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "1234",
-											},
-										},
+						},
+					},
+					Identifier: ast.Expr{
+						Type: "map",
+						Value: ast.MapCollection{
+							Value: map[string]ast.Expr{
+								"name": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "my-resource-name",
+									},
+								},
+								"region": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "us-west-2",
+									},
+								},
+								"project": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "1234",
 									},
 								},
 							},
-							Config: ast.Expr{
-								Type: "map",
-								Value: ast.MapCollection{
-									Value: map[string]ast.Expr{
-										"thing": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "my-config",
-											},
-										},
-										"test": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "hey",
-											},
-										},
+						},
+					},
+					Config: ast.Expr{
+						Type: "map",
+						Value: ast.MapCollection{
+							Value: map[string]ast.Expr{
+								"thing": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "my-config",
+									},
+								},
+								"test": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "hey",
 									},
 								},
 							},
@@ -133,67 +128,62 @@ func main() {
 							Value: true,
 						},
 					},
-					Resource: ast.Expr{
-						Type: "resource",
-						Value: ast.Resource{
-							Type: ast.Expr{
+					Type: ast.Expr{
+						Type: "string",
+						Value: ast.StringLiteral{
+							Value: "bucket",
+						},
+					},
+					Provider: ast.Expr{
+						Type: "provider",
+						Value: ast.Provider{
+							Name: ast.Expr{
 								Type: "string",
 								Value: ast.StringLiteral{
-									Value: "bucket",
+									Value: "google-cloud",
 								},
 							},
-							Provider: ast.Expr{
-								Type: "provider",
-								Value: ast.Provider{
-									Name: ast.Expr{
-										Type: "string",
-										Value: ast.StringLiteral{
-											Value: "google-cloud",
-										},
-									},
-									Version: ast.Expr{
-										Type: "string",
-										Value: ast.StringLiteral{
-											Value: "v0.0.1",
-										},
-									},
+							Version: ast.Expr{
+								Type: "string",
+								Value: ast.StringLiteral{
+									Value: "v0.0.1",
 								},
 							},
-							Identifier: ast.Expr{
-								Type: "map",
-								Value: ast.MapCollection{
-									Value: map[string]ast.Expr{
-										"name": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "my-other-resource-name",
-											},
-										},
-										"region": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "us-east-1",
-											},
-										},
-										"project": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "1234",
-											},
-										},
+						},
+					},
+					Identifier: ast.Expr{
+						Type: "map",
+						Value: ast.MapCollection{
+							Value: map[string]ast.Expr{
+								"name": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "my-other-resource-name",
+									},
+								},
+								"region": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "us-east-1",
+									},
+								},
+								"project": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "1234",
 									},
 								},
 							},
-							Config: ast.Expr{
-								Type: "map",
-								Value: ast.MapCollection{
-									Value: map[string]ast.Expr{
-										"other-thing": {
-											Type: "string",
-											Value: ast.StringLiteral{
-												Value: "my-config",
-											},
-										},
+						},
+					},
+					Config: ast.Expr{
+						Type: "map",
+						Value: ast.MapCollection{
+							Value: map[string]ast.Expr{
+								"other-thing": {
+									Type: "string",
+									Value: ast.StringLiteral{
+										Value: "my-config",
 									},
 								},
 							},

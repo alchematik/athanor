@@ -2,13 +2,6 @@ package state
 
 import (
 	"context"
-	"fmt"
-	"os/exec"
-
-	"github.com/alchematik/athanor/provider"
-
-	"github.com/hashicorp/go-hclog"
-	plugin "github.com/hashicorp/go-plugin"
 )
 
 type StmtBuild struct {
@@ -21,11 +14,13 @@ type StmtBuild struct {
 }
 
 type StmtResource struct {
-	ID       string
-	Name     string
-	BuildID  string
-	Exists   Expr[bool]
-	Resource Expr[Resource]
+	ID      string
+	Name    string
+	BuildID string
+
+	Type       Expr[string]
+	Provider   Expr[Provider]
+	Identifier Expr[any]
 }
 
 type Expr[T any] interface {
@@ -85,74 +80,6 @@ func (e ExprMap) Eval(ctx context.Context, s *State) (map[string]any, error) {
 	}
 
 	return m, nil
-}
-
-type ExprResource struct {
-	Name       string
-	Type       Expr[string]
-	Provider   Expr[Provider]
-	Identifier Expr[any]
-	Config     Expr[any]
-}
-
-func (e ExprResource) Eval(ctx context.Context, s *State) (Resource, error) {
-	id, err := e.Identifier.Eval(ctx, s)
-	if err != nil {
-		return Resource{}, err
-	}
-
-	t, err := e.Type.Eval(ctx, s)
-	if err != nil {
-		return Resource{}, err
-	}
-
-	p, err := e.Provider.Eval(ctx, s)
-	if err != nil {
-		return Resource{}, err
-	}
-
-	// TODO: Extract and use provider to determine plugin.
-	client := plugin.NewClient(&plugin.ClientConfig{
-		HandshakeConfig: plugin.HandshakeConfig{
-			ProtocolVersion:  1,
-			MagicCookieKey:   "BASIC_PLUGIN",
-			MagicCookieValue: "hello",
-		},
-		Plugins: map[string]plugin.Plugin{
-			"provider": &provider.Plugin{},
-		},
-		Cmd:    exec.Command(".provider/google-cloud-v0.0.1"),
-		Logger: hclog.NewNullLogger(),
-	})
-	defer client.Kill()
-
-	c, err := client.Client()
-	if err != nil {
-		return Resource{}, err
-	}
-
-	pr, err := c.Dispense("provider")
-	if err != nil {
-		return Resource{}, err
-	}
-
-	providerClient, ok := pr.(*provider.Client)
-	if !ok {
-		return Resource{}, fmt.Errorf("invalid provider client: %T", p)
-	}
-
-	res, err := providerClient.Get(ctx, provider.GetResourceRequest{
-		Type:       t,
-		Identifier: id,
-	})
-
-	return Resource{
-		Type:       t,
-		Provider:   p,
-		Identifier: id,
-		Config:     res.Resource.Config,
-		Attrs:      res.Resource.Attrs,
-	}, nil
 }
 
 type ExprProvider struct {

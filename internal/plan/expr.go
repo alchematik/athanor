@@ -14,11 +14,15 @@ type StmtBuild struct {
 }
 
 type StmtResource struct {
-	ID       string
-	Name     string
-	BuildID  string
-	Exists   Expr[bool]
-	Resource Expr[Resource]
+	ID      string
+	Name    string
+	BuildID string
+
+	Exists     Expr[bool]
+	Type       Expr[string]
+	Provider   Expr[Provider]
+	Identifier Expr[any]
+	Config     Expr[any]
 }
 
 type Expr[T any] interface {
@@ -82,46 +86,6 @@ func (e ExprMap) Eval(ctx context.Context, p *Plan) (Maybe[map[Maybe[string]]May
 	}
 
 	return Maybe[map[Maybe[string]]Maybe[any]]{Value: out}, nil
-}
-
-type ExprResource struct {
-	Name       string
-	Provider   Expr[Provider]
-	Type       Expr[string]
-	Identifier Expr[any]
-	Config     Expr[any]
-}
-
-func (e ExprResource) Eval(ctx context.Context, p *Plan) (Maybe[Resource], error) {
-	id, err := e.Identifier.Eval(ctx, p)
-	if err != nil {
-		return Maybe[Resource]{}, err
-	}
-
-	c, err := e.Config.Eval(ctx, p)
-	if err != nil {
-		return Maybe[Resource]{}, err
-	}
-
-	t, err := e.Type.Eval(ctx, p)
-	if err != nil {
-		return Maybe[Resource]{}, err
-	}
-
-	provider, err := e.Provider.Eval(ctx, p)
-	if err != nil {
-		return Maybe[Resource]{}, err
-	}
-
-	res := Resource{
-		Type:       t,
-		Provider:   provider,
-		Identifier: id,
-		Config:     c,
-		Attrs:      Maybe[any]{Unknown: true},
-	}
-
-	return Maybe[Resource]{Value: res}, nil
 }
 
 type ExprProvider struct {
