@@ -250,7 +250,8 @@ func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.DiffResult, build *scope.B
 func (s *DiffEval) renderResource(r *diff.ResourceDiff) string {
 	p := r.GetProvider()
 	providerStr := fmt.Sprintf("(%s@%s)", p.Name, p.Version)
-	out := s.renderEvalState(r.GetEvalState()) + r.GetName() + " " + providerStr + " " + "\n"
+	action := renderDiffAction(r.Action())
+	out := action + " " + s.renderEvalState(r.GetEvalState()) + r.GetName() + " " + providerStr + " " + "\n"
 	out += "    [identifier]\n"
 	out += render(r.Identifier(), 8, false)
 	configDiff := r.GetConfig()

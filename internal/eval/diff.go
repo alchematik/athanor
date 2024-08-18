@@ -169,6 +169,14 @@ func (e *DiffEvaluator) Eval(ctx context.Context, d *diff.DiffResult, stmt any) 
 			diff.Emptyable[any]{Value: res.Resource.Config},
 		)
 		current.SetConfig(configDiff)
+
+		action := existsDiff.Action
+		if action == diff.ActionNoop {
+			action = configDiff.Action
+		}
+
+		current.SetAction(action)
+
 		current.ToDone()
 		return nil
 	case diff.StmtBuild:

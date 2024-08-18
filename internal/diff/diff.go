@@ -86,6 +86,7 @@ type ResourceDiff struct {
 
 	name      string
 	evalState EvalState
+	action    Action
 
 	identifier   any
 	provider     state.Provider
@@ -178,6 +179,20 @@ func (r *ResourceDiff) Identifier() any {
 	defer r.Unlock()
 
 	return r.identifier
+}
+
+func (r *ResourceDiff) SetAction(a Action) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.action = a
+}
+
+func (r *ResourceDiff) Action() Action {
+	r.Lock()
+	defer r.Unlock()
+
+	return r.action
 }
 
 type Action string
