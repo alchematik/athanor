@@ -194,12 +194,15 @@ func (e *DiffEvaluator) Eval(ctx context.Context, d *diff.DiffResult, stmt any) 
 				diff.Emptyable[plan.Maybe[bool]]{Value: planExists},
 				diff.Emptyable[bool]{Value: stateExists},
 			)
+
 			if err != nil {
 				return err
 			}
 
-			// TODO: Use these values
-			e.Logger.Info("got build exists diff", "exists", exists, "err", err)
+			// TODO: Use exists value
+			e.Logger.Info("got build exists diff", "exists", exists)
+
+			// TODO: Need to check all resources/sub builds in build to see if there's a diff.
 
 			current.ToDone()
 			return e.Iter.Done(stmt.ID)

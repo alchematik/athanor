@@ -139,7 +139,7 @@ func (e *StateEvaluator) Eval(ctx context.Context, s *state.State, stmt any) err
 			return e.Iter.Done(stmt.ID)
 		}
 
-		// TODO: handle case where doesn't exist.
+		// TODO: handle case where doesn't exist by checking all resources and sub builds in build.
 		current.SetExists(true)
 
 		current.ToEvaluating()
