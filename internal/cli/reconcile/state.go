@@ -1,11 +1,18 @@
 package reconcile
 
 import (
-	// "log/slog"
 	"context"
+	"log/slog"
 
+	external_ast "github.com/alchematik/athanor/ast"
 	"github.com/alchematik/athanor/internal/cli/model"
+	"github.com/alchematik/athanor/internal/diff"
+	"github.com/alchematik/athanor/internal/interpreter"
+	"github.com/alchematik/athanor/internal/plan"
+	"github.com/alchematik/athanor/internal/scope"
+	"github.com/alchematik/athanor/internal/state"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/urfave/cli/v3"
 )
@@ -27,33 +34,80 @@ func NewStateCommand() *cli.Command {
 }
 
 func StateAction(ctx context.Context, cmd *cli.Command) error {
-	// inputPath := cmd.Args().First()
+	inputPath := cmd.Args().First()
 	logFilePath := cmd.String("log-file")
-	// configFilePath := cmd.String("config")
-	//
-	// var logger *slog.Logger
-	// if logFilePath != "" {
-	// 	f, err := tea.LogToFile(logFilePath, "")
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	//
-	// 	logger = slog.New(slog.NewTextHandler(f, nil))
-	// }
+
 	m, err := model.NewBaseModel(logFilePath)
 	if err != nil {
 		return err
 	}
 
+	init := &StateInit{
+		spinner:   m.Spinner,
+		logger:    m.Logger,
+		inputPath: inputPath,
+		diff: &diff.DiffResult{
+			Resources: map[string]*diff.ResourceDiff{},
+			Builds:    map[string]*diff.BuildDiff{},
+			Plan: &plan.Plan{
+				Resources: map[string]*plan.ResourcePlan{},
+				Builds:    map[string]*plan.BuildPlan{},
+			},
+			State: &state.State{
+				Resources: map[string]*state.ResourceState{},
+				Builds:    map[string]*state.BuildState{},
+			},
+		},
+	}
+	m.Current = init
 	_, err = tea.NewProgram(m).Run()
 	return err
 }
 
 type StateInit struct {
+	logger    *slog.Logger
+	spinner   *spinner.Model
+	inputPath string
+	scope     *scope.Scope
+	diff      *diff.DiffResult
+	context   context.Context
 }
 
 func (m *StateInit) Init() tea.Cmd {
-	return nil
+	m.scope = scope.NewScope()
+	in := &interpreter.Interpreter{Logger: m.logger}
+	cmd := func() tea.Msg {
+		c := diff.Converter{
+			BlueprintInterpreter: in,
+			PlanConverter:        &plan.Converter{BlueprintInterpreter: in},
+			StateConverter:       &state.Converter{BlueprintInterpreter: in},
+		}
+		b := external_ast.DeclareBuild{
+			Name: "Build",
+			Exists: external_ast.Expr{
+				Type: "bool",
+				Value: external_ast.BoolLiteral{
+					Value: true,
+				},
+			},
+			Runtimeinput: external_ast.Expr{
+				Value: external_ast.MapCollection{
+					Value: map[string]external_ast.Expr{},
+				},
+			},
+			BlueprintSource: external_ast.BlueprintSource{
+				LocalFile: external_ast.BlueprintSourceLocalFile{
+					Path: m.inputPath,
+				},
+			},
+		}
+		if _, err := c.ConvertBuildStmt(m.diff, m.scope, b); err != nil {
+			return model.ErrorMsg{Error: err}
+		}
+
+		return "done"
+	}
+	return cmd
 }
 
 func (m *StateInit) View() string {
