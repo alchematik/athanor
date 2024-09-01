@@ -19,18 +19,18 @@ type BlueprintInterpreter interface {
 	InterpretBlueprint(source external.BlueprintSource, input map[string]any) (external.Blueprint, error)
 }
 
-func (c *Converter) ConvertStmt(d *DiffResult, sc *scope.Scope, stmt external.Stmt) (any, error) {
+func (c *Converter) ConvertStmt(d *DiffResult, sc *scope.Scope, parentID string, stmt external.Stmt) (any, error) {
 	switch stmt := stmt.Value.(type) {
 	case external.DeclareResource:
-		return c.ConvertResourceStmt(d, sc, stmt)
+		return c.ConvertResourceStmt(d, sc, parentID, stmt)
 	case external.DeclareBuild:
-		return c.ConvertBuildStmt(d, sc, stmt)
+		return c.ConvertBuildStmt(d, sc, parentID, stmt)
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
 }
 
-func (c *Converter) ConvertBuildStmt(d *DiffResult, sc *scope.Scope, stmt external.DeclareBuild) (StmtBuild, error) {
+func (c *Converter) ConvertBuildStmt(d *DiffResult, sc *scope.Scope, parentID string, stmt external.DeclareBuild) (StmtBuild, error) {
 	blueprint, err := c.BlueprintInterpreter.InterpretBlueprint(stmt.BlueprintSource, stmt.Input)
 	if err != nil {
 		return StmtBuild{}, err
@@ -46,15 +46,14 @@ func (c *Converter) ConvertBuildStmt(d *DiffResult, sc *scope.Scope, stmt extern
 		return StmtBuild{}, err
 	}
 
-	buildID := sc.ComponentID(stmt.Name)
-	d.State.Builds[buildID] = state.NewBuildState(stmt.Name)
-	d.Plan.Builds[buildID] = plan.NewBuildPlan(stmt.Name)
-	d.Builds[buildID] = &BuildDiff{name: stmt.Name}
+	id := fmt.Sprintf("%s.%s", parentID, stmt.Name)
+	d.State.Builds[id] = state.NewBuildState(stmt.Name)
+	d.Plan.Builds[id] = plan.NewBuildPlan(stmt.Name)
+	d.Builds[id] = &BuildDiff{name: stmt.Name}
 
 	var stmts []any
-	sub := sc.Sub(stmt.Name)
 	for _, s := range blueprint.Stmts {
-		converted, err := c.ConvertStmt(d, sub, s)
+		converted, err := c.ConvertStmt(d, sc, id, s)
 		if err != nil {
 			return StmtBuild{}, err
 		}
@@ -62,19 +61,19 @@ func (c *Converter) ConvertBuildStmt(d *DiffResult, sc *scope.Scope, stmt extern
 		stmts = append(stmts, converted)
 	}
 	b := StmtBuild{
-		ID:                buildID,
+		ID:                id,
 		Name:              stmt.Name,
-		BuildID:           sc.ID(),
+		BuildID:           parentID,
 		Stmts:             stmts,
 		PlanRuntimeInput:  planRuntimeInput,
 		StateRuntimeInput: stateRuntimeInput,
 	}
-	sc.SetBuild(buildID, b)
+	sc.SetBuild(parentID, id, b)
 	return b, nil
 }
 
-func (c *Converter) ConvertResourceStmt(d *DiffResult, sc *scope.Scope, stmt external.DeclareResource) (StmtResource, error) {
-	resourceID := sc.ComponentID(stmt.Name)
+func (c *Converter) ConvertResourceStmt(d *DiffResult, sc *scope.Scope, parentID string, stmt external.DeclareResource) (StmtResource, error) {
+	resourceID := fmt.Sprintf("%s.%s", parentID, stmt.Name)
 
 	d.Plan.Resources[resourceID] = plan.NewResourcePlan(stmt.Name)
 	d.State.Resources[resourceID] = state.NewResourceState(stmt.Name)
@@ -123,7 +122,7 @@ func (c *Converter) ConvertResourceStmt(d *DiffResult, sc *scope.Scope, stmt ext
 	sr := StmtResource{
 		ID:      resourceID,
 		Name:    stmt.Name,
-		BuildID: sc.ID(),
+		BuildID: parentID,
 
 		Type:       t,
 		Identifier: id,
@@ -135,7 +134,7 @@ func (c *Converter) ConvertResourceStmt(d *DiffResult, sc *scope.Scope, stmt ext
 		PlanIdentifier: planIdentifier,
 		PlanConfig:     planConfig,
 	}
-	sc.SetResource(resourceID, sr)
+	sc.SetResource(parentID, resourceID, sr)
 
 	return sr, nil
 }

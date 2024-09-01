@@ -81,7 +81,7 @@ type DiffInit struct {
 }
 
 func (m *DiffInit) Init() tea.Cmd {
-	m.scope = scope.NewRootScope()
+	m.scope = scope.NewScope()
 	in := &interpreter.Interpreter{Logger: m.logger}
 	cmd := func() tea.Msg {
 		c := diff.Converter{
@@ -108,7 +108,7 @@ func (m *DiffInit) Init() tea.Cmd {
 				},
 			},
 		}
-		if _, err := c.ConvertBuildStmt(m.diff, m.scope, b); err != nil {
+		if _, err := c.ConvertBuildStmt(m.diff, m.scope, "", b); err != nil {
 			return model.ErrorMsg{Error: err}
 		}
 
@@ -200,10 +200,9 @@ func (s *DiffEval) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *DiffEval) View() string {
 	tree := treeprint.New()
-	build := s.scope.Build().Build(".Build")
 	b, _ := s.diff.Build(".Build")
 	tree.SetValue(s.renderEvalState(b.GetEvalState()) + "Build")
-	s.addNodes(tree, s.diff, build)
+	s.addNodes(tree, s.diff, ".Build")
 
 	return tree.String()
 }
@@ -221,8 +220,8 @@ func (s *DiffEval) renderEvalState(es diff.EvalState) string {
 	}
 }
 
-func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.DiffResult, build *scope.Build) {
-	resources := build.Resources()
+func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.DiffResult, id string) {
+	resources := s.scope.Resources(id)
 	sort.Strings(resources)
 	for _, id := range resources {
 		rs, ok := p.Resource(id)
@@ -233,17 +232,17 @@ func (s *DiffEval) addNodes(t treeprint.Tree, p *diff.DiffResult, build *scope.B
 		t.AddNode(s.renderResource(rs))
 	}
 
-	builds := build.Builds()
+	builds := s.scope.Builds(id)
 	sort.Strings(builds)
-	for _, id := range builds {
-		bs, ok := p.Build(id)
+	for _, childID := range builds {
+		bs, ok := p.Build(childID)
 		if !ok {
 			panic("build not in state: " + id)
 		}
 
 		branch := t.AddBranch(s.renderEvalState(bs.GetEvalState()) + bs.GetName())
 
-		s.addNodes(branch, p, build.Build(id))
+		s.addNodes(branch, p, childID)
 	}
 }
 

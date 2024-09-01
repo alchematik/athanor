@@ -18,18 +18,18 @@ type BlueprintInterpreter interface {
 	InterpretBlueprint(source external.BlueprintSource, input map[string]any) (external.Blueprint, error)
 }
 
-func (c *Converter) ConvertStmt(p *Plan, sc *scope.Scope, stmt external.Stmt) (any, error) {
+func (c *Converter) ConvertStmt(p *Plan, sc *scope.Scope, parentID string, stmt external.Stmt) (any, error) {
 	switch stmt := stmt.Value.(type) {
 	case external.DeclareBuild:
-		return c.ConvertBuildStmt(p, sc, stmt)
+		return c.ConvertBuildStmt(p, sc, parentID, stmt)
 	case external.DeclareResource:
-		return c.ConvertResourceStmt(p, sc, stmt)
+		return c.ConvertResourceStmt(p, sc, parentID, stmt)
 	default:
 		return nil, fmt.Errorf("unsupported statement type: %T", stmt)
 	}
 }
 
-func (c *Converter) ConvertBuildStmt(p *Plan, sc *scope.Scope, build external.DeclareBuild) (StmtBuild, error) {
+func (c *Converter) ConvertBuildStmt(p *Plan, sc *scope.Scope, parentID string, build external.DeclareBuild) (StmtBuild, error) {
 	// TODO: better validation function.
 	if build.Exists.IsEmpty() {
 		return StmtBuild{}, errors.New("must provide exists")
@@ -50,12 +50,12 @@ func (c *Converter) ConvertBuildStmt(p *Plan, sc *scope.Scope, build external.De
 		return StmtBuild{}, err
 	}
 
-	buildID := sc.ComponentID(build.Name)
+	// buildID := sc.ComponentID(build.Name)
+	buildID := fmt.Sprintf("%s.%s", parentID, build.Name)
 
 	var stmts []any
-	subG := sc.Sub(build.Name)
 	for _, stmt := range blueprint.Stmts {
-		s, err := c.ConvertStmt(p, subG, stmt)
+		s, err := c.ConvertStmt(p, sc, buildID, stmt)
 		if err != nil {
 			return StmtBuild{}, err
 		}
@@ -67,18 +67,18 @@ func (c *Converter) ConvertBuildStmt(p *Plan, sc *scope.Scope, build external.De
 		ID:           buildID,
 		Name:         build.Name,
 		Exists:       exists,
-		BuildID:      sc.ID(),
+		BuildID:      parentID,
 		RuntimeInput: runtimeInput,
 		Stmts:        stmts,
 	}
 
-	sc.SetBuild(buildID, b)
+	sc.SetBuild(parentID, buildID, b)
 	p.Builds[buildID] = NewBuildPlan(build.Name)
 
 	return b, nil
 }
 
-func (c *Converter) ConvertResourceStmt(p *Plan, sc *scope.Scope, stmt external.DeclareResource) (StmtResource, error) {
+func (c *Converter) ConvertResourceStmt(p *Plan, sc *scope.Scope, parentID string, stmt external.DeclareResource) (StmtResource, error) {
 	// TODO: Validate
 
 	exists, err := c.ConvertBoolExpr(stmt.Name, stmt.Exists)
@@ -106,11 +106,12 @@ func (c *Converter) ConvertResourceStmt(p *Plan, sc *scope.Scope, stmt external.
 		return StmtResource{}, err
 	}
 
-	resourceID := sc.ComponentID(stmt.Name)
+	// resourceID := sc.ComponentID(stmt.Name)
+	resourceID := fmt.Sprintf("%s.%s", parentID, stmt.Name)
 	r := StmtResource{
 		ID:      resourceID,
 		Name:    stmt.Name,
-		BuildID: sc.ID(),
+		BuildID: parentID,
 
 		Exists:     exists,
 		Type:       t,
@@ -119,7 +120,7 @@ func (c *Converter) ConvertResourceStmt(p *Plan, sc *scope.Scope, stmt external.
 		Config:     config,
 	}
 
-	sc.SetResource(resourceID, r)
+	sc.SetResource(parentID, resourceID, r)
 	p.Resources[resourceID] = NewResourcePlan(stmt.Name)
 	return r, nil
 }

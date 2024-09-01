@@ -68,7 +68,7 @@ type PlanInitModel struct {
 }
 
 func (s *PlanInitModel) Init() tea.Cmd {
-	s.scope = scope.NewRootScope()
+	s.scope = scope.NewScope()
 	s.plan = &plan.Plan{
 		Resources: map[string]*plan.ResourcePlan{},
 		Builds:    map[string]*plan.BuildPlan{},
@@ -98,7 +98,7 @@ func (s *PlanInitModel) Init() tea.Cmd {
 				},
 			},
 		}
-		if _, err := c.ConvertBuildStmt(s.plan, s.scope, b); err != nil {
+		if _, err := c.ConvertBuildStmt(s.plan, s.scope, "", b); err != nil {
 			return model.ErrorMsg{Error: err}
 		}
 
@@ -110,8 +110,8 @@ func (s *PlanInitModel) View() string {
 	return s.spinner.View() + " initializing..."
 }
 
-func (m *PlanEvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Build) {
-	resources := build.Resources()
+func (m *PlanEvalModel) addNodes(t treeprint.Tree, p *plan.Plan, id string) {
+	resources := m.scope.Resources(id)
 	sort.Strings(resources)
 	for _, id := range resources {
 		rs, ok := p.Resource(id)
@@ -128,10 +128,10 @@ func (m *PlanEvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Bu
 		t.AddNode(m.renderResource(rs.GetEvalState(), rs.GetName(), rs))
 	}
 
-	builds := build.Builds()
+	builds := m.scope.Builds(id)
 	sort.Strings(builds)
-	for _, id := range builds {
-		bs, ok := p.Build(id)
+	for _, childID := range builds {
+		bs, ok := p.Build(childID)
 		if !ok {
 			panic("build not in state: " + id)
 		}
@@ -143,7 +143,7 @@ func (m *PlanEvalModel) addNodes(t treeprint.Tree, p *plan.Plan, build *scope.Bu
 
 		branch := t.AddBranch(m.renderEvalState(bs.GetEvalState()) + bs.GetName())
 
-		m.addNodes(branch, p, build.Build(id))
+		m.addNodes(branch, p, childID)
 	}
 }
 
@@ -224,10 +224,9 @@ func (m *PlanEvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m *PlanEvalModel) View() string {
 	tree := treeprint.New()
-	build := m.scope.Build().Build(".Build")
 	s, _ := m.plan.Build(".Build")
 	tree.SetValue(m.renderEvalState(s.GetEvalState()) + "Build")
-	m.addNodes(tree, m.plan, build)
+	m.addNodes(tree, m.plan, ".Build")
 
 	return tree.String()
 }

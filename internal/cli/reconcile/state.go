@@ -74,7 +74,7 @@ type StateInit struct {
 }
 
 func (m *StateInit) Init() tea.Cmd {
-	m.scope = scope.NewRootScope()
+	m.scope = scope.NewScope()
 	in := &interpreter.Interpreter{Logger: m.logger}
 	cmd := func() tea.Msg {
 		c := diff.Converter{
@@ -101,7 +101,7 @@ func (m *StateInit) Init() tea.Cmd {
 				},
 			},
 		}
-		if _, err := c.ConvertBuildStmt(m.diff, m.scope, b); err != nil {
+		if _, err := c.ConvertBuildStmt(m.diff, m.scope, "", b); err != nil {
 			return model.ErrorMsg{Error: err}
 		}
 

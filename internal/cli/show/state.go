@@ -51,7 +51,7 @@ func StateAction(ctx context.Context, cmd *cli.Command) error {
 		context:   ctx,
 		spinner:   m.Spinner,
 		logger:    m.Logger,
-		scope:     scope.NewRootScope(),
+		scope:     scope.NewScope(),
 		state: &state.State{
 			Resources: map[string]*state.ResourceState{},
 			Builds:    map[string]*state.BuildState{},
@@ -96,7 +96,7 @@ func (m *StateInit) Init() tea.Cmd {
 				},
 			},
 		}
-		if _, err := c.ConvertBuildStmt(m.state, m.scope, b); err != nil {
+		if _, err := c.ConvertBuildStmt(m.state, m.scope, "", b); err != nil {
 			return model.ErrorMsg{Error: err}
 		}
 
@@ -188,21 +188,20 @@ func (s *StateEvalModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (s *StateEvalModel) View() string {
 	tree := treeprint.New()
-	build := s.scope.Build().Build(".Build")
 	b, _ := s.state.Build(".Build")
 	tree.SetValue(s.renderEvalState(b.GetEvalState()) + "Build")
-	s.addNodes(tree, s.state, build)
+	s.addNodes(tree, s.state, ".Build")
 
 	return tree.String()
 }
 
-func (s *StateEvalModel) addNodes(t treeprint.Tree, p *state.State, build *scope.Build) {
-	resources := build.Resources()
+func (s *StateEvalModel) addNodes(t treeprint.Tree, p *state.State, id string) {
+	resources := s.scope.Resources(id)
 	sort.Strings(resources)
-	for _, id := range resources {
-		rs, ok := p.Resource(id)
+	for _, childID := range resources {
+		rs, ok := p.Resource(childID)
 		if !ok {
-			panic("resource not in state: " + id)
+			panic("resource not in state: " + childID)
 		}
 
 		exists := rs.GetExists()
@@ -214,12 +213,12 @@ func (s *StateEvalModel) addNodes(t treeprint.Tree, p *state.State, build *scope
 		t.AddNode(s.renderResource(rs.GetEvalState(), rs.GetName(), rs))
 	}
 
-	builds := build.Builds()
+	builds := s.scope.Builds(id)
 	sort.Strings(builds)
-	for _, id := range builds {
+	for _, childID := range builds {
 		bs, ok := p.Build(id)
 		if !ok {
-			panic("build not in state: " + id)
+			panic("build not in state: " + childID)
 		}
 
 		exists := bs.GetExists()
@@ -229,7 +228,7 @@ func (s *StateEvalModel) addNodes(t treeprint.Tree, p *state.State, build *scope
 
 		branch := t.AddBranch(s.renderEvalState(bs.GetEvalState()) + bs.GetName())
 
-		s.addNodes(branch, p, build.Build(id))
+		s.addNodes(branch, p, childID)
 	}
 }
 
