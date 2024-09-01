@@ -68,7 +68,7 @@ type PlanInitModel struct {
 }
 
 func (s *PlanInitModel) Init() tea.Cmd {
-	s.scope = scope.NewScope()
+	s.scope = scope.NewRootScope()
 	s.plan = &plan.Plan{
 		Resources: map[string]*plan.ResourcePlan{},
 		Builds:    map[string]*plan.BuildPlan{},

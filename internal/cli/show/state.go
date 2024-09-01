@@ -51,7 +51,7 @@ func StateAction(ctx context.Context, cmd *cli.Command) error {
 		context:   ctx,
 		spinner:   m.Spinner,
 		logger:    m.Logger,
-		scope:     scope.NewScope(),
+		scope:     scope.NewRootScope(),
 		state: &state.State{
 			Resources: map[string]*state.ResourceState{},
 			Builds:    map[string]*state.BuildState{},

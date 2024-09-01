@@ -14,7 +14,7 @@ func NewBuild() *Build {
 	}
 }
 
-func NewScope() *Scope {
+func NewRootScope() *Scope {
 	return &Scope{
 		components: map[string]any{},
 		dag:        dag.NewGraph(),
@@ -25,59 +25,71 @@ func NewScope() *Scope {
 type Scope struct {
 	id         string
 	components map[string]any
-	dag        *dag.Graph
 	build      *Build
+
+	dag *dag.Graph
+
+	// resources is a map of build ID to child resources.
+	resources map[string][]string
+
+	// builds is a map of build ID to child builds.
+	builds map[string][]string
 }
 
-func (g *Scope) ID() string {
-	return g.id
+func (s *Scope) ID() string {
+	return s.id
 }
 
-func (g *Scope) ComponentID(name string) string {
-	return fmt.Sprintf("%s.%s", g.id, name)
+func (s *Scope) ComponentID(name string) string {
+	return fmt.Sprintf("%s.%s", s.id, name)
 }
 
-func (g *Scope) SetBuild(id string, e any) string {
-	g.components[id] = e
-	if g.id == "" {
-		return ""
-	}
-	g.dag.AddEdge(g.id, id)
-	return id
-}
+func (s *Scope) SetBuild(id string, e any) {
+	s.components[id] = e
 
-func (g *Scope) SetResource(id string, e any) {
-	g.components[id] = e
-	if g.id == "" {
+	// Root scope will not have an ID.
+	if s.id == "" {
 		return
 	}
-	g.dag.AddEdge(g.id, id)
-	g.build.resources.Add(id)
+
+	s.dag.AddEdge(s.id, id)
 }
 
-func (g *Scope) Component(id string) (any, bool) {
-	comp, ok := g.components[id]
+func (s *Scope) SetResource(id string, e any) {
+	s.components[id] = e
+
+	// Root scope will not have an ID.
+	if s.id == "" {
+		return
+	}
+
+	s.dag.AddEdge(s.id, id)
+	s.build.resources.Add(id)
+}
+
+func (s *Scope) Component(id string) (any, bool) {
+	comp, ok := s.components[id]
 	return comp, ok
 }
 
-func (g *Scope) Sub(name string) *Scope {
-	subID := fmt.Sprintf("%s.%s", g.id, name)
+func (s *Scope) Sub(name string) *Scope {
+	subID := fmt.Sprintf("%s.%s", s.id, name)
 	subBuild := NewBuild()
-	g.build.builds[subID] = subBuild
+	s.build.builds[subID] = subBuild
 	return &Scope{
 		id:         subID,
-		components: g.components,
-		dag:        g.dag,
+		components: s.components,
+		dag:        s.dag,
 		build:      subBuild,
 	}
 }
 
-func (g *Scope) Build() *Build {
-	return g.build
+func (s *Scope) Build() *Build {
+	return s.build
 }
 
-func (g *Scope) NewIterator() *dag.Iterator {
-	return dag.InitIterator(g.dag)
+func (s *Scope) NewIterator() *dag.Iterator {
+	return dag.InitIterator(s.dag)
 }
 
 type Build struct {
@@ -85,30 +97,19 @@ type Build struct {
 	builds    map[string]*Build
 }
 
-func (c *Build) RegisterResource(id string) {
-	c.resources.Add(id)
+func (b *Build) Resources() []string {
+	return b.resources.Values()
 }
 
-func (c *Build) RegisterBuild(id string) *Build {
-	sub := NewBuild()
-	c.builds[id] = sub
-
-	return sub
-}
-
-func (c *Build) Resources() []string {
-	return c.resources.Values()
-}
-
-func (c *Build) Builds() []string {
-	builds := make([]string, 0, len(c.builds))
-	for k := range c.builds {
+func (b *Build) Builds() []string {
+	builds := make([]string, 0, len(b.builds))
+	for k := range b.builds {
 		builds = append(builds, k)
 	}
 
 	return builds
 }
 
-func (c *Build) Build(id string) *Build {
-	return c.builds[id]
+func (b *Build) Build(id string) *Build {
+	return b.builds[id]
 }

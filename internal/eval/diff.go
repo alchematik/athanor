@@ -9,6 +9,7 @@ import (
 	"github.com/alchematik/athanor/internal/dag"
 	"github.com/alchematik/athanor/internal/diff"
 	"github.com/alchematik/athanor/internal/plan"
+	"github.com/alchematik/athanor/internal/scope"
 	"github.com/alchematik/athanor/provider"
 
 	"github.com/hashicorp/go-hclog"
@@ -18,6 +19,7 @@ import (
 type DiffEvaluator struct {
 	Iter   *dag.Iterator
 	Logger *slog.Logger
+	Scope  *scope.Scope
 }
 
 func (e *DiffEvaluator) Next() []string {
@@ -194,15 +196,16 @@ func (e *DiffEvaluator) Eval(ctx context.Context, d *diff.DiffResult, stmt any) 
 				diff.Emptyable[plan.Maybe[bool]]{Value: planExists},
 				diff.Emptyable[bool]{Value: stateExists},
 			)
-
 			if err != nil {
 				return err
 			}
 
 			// TODO: Use exists value
-			e.Logger.Info("got build exists diff", "exists", exists)
+			current.SetExists(exists)
 
 			// TODO: Need to check all resources/sub builds in build to see if there's a diff.
+			// Check scope?
+			// e.Scope.ComponentIDs()
 
 			current.ToDone()
 			return e.Iter.Done(stmt.ID)

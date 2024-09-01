@@ -44,6 +44,7 @@ type BuildDiff struct {
 	action    Action
 	name      string
 	evalState EvalState
+	exists    Diff[Literal[bool]]
 }
 
 func (b *BuildDiff) ToDone() {
@@ -79,6 +80,13 @@ func (b *BuildDiff) GetName() string {
 	defer b.Unlock()
 
 	return b.name
+}
+
+func (b *BuildDiff) SetExists(exists Diff[Literal[bool]]) {
+	b.Lock()
+	defer b.Unlock()
+
+	b.exists = exists
 }
 
 type ResourceDiff struct {

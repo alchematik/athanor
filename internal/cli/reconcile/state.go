@@ -74,7 +74,7 @@ type StateInit struct {
 }
 
 func (m *StateInit) Init() tea.Cmd {
-	m.scope = scope.NewScope()
+	m.scope = scope.NewRootScope()
 	in := &interpreter.Interpreter{Logger: m.logger}
 	cmd := func() tea.Msg {
 		c := diff.Converter{
